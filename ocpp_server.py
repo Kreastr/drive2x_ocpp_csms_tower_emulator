@@ -9,9 +9,7 @@ from ocpp.v201 import ChargePoint
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType
-from ocpp.v201.enums import Action
-from ocpp.v21.enums import RegistrationStatusEnumType
-from websockets.asyncio.server import serve
+from ocpp.v201.enums import Action, RegistrationStatusEnumType
 from logging import getLogger
 
 logger = getLogger(__name__)
