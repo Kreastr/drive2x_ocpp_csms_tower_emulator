@@ -1,0 +1,13 @@
+FROM py312d2x:latest
+
+RUN  mkdir /app
+COPY requirements.txt /app
+
+RUN pip install -r /app/requirements.txt
+
+COPY . /app
+
+WORKDIR /app
+
+CMD python test_client.py --uri ws://ocpp:9000/ocpp --redis_host redis --redis_port 6379 --redis_db 5
+
