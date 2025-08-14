@@ -23,8 +23,8 @@ def get_time_str():
 class OCPPServerHandler(ChargePoint):
 
     @on(Action.boot_notification)
-    async def on_boot_notification(self,  charging_station, reason):
-        logger.warning(f"id={self.id} boot_notification {charging_station=} {reason=}")
+    async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
+        logger.warning(f"id={self.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
         #asyncio.create_task(self.call(GetVariables([GetVariableDataType(ComponentType.)])))
         return call_result.BootNotification(
             current_time=get_time_str(),
