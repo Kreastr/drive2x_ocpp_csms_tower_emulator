@@ -52,7 +52,7 @@ async def on_connect(websocket):
 
 async def main():
     logging.warning("main start")
-    server = await websockets.serve(on_connect, '0.0.0.0', 9000)
+    server = await websockets.serve(on_connect, '0.0.0.0', 9000, subprotocols=['ocpp2.0.1'])
     logging.warning("main server ready")
     await server.serve_forever()
     logging.warning("main exit")
