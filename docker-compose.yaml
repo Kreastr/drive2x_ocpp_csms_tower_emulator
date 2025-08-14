@@ -1,0 +1,6 @@
+services:
+   ocpp:
+      image: ocpp:latest
+      ports: 
+        - 9000:9000
+      restart: unless-stopped
