@@ -64,11 +64,16 @@ class OCPPServerHandler(ChargePoint):
             response.update(dict(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted)))
         return call_result.TransactionEvent(**response)
 
+    @on(Action.notify_report)
+    async def on_notify_report(self, **data):
+        logger.warning(f"id={self.id} on_notify_report {data=}")
+        return call_result.NotifyReport()
+
 
 async def on_connect(websocket):
     logger.warning(f"on client connect {websocket=}")
     cp = OCPPServerHandler("same_id", websocket)
-    await cp.start()
+    asyncio.create_task(cp.start())
     await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
                                      report_base=ReportBaseEnumType.configuration_inventory))
 
