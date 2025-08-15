@@ -79,7 +79,9 @@ async def on_connect(websocket):
     await asyncio.sleep(30)
     await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
                                      report_base=ReportBaseEnumType.summary_inventory))
-    start_task.result()
+    while not start_task.done():
+        await asyncio.sleep(1)
+    print("start_task.result",start_task.result())
 
 async def main():
     logging.warning("main start")
