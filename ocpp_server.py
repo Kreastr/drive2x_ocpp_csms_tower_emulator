@@ -45,6 +45,12 @@ class OCPPServerHandler(ChargePoint):
             current_time=get_time_str()
         )
 
+    @on(Action.meter_values)
+    async def on_meter_values(self, **data):
+        logger.warning(f"id={self.id} on_meter_values {data=}")
+        return call_result.MeterValues(
+        )
+
 async def on_connect(websocket):
     logger.warning(f"on client connect {websocket=}")
     cp = OCPPServerHandler("same_id", websocket)
