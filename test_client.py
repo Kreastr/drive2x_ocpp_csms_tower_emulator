@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import ssl
 from datetime import datetime
 from time import sleep
 
+import certifi
 import websockets
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result
@@ -24,8 +26,12 @@ class OCPPClient(ChargePoint):
 
 
 async def main():
-    uri = "ws://localhost:9000/CP_ESS_01"
-    async with websockets.connect(uri) as ws:
+    uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+
+    ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
+    async with websockets.connect(uri, ssl=ctx,
+            subprotocols=["ocpp2.0.1"],    # <-- or "ocpp2.0.1"
+            open_timeout=20) as ws:              # optional: make errors clearer)
         cp = OCPPClient("CP_ESS_01", ws)
         asyncio.create_task(cp.start())
 
@@ -34,8 +40,10 @@ async def main():
                                                  model="ACME Battery 1",
                                                  serial_number="00001",
                                                  firmware_version="0.0.1"),
-            reason=BootReasonEnumType.power_up
+            reason=BootReasonEnumType.power_up,
+            custom_data={"vendorId": "ACME labs", "sn": 234}
         )
+        boot_notification.extra_field = 5
         await cp.call(boot_notification)
 
         while True:
