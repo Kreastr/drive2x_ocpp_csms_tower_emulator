@@ -84,11 +84,14 @@ async def on_connect(websocket):
     start_task = asyncio.create_task(start)
     await asyncio.sleep(15)
     if not cp.booted_ok:
-        await cp.call(call.Reset(type=ResetEnumType.immediate))
+        logger.warning("no boot notification within timeout period. Requesting CP self-reset")
+        result = await cp.call(call.Reset(type=ResetEnumType.immediate))
+        logger.warning(f"{result=}")
     else:
         await asyncio.sleep(30)
-        await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
+        result = await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
                                          report_base=ReportBaseEnumType.summary_inventory))
+        logger.warning(f"Base report {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
     print("start_task.result",start_task.result())
