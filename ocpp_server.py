@@ -9,7 +9,8 @@ from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType
-from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType
+from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
+    ResetEnumType
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -76,6 +77,8 @@ async def on_connect(websocket):
     #await cp.start()
     start = cp.start()
     start_task = asyncio.create_task(start)
+    await asyncio.sleep(5)
+    await cp.call(call.Reset(type=ResetEnumType.immediate))
     await asyncio.sleep(30)
     await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
                                      report_base=ReportBaseEnumType.summary_inventory))
