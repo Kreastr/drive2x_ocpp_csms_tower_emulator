@@ -5,11 +5,11 @@ from datetime import datetime
 import websockets
 from ocpp.routing import on
 from ocpp.v16.enums import RegistrationStatus
-from ocpp.v201 import ChargePoint
+from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType
-from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType
+from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -69,6 +69,8 @@ async def on_connect(websocket):
     logger.warning(f"on client connect {websocket=}")
     cp = OCPPServerHandler("same_id", websocket)
     await cp.start()
+    await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
+                                     report_base=ReportBaseEnumType.configuration_inventory))
 
 async def main():
     logging.warning("main start")
