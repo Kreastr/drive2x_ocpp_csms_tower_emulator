@@ -8,8 +8,8 @@ from ocpp.v16.enums import RegistrationStatus
 from ocpp.v201 import ChargePoint
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType
-from ocpp.v201.enums import Action, RegistrationStatusEnumType
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType
+from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -50,6 +50,20 @@ class OCPPServerHandler(ChargePoint):
         logger.warning(f"id={self.id} on_meter_values {data=}")
         return call_result.MeterValues(
         )
+
+    @on(Action.authorize)
+    async def on_authorize(self, **data):
+        logger.warning(f"id={self.id} on_authorize {data=}")
+        return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted))
+
+    @on(Action.transaction_event)
+    async def on_transaction_event(self, **data):
+        logger.warning(f"id={self.id} on_transaction_event {data=}")
+        response = dict()
+        if "id_token_info" in data:
+            response.update(dict(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted)))
+        return call_result.TransactionEvent(**response)
+
 
 async def on_connect(websocket):
     logger.warning(f"on client connect {websocket=}")
