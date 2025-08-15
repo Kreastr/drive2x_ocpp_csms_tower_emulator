@@ -74,6 +74,7 @@ async def on_connect(websocket):
     logger.warning(f"on client connect {websocket=}")
     cp = OCPPServerHandler("same_id", websocket)
     asyncio.create_task(cp.start())
+    await asyncio.sleep(30)
     await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
                                      report_base=ReportBaseEnumType.configuration_inventory))
 
