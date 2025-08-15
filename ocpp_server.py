@@ -73,11 +73,13 @@ class OCPPServerHandler(ChargePoint):
 async def on_connect(websocket):
     logger.warning(f"on client connect {websocket=}")
     cp = OCPPServerHandler("same_id", websocket)
-    await cp.start()
-    #asyncio.create_task(cp.start())
-    #await asyncio.sleep(30)
-    #await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
-    #                                 report_base=ReportBaseEnumType.configuration_inventory))
+    #await cp.start()
+    start = cp.start()
+    asyncio.create_task(start)
+    await asyncio.sleep(30)
+    await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
+                                     report_base=ReportBaseEnumType.summary_inventory))
+    start.result()
 
 async def main():
     logging.warning("main start")
