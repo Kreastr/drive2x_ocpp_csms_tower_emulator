@@ -23,8 +23,13 @@ def get_time_str():
 
 class OCPPServerHandler(ChargePoint):
 
+    def __init__(self, *vargs, **kwargs):
+        super().__init__(*vargs, **kwargs)
+        self.booted_ok = False
+
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
+        self.booted_ok = True
         logger.warning(f"id={self.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
         #asyncio.create_task(self.call(GetVariables([GetVariableDataType(ComponentType.)])))
         return call_result.BootNotification(
@@ -77,11 +82,13 @@ async def on_connect(websocket):
     #await cp.start()
     start = cp.start()
     start_task = asyncio.create_task(start)
-    #await asyncio.sleep(5)
-    #await cp.call(call.Reset(type=ResetEnumType.immediate))
-    await asyncio.sleep(30)
-    await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
-                                     report_base=ReportBaseEnumType.summary_inventory))
+    await asyncio.sleep(15)
+    if not cp.booted_ok:
+        await cp.call(call.Reset(type=ResetEnumType.immediate))
+    else:
+        await asyncio.sleep(30)
+        await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
+                                         report_base=ReportBaseEnumType.summary_inventory))
     while not start_task.done():
         await asyncio.sleep(1)
     print("start_task.result",start_task.result())
