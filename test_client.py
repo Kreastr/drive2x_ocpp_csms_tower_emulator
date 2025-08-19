@@ -6,22 +6,26 @@ from copy import deepcopy
 from datetime import datetime
 from email.policy import default
 from time import sleep
+from uuid import uuid4
 
 import certifi
 import websockets
 from ocpp.routing import on
-from ocpp.v201 import ChargePoint, call_result
+from ocpp.v201 import ChargePoint, call_result, call
 from logging import getLogger
 
 from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification, SetVariables
 from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType, GetVariableDataType, \
-    GetVariableResultType, VariableType
-from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType
+    GetVariableResultType, VariableType, SetVariableResultType, TransactionType
+from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
+    RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def get_time_str():
+    return datetime.now().isoformat()
 
 class OCPPClient(ChargePoint):
 
@@ -30,10 +34,94 @@ class OCPPClient(ChargePoint):
         self.settings: dict[str, dict[str, str]] = deepcopy({"ChargingStation": {}})
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
+        self.tid = None
+        self.auth_status = None
+        self.cable_connected = False
+        self.tx_task = None
+        self.soc_kwh = 50.0
+        self.total_capacity_kwh = 70.0
+        self._tx_seq_no = 0
+
+    @property
+    def seq_no(self):
+        self._tx_seq_no += 1
+        return self._tx_seq_no - 1
+
+    async def transaction_task(self, remote_start_id):
+        self._tx_seq_no = 0
+        tx_id = str(uuid4())
+        await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                        timestamp=get_time_str(),
+                                        trigger_reason=TriggerReasonEnumType.authorized,
+                                        seq_no=self.seq_no,
+                                        transaction_info=TransactionType(transaction_id=tx_id,
+                                                                         remote_start_id=remote_start_id,
+                                                                         ),
+                                        id_token=self.auth_status
+                                        ))
+
+        while not self.cable_connected:
+            if self.auth_status is None:
+                break
+            await asyncio.sleep(1)
+
+        if self.auth_status is not None:
+            await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
+                                                  timestamp=get_time_str(),
+                                                  trigger_reason=TriggerReasonEnumType.cable_plugged_in,
+                                                  seq_no=self.seq_no,
+                                                  transaction_info=TransactionType(transaction_id=tx_id
+                                                                                     )
+                                                    ))
+
+            while True:
+                if self.auth_status is None:
+                    await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
+                                                          timestamp=get_time_str(),
+                                                          trigger_reason=TriggerReasonEnumType.cable_plugged_in,
+                                                          seq_no=self.seq_no,
+                                                          transaction_info=TransactionType(transaction_id=tx_id
+                                                                                         )
+                                                          ))
+                    break
+                if not self.cable_connected:
+                    await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
+                                                          timestamp=get_time_str(),
+                                                          trigger_reason=TriggerReasonEnumType.cable_plugged_in,
+                                                          seq_no=self.seq_no,
+                                                          transaction_info=TransactionType(transaction_id=tx_id
+                                                                                         )
+                                                          ))
+                    break
+
+                await asyncio.sleep(1)
+        await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
+                                        timestamp=get_time_str(),
+                                        trigger_reason=TriggerReasonEnumType.authorized,
+                                        seq_no=self.seq_no,
+                                        transaction_info=TransactionType(transaction_id=tx_id
+                                                                         )
+                                        ))
+
+    @on(Action.request_stop_transaction)
+    async def request_stop_transaction(self, **data):
+        logger.warning(f"on request_stop_transaction {data}")
+        self.auth_status = None
+        await self.tx_task
+        return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
+
+    @on(Action.request_start_transaction)
+    async def request_start_transaction(self, remote_start_id, id_token, **data):
+        logger.warning(f"on request_start_transaction {(remote_start_id, id_token, data)}")
+        self.auth_status = id_token
+        self.tx_task = asyncio.create_task(self.transaction_task(remote_start_id))
+        return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.accepted,
+                                                   transaction_id=None
+                                                   )
 
     @on(Action.get_variables)
     async def get_variables(self, get_variable_data):
-        logger.warning("on get_variables")
+        logger.warning(f"on get_variables {get_variable_data}")
         results = list()
         for dv in map(lambda x: GetVariableDataType(**x), get_variable_data):
             v : GetVariableDataType = GetVariableDataType(
@@ -44,9 +132,11 @@ class OCPPClient(ChargePoint):
                                                      component=v.component,
                                                      attribute_status=GetVariableStatusEnumType.unknown_component))
             elif v.variable.name in self.settings[v.component.name]:
+                value = self.settings[v.component.name][v.variable.name]
+
                 results.append(GetVariableResultType(variable=v.variable,
                                                      component=v.component,
-                                                     attribute_value=self.settings[v.component.name][v.variable.name],
+                                                     attribute_value=value,
                                                      attribute_type=AttributeEnumType.actual,
                                                      attribute_status=GetVariableStatusEnumType.accepted))
             else:
@@ -54,6 +144,32 @@ class OCPPClient(ChargePoint):
                                                      component=v.component,
                                                      attribute_status=GetVariableStatusEnumType.unknown_variable))
         return call_result.GetVariables(results)
+
+    @on(Action.set_variables)
+    async def set_variables(self, set_variable_data):
+        logger.warning(f"on set_variables {set_variable_data}")
+        results = list()
+        for dv in map(lambda x: SetVariableDataType(**x), set_variable_data):
+            v: SetVariableDataType = SetVariableDataType(
+                variable=VariableType(**dv.variable),
+                component=ComponentType(**dv.component),
+                attribute_value=dv.attribute_value)
+            if v.component.name not in self.settings:
+                results.append(SetVariableResultType(variable=v.variable,
+                                                     component=v.component,
+                                                     attribute_status=SetVariableStatusEnumType.unknown_component))
+            elif v.variable.name not in self.settings[v.component.name]:
+                results.append(SetVariableResultType(variable=v.variable,
+                                                     component=v.component,
+                                                     attribute_status=SetVariableStatusEnumType.unknown_variable))
+            else:
+                self.settings[v.component.name][v.variable.name] = v.attribute_value
+
+                results.append(SetVariableResultType(variable=v.variable,
+                                                     component=v.component,
+                                                     attribute_type=AttributeEnumType.actual,
+                                                     attribute_status=SetVariableStatusEnumType.accepted))
+        return call_result.SetVariables(results)
 
 
 async def main():
@@ -79,7 +195,7 @@ async def main():
         await cp.call(boot_notification)
 
         while True:
-            await asyncio.sleep(3)
+            await asyncio.sleep(30)
             heartbeat = Heartbeat()
             await cp.call(heartbeat)
             status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
