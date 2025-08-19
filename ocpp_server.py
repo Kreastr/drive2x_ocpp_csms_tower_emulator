@@ -108,9 +108,27 @@ async def on_connect(websocket):
                                                                   variable=VariableType(name="SerialNumber"))]))
     logger.warning(f"Charger S/N variable {result=}")
     result = await latest_cp.call(
-        call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                                 component=ComponentType(name="AlignedDataCtrlr"),
-                                                                 variable=VariableType(name="Measurands"))]))
+        call.SetVariables(set_variable_data=[SetVariableDataType(
+                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                 component=ComponentType(name="AlignedDataCtrlr"),
+                                                 variable=VariableType(name="Measurands")),
+                                             SetVariableDataType(
+                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                 component=ComponentType(name="AlignedDataCtrlr"),
+                                                 variable=VariableType(name="TxEndedMeasurands")),
+                                             SetVariableDataType(
+                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                 component=ComponentType(name="SampledDataCtrlr"),
+                                                 variable=VariableType(name="TxStartedMeasurands")),
+                                             SetVariableDataType(
+                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                 component=ComponentType(name="SampledDataCtrlr"),
+                                                 variable=VariableType(name="TxUpdatedMeasurands")),
+                                             SetVariableDataType(
+                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                 component=ComponentType(name="SampledDataCtrlr"),
+                                                 variable=VariableType(name="TxEndedMeasurands"))
+                                             ]))
     logger.warning(f"Charger measurands set {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
