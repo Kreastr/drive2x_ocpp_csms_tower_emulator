@@ -108,7 +108,7 @@ async def on_connect(websocket):
     result : call_result.GetVariables = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                                   variable=VariableType(name="SerialNumber"))]))
     logger.warning(f"Charger S/N variable {result=}")
-    if result.get_variable_result[0].attribute_status != GetVariableStatusEnumType.accepted:
+    if result.get_variable_result[0]["attribute_status"] != GetVariableStatusEnumType.accepted:
         cp.log_event("Failed to read CP serial number. Refusing to operate.")
         cp.close_connection()
 

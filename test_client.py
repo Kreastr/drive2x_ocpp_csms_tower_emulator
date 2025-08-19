@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import ssl
+from collections import defaultdict
 from datetime import datetime
+from email.policy import default
 from time import sleep
 
 import certifi
@@ -11,18 +13,40 @@ from ocpp.v201 import ChargePoint, call_result
 from logging import getLogger
 
 from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification, SetVariables
-from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType
-from ocpp.v201.enums import ConnectorStatusEnumType
-from ocpp.v21.enums import BootReasonEnumType, Action
+from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType, GetVariableDataType, \
+    GetVariableResultType, VariableType
+from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType
+from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+settings : dict[str, dict[str, str]] = defaultdict(default_factory=dict)
+
 class OCPPClient(ChargePoint):
     @on(Action.get_variables)
-    async def get_variables(self):
+    async def get_variables(self, get_variable_data):
         logger.warning("on get_variables")
-        return call_result.GetVariables([])
+        results = list()
+        for dv in map(lambda x: GetVariableDataType(**x), get_variable_data):
+            v : GetVariableDataType = GetVariableDataType(
+                                variable = VariableType(**dv.variable),
+                                component = ComponentType(**dv.component))
+            if v.component.name not in settings:
+                results.append(GetVariableResultType(variable=v.variable,
+                                                     component=v.component,
+                                                     attribute_status=GetVariableStatusEnumType.unknown_component))
+            elif v.variable.name in settings[v.component.name]:
+                results.append(GetVariableResultType(variable=v.variable,
+                                                     component=v.component,
+                                                     attribute_value=settings[v.component.name][v.variable.name],
+                                                     attribute_type=AttributeEnumType.actual,
+                                                     attribute_status=GetVariableStatusEnumType.accepted))
+            else:
+                results.append(GetVariableResultType(variable=v.variable,
+                                                     component=v.component,
+                                                     attribute_status=GetVariableStatusEnumType.unknown_variable))
+        return call_result.GetVariables(results)
 
 
 async def main():
