@@ -190,7 +190,7 @@ async def setpoint(value : int):
         if value < -2000:
             value = -2000
         return {"result": await latest_cp.call(
-            call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=value,
+            call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
                                                                      component=ComponentType(name="V2XChargingCtrlr", evse=1),
                                                                      variable=VariableType(name="Setpoint"))]))}
 
