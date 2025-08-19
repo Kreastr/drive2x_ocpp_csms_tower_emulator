@@ -108,12 +108,17 @@ async def on_connect(websocket):
         result = await cp.call(call.Reset(type=ResetEnumType.immediate))
         logger.warning(f"{result=}")
     else:
-        result = await cp.call(call.GetBaseReport(request_id=int((datetime.now()-datetime(2025,1,1)).total_seconds()*10),
-                                         report_base=ReportBaseEnumType.configuration_inventory))
+        result = await cp.call(call.GetBaseReport(request_id=time_based_id(),
+                                                  report_base=ReportBaseEnumType.configuration_inventory))
         logger.warning(f"Base report {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
     print("start_task.result",start_task.result())
+
+
+def time_based_id():
+    return int((datetime.now() - datetime(2025, 1, 1)).total_seconds() * 10)
+
 
 async def main():
     logging.warning("main start")
@@ -151,7 +156,7 @@ async def remote_start():
         return {"status": "error"}
     else:
         return {"result": await latest_cp.call(
-            call.RequestStartTransaction(remote_start_id=int(uuid4()),
+            call.RequestStartTransaction(remote_start_id=time_based_id(),
                                          id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))}
 
 
