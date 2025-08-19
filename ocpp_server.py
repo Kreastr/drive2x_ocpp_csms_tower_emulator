@@ -17,7 +17,6 @@ from fastapi import FastAPI
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-
 def get_time_str():
     return datetime.now().isoformat()
 
@@ -27,10 +26,12 @@ class OCPPServerHandler(ChargePoint):
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
         self.booted_ok = False
+        self.events = []
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
         self.booted_ok = True
+        self.events.append(("boot_notification", (charging_station, reason, vargs, kwargs)))
         logger.warning(f"id={self.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
         #asyncio.create_task(self.call(GetVariables([GetVariableDataType(ComponentType.)])))
         return call_result.BootNotification(
@@ -41,12 +42,14 @@ class OCPPServerHandler(ChargePoint):
 
     @on(Action.status_notification)
     async def on_status_notification(self, **data):
+        self.events.append(("status_notification", (data)))
         logger.warning(f"id={self.id} on_status_notification {data=}")
         return call_result.StatusNotification(
         )
 
     @on(Action.heartbeat)
     async def on_heartbeat(self, **data):
+        self.events.append(("heartbeat", (data)))
         logger.warning(f"id={self.id} on_heartbeat {data=}")
         return call_result.Heartbeat(
             current_time=get_time_str()
@@ -54,17 +57,20 @@ class OCPPServerHandler(ChargePoint):
 
     @on(Action.meter_values)
     async def on_meter_values(self, **data):
+        self.events.append(("meter_values", (data)))
         logger.warning(f"id={self.id} on_meter_values {data=}")
         return call_result.MeterValues(
         )
 
     @on(Action.authorize)
     async def on_authorize(self, **data):
+        self.events.append(("authorize", (data)))
         logger.warning(f"id={self.id} on_authorize {data=}")
         return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted))
 
     @on(Action.transaction_event)
     async def on_transaction_event(self, **data):
+        self.events.append(("transaction_event", (data)))
         logger.warning(f"id={self.id} on_transaction_event {data=}")
         response = dict()
         if "id_token_info" in data:
@@ -73,13 +79,18 @@ class OCPPServerHandler(ChargePoint):
 
     @on(Action.notify_report)
     async def on_notify_report(self, **data):
+        self.events.append(("notify_report", (data)))
         logger.warning(f"id={self.id} on_notify_report {data=}")
         return call_result.NotifyReport()
 
+latest_cp : OCPPServerHandler | None = None
+
 
 async def on_connect(websocket):
+    global latest_cp
     logger.warning(f"on client connect {websocket=}")
     cp = OCPPServerHandler("same_id", websocket)
+    latest_cp = cp
     #await cp.start()
     start = cp.start()
     start_task = asyncio.create_task(start)
@@ -107,7 +118,17 @@ app = FastAPI()
 
 @app.get("/")
 async def index():
-    return {"index": "empty"}
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        return {"status": "ready"}
+
+@app.get("/events")
+async def index():
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        return {"events": latest_cp.events}
 
 asyncio.create_task(main())
 
