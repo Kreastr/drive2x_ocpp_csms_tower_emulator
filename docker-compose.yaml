@@ -3,4 +3,5 @@ services:
       image: ocpp:latest
       ports: 
         - 9000:9000
+        - 8000:8000
       restart: unless-stopped
