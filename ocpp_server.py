@@ -107,7 +107,11 @@ async def on_connect(websocket):
     result = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                                   variable=VariableType(name="SerialNumber"))]))
     logger.warning(f"Charger S/N variable {result=}")
-
+    result = await latest_cp.call(
+        call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                                 component=ComponentType(name="AlignedDataCtrlr"),
+                                                                 variable=VariableType(name="Measurands"))]))
+    logger.warning(f"Charger measurands set {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
     print("start_task.result",start_task.result())
@@ -194,7 +198,7 @@ async def setpoint(value : int):
             value = -2000
         return {"result": await latest_cp.call(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
-                                                                     component=ComponentType(name="V2XChargingCtrlr", evse=EVSEType(id=1)),
+                                                                     component=ComponentType(name="V2XChargingCtrlr", instance="1" , evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}
 
 asyncio.create_task(main())
