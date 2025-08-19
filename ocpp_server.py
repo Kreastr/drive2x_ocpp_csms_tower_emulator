@@ -151,8 +151,8 @@ async def remote_start():
         return {"status": "error"}
     else:
         return {"result": await latest_cp.call(
-            call.RequestStartTransaction(remote_start_id=uuid4(),
-                                         id_token=IdTokenType(id_token=uuid4(), type=IdTokenEnumType.central)))}
+            call.RequestStartTransaction(remote_start_id=int(uuid4()),
+                                         id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))}
 
 
 @app.get("/remote_stop/{transaction_id}")
