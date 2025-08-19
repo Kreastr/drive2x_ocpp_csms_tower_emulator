@@ -9,7 +9,7 @@ from ocpp.v16.enums import RegistrationStatus
 from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType, VariableType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
     ResetEnumType, IdTokenEnumType
 from logging import getLogger
@@ -108,9 +108,12 @@ async def on_connect(websocket):
         result = await cp.call(call.Reset(type=ResetEnumType.immediate))
         logger.warning(f"{result=}")
     else:
-        result = await cp.call(call.GetBaseReport(request_id=time_based_id(),
-                                                  report_base=ReportBaseEnumType.configuration_inventory))
-        logger.warning(f"Base report {result=}")
+        #result = await cp.call(call.GetBaseReport(request_id=time_based_id(),
+        #                                          report_base=ReportBaseEnumType.configuration_inventory))
+        #logger.warning(f"Base report {result=}")
+        result = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
+                                                                      variable=VariableType(name="SerialNumber"))]))
+        logger.warning(f"Charger S/N variable {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
     print("start_task.result",start_task.result())
