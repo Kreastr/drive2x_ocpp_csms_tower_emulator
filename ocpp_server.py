@@ -78,7 +78,7 @@ class OCPPServerHandler(ChargePoint):
         response = dict()
         if "id_token_info" in data:
             response.update(dict(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted)))
-        if "transactionId" in data:
+        if "transaction_id" in data:
             self.transactions |= {data["transactionId"]}
         return call_result.TransactionEvent(**response)
 
