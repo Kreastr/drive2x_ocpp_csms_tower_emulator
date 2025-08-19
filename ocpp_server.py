@@ -30,11 +30,13 @@ class OCPPServerHandler(ChargePoint):
         self.booted_ok = False
         self.events = []
         self.transactions = set()
+        self.boot_notifications = []
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
         self.booted_ok = True
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
+        self.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
         logger.warning(f"id={self.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
         #asyncio.create_task(self.call(GetVariables([GetVariableDataType(ComponentType.)])))
         return call_result.BootNotification(
@@ -95,7 +97,7 @@ class OCPPServerHandler(ChargePoint):
         await self._connection.close()
 
 
-charge_points : list[OCPPServerHandler] = list()
+charge_points : dict[str, OCPPServerHandler] = dict()
 
 
 async def on_connect(websocket):
@@ -160,7 +162,7 @@ app = FastAPI()
 
 @app.get("/")
 async def index():
-    return {"charge_points": list(map(lambda x: x.id, charge_points))}
+    return {"charge_points": list(charge_points)}
 
 @app.get("/cp/{cp_id}/events/")
 async def events(cp_id : str):
