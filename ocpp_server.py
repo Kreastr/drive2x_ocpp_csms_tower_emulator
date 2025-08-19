@@ -113,7 +113,7 @@ async def on_connect(websocket):
         cp.close_connection()
 
 
-    cp.id = result.get_variable_result[0].attribute_value
+    cp.id = result.get_variable_result[0]["attribute_value"]
     charge_points[cp.id] = cp
     result : call_result.SetVariables = await cp.call(
         call.SetVariables(set_variable_data=[SetVariableDataType(
