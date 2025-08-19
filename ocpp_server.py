@@ -91,8 +91,8 @@ class OCPPServerHandler(ChargePoint):
     def log_event(self, event_data):
         self.events.append(event_data)
 
-    def close_connection(self):
-        self._connection.close()
+    async def close_connection(self):
+        await self._connection.close()
 
 
 charge_points : list[OCPPServerHandler] = list()
@@ -110,7 +110,7 @@ async def on_connect(websocket):
     logger.warning(f"Charger S/N variable {result=}")
     if result.get_variable_result[0]["attribute_status"] != GetVariableStatusEnumType.accepted:
         cp.log_event("Failed to read CP serial number. Refusing to operate.")
-        cp.close_connection()
+        await cp.close_connection()
         return
 
 
