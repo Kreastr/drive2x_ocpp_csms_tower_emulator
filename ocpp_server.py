@@ -92,14 +92,12 @@ class OCPPServerHandler(ChargePoint):
         self.events.append(event_data)
 
 
-latest_cp : OCPPServerHandler | None = None
+charge_points : list[OCPPServerHandler] = list()
 
 
 async def on_connect(websocket):
-    global latest_cp
     logger.warning(f"on client connect {websocket=}")
-    cp = OCPPServerHandler("same_id", websocket)
-    latest_cp = cp
+    cp = OCPPServerHandler("provisional", websocket)
     #await cp.start()
     start = cp.start()
     start_task = asyncio.create_task(start)
@@ -107,7 +105,9 @@ async def on_connect(websocket):
     result = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                                   variable=VariableType(name="SerialNumber"))]))
     logger.warning(f"Charger S/N variable {result=}")
-    result = await latest_cp.call(
+    cp.id = result.get_variable_result[0].attribute_value
+    charge_points[cp.id] = cp
+    result = await cp.call(
         call.SetVariables(set_variable_data=[SetVariableDataType(
                                                  attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
                                                  component=ComponentType(name="AlignedDataCtrlr"),
@@ -150,71 +150,68 @@ app = FastAPI()
 
 @app.get("/")
 async def index():
-    if latest_cp is None:
+    return {"charge_points": list(map(lambda x: x.id, charge_points))}
+
+@app.get("/cp/{cp_id}/events/")
+async def events(cp_id : str):
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"status": "ready"}
+        return {"events": charge_points[cp_id].events}
 
-@app.get("/events")
-async def index():
-    if latest_cp is None:
-        return {"status": "error"}
-    else:
-        return {"events": latest_cp.events}
-
-@app.get("/reboot/{cp_id}")
+@app.get("/cp/{cp_id}/reboot")
 async def reboot(cp_id : str):
-    if latest_cp is None:
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await latest_cp.call(call.Reset(type=ResetEnumType.immediate))}
+        return {"result": await charge_points[cp_id].call(call.Reset(type=ResetEnumType.immediate))}
 
-@app.get("/transactions")
-async def transactions():
-    if latest_cp is None:
+@app.get("/cp/{cp_id}/transactions")
+async def transactions(cp_id : str):
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"events": latest_cp.transactions}
+        return {"events": charge_points[cp_id].transactions}
 
-@app.get("/remote_start")
-async def remote_start():
-    if latest_cp is None:
+@app.get("/cp/{cp_id}/remote_start")
+async def remote_start(cp_id : str):
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await latest_cp.call(
+        return {"result": await charge_points[cp_id].call(
             call.RequestStartTransaction(evse_id=1,
                                          remote_start_id=time_based_id(),
                                          id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))}
 
 
-@app.get("/remote_stop/{transaction_id}")
-async def remote_stop(transaction_id : str):
-    if latest_cp is None:
+@app.get("/cp/{cp_id}/remote_stop/{transaction_id}")
+async def remote_stop(cp_id : str, transaction_id : str):
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await latest_cp.call(
+        return {"result": await charge_points[cp_id].call(
             call.RequestStopTransaction(transaction_id=transaction_id))}
 
-@app.get("/report_full")
-async def report_full():
-    if latest_cp is None:
+@app.get("/cp/{cp_id}/report_full")
+async def report_full(cp_id : str):
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await latest_cp.call(
+        return {"result": await charge_points[cp_id].call(
             call.GetBaseReport(request_id=time_based_id(),
                                report_base=ReportBaseEnumType.full_inventory))}
 
 
-@app.get("/setpoint/{value}")
-async def setpoint(value : int):
-    if latest_cp is None:
+@app.get("/cp/{cp_id}/setpoint/{value}")
+async def setpoint(cp_id : str, value : int):
+    if cp_id not in charge_points:
         return {"status": "error"}
     else:
         if value > 4000:
             value = 4000
         if value < -2000:
             value = -2000
-        return {"result": await latest_cp.call(
+        return {"result": await charge_points[cp_id].call(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
                                                                      component=ComponentType(name="V2XChargingCtrlr", instance="1" , evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}
