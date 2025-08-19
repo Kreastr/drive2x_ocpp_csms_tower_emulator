@@ -169,5 +169,13 @@ async def remote_stop(transaction_id : str):
         return {"result": await latest_cp.call(
             call.RequestStopTransaction(transaction_id=transaction_id))}
 
+@app.get("/report_full")
+async def report_full():
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        return {"result": await latest_cp.call(
+            call.GetBaseReport(request_id=time_based_id(),
+                               report_base=ReportBaseEnumType.full_inventory))}
 asyncio.create_task(main())
 
