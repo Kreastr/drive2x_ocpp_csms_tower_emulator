@@ -12,6 +12,7 @@ from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoT
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
     ResetEnumType
 from logging import getLogger
+from fastapi import FastAPI
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -102,6 +103,11 @@ async def main():
     await server.serve_forever()
     logging.warning("main exit")
 
+app = FastAPI()
 
-if __name__ == '__main__':
-    asyncio.run(main())
+@app.get("/")
+async def index():
+    return {"index": "empty"}
+
+asyncio.run(main())
+
