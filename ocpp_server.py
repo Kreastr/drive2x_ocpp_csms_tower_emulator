@@ -109,5 +109,5 @@ app = FastAPI()
 async def index():
     return {"index": "empty"}
 
-asyncio.run(main())
+asyncio.create_task(main())
 
