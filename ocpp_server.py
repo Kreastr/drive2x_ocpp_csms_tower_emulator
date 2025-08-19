@@ -8,9 +8,9 @@ from ocpp.v16.enums import RegistrationStatus
 from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
-    ResetEnumType
+    ResetEnumType, IdTokenEnumType
 from logging import getLogger
 from fastapi import FastAPI
 
@@ -27,11 +27,12 @@ class OCPPServerHandler(ChargePoint):
         super().__init__(*vargs, **kwargs)
         self.booted_ok = False
         self.events = []
+        self.transactions = set()
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
         self.booted_ok = True
-        self.events.append(("boot_notification", (charging_station, reason, vargs, kwargs)))
+        self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         logger.warning(f"id={self.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
         #asyncio.create_task(self.call(GetVariables([GetVariableDataType(ComponentType.)])))
         return call_result.BootNotification(
@@ -42,14 +43,14 @@ class OCPPServerHandler(ChargePoint):
 
     @on(Action.status_notification)
     async def on_status_notification(self, **data):
-        self.events.append(("status_notification", (data)))
+        self.log_event(("status_notification", (data)))
         logger.warning(f"id={self.id} on_status_notification {data=}")
         return call_result.StatusNotification(
         )
 
     @on(Action.heartbeat)
     async def on_heartbeat(self, **data):
-        self.events.append(("heartbeat", (data)))
+        self.log_event(("heartbeat", (data)))
         logger.warning(f"id={self.id} on_heartbeat {data=}")
         return call_result.Heartbeat(
             current_time=get_time_str()
@@ -57,31 +58,37 @@ class OCPPServerHandler(ChargePoint):
 
     @on(Action.meter_values)
     async def on_meter_values(self, **data):
-        self.events.append(("meter_values", (data)))
+        self.log_event(("meter_values", (data)))
         logger.warning(f"id={self.id} on_meter_values {data=}")
         return call_result.MeterValues(
         )
 
     @on(Action.authorize)
     async def on_authorize(self, **data):
-        self.events.append(("authorize", (data)))
+        self.log_event(("authorize", (data)))
         logger.warning(f"id={self.id} on_authorize {data=}")
         return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted))
 
     @on(Action.transaction_event)
     async def on_transaction_event(self, **data):
-        self.events.append(("transaction_event", (data)))
+        self.log_event(("transaction_event", (data)))
         logger.warning(f"id={self.id} on_transaction_event {data=}")
         response = dict()
         if "id_token_info" in data:
             response.update(dict(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted)))
+        if "transactionId" in data:
+            self.transactions |= {data["transactionId"]}
         return call_result.TransactionEvent(**response)
 
     @on(Action.notify_report)
     async def on_notify_report(self, **data):
-        self.events.append(("notify_report", (data)))
+        self.log_event(("notify_report", (data)))
         logger.warning(f"id={self.id} on_notify_report {data=}")
         return call_result.NotifyReport()
+
+    def log_event(self, event_data):
+        self.events.append(event_data)
+
 
 latest_cp : OCPPServerHandler | None = None
 
@@ -129,6 +136,30 @@ async def index():
         return {"status": "error"}
     else:
         return {"events": latest_cp.events}
+
+@app.get("/transactions")
+async def transactions():
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        return {"events": latest_cp.transactions}
+
+@app.get("/remote_start")
+async def remote_start():
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        return {"result": await latest_cp.call(
+            call.RequestStartTransaction(id_token=IdTokenType(id_token="aaa", type=IdTokenEnumType.central)))}
+
+
+@app.get("/remote_stop/{transaction_id}")
+async def remote_stop(transaction_id : str):
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        return {"result": await latest_cp.call(
+            call.RequestStopTransaction(transaction_id=transaction_id))}
 
 asyncio.create_task(main())
 
