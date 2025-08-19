@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime
+from uuid import uuid4
 
 import websockets
 from ocpp.routing import on
@@ -150,7 +151,8 @@ async def remote_start():
         return {"status": "error"}
     else:
         return {"result": await latest_cp.call(
-            call.RequestStartTransaction(id_token=IdTokenType(id_token="aaa", type=IdTokenEnumType.central)))}
+            call.RequestStartTransaction(remote_start_id=uuid4(),
+                                         id_token=IdTokenType(id_token=uuid4(), type=IdTokenEnumType.central)))}
 
 
 @app.get("/remote_stop/{transaction_id}")
