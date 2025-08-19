@@ -111,6 +111,7 @@ async def on_connect(websocket):
     if result.get_variable_result[0]["attribute_status"] != GetVariableStatusEnumType.accepted:
         cp.log_event("Failed to read CP serial number. Refusing to operate.")
         cp.close_connection()
+        return
 
 
     cp.id = result.get_variable_result[0]["attribute_value"]
