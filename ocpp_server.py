@@ -10,7 +10,7 @@ from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType, VariableType, \
-    SetVariableDataType
+    SetVariableDataType, EVSEType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
     ResetEnumType, IdTokenEnumType
 from logging import getLogger
@@ -191,7 +191,7 @@ async def setpoint(value : int):
             value = -2000
         return {"result": await latest_cp.call(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
-                                                                     component=ComponentType(name="V2XChargingCtrlr", evse=1),
+                                                                     component=ComponentType(name="V2XChargingCtrlr", evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}
 
 asyncio.create_task(main())
