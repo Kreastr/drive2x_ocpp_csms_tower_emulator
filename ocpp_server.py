@@ -12,7 +12,7 @@ from ocpp.v201.call import GetVariables
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType, VariableType, \
     SetVariableDataType, EVSEType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
-    ResetEnumType, IdTokenEnumType
+    ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
 from logging import getLogger
 from fastapi import FastAPI
 
@@ -91,6 +91,9 @@ class OCPPServerHandler(ChargePoint):
     def log_event(self, event_data):
         self.events.append(event_data)
 
+    def close_connection(self):
+        self._connection.close()
+
 
 charge_points : list[OCPPServerHandler] = list()
 
@@ -102,12 +105,17 @@ async def on_connect(websocket):
     start = cp.start()
     start_task = asyncio.create_task(start)
 
-    result = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
+    result : call_result.GetVariables = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                                   variable=VariableType(name="SerialNumber"))]))
     logger.warning(f"Charger S/N variable {result=}")
+    if result.get_variable_result[0].attribute_status != GetVariableStatusEnumType.accepted:
+        cp.log_event("Failed to read CP serial number. Refusing to operate.")
+        cp.close_connection()
+
+
     cp.id = result.get_variable_result[0].attribute_value
     charge_points[cp.id] = cp
-    result = await cp.call(
+    result : call_result.SetVariables = await cp.call(
         call.SetVariables(set_variable_data=[SetVariableDataType(
                                                  attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
                                                  component=ComponentType(name="AlignedDataCtrlr"),
