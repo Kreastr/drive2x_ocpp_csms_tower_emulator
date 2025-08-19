@@ -102,18 +102,15 @@ async def on_connect(websocket):
     #await cp.start()
     start = cp.start()
     start_task = asyncio.create_task(start)
+
+    result = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
+                                                                  variable=VariableType(name="SerialNumber"))]))
+    logger.warning(f"Charger S/N variable {result=}")
     await asyncio.sleep(15)
     if not cp.booted_ok:
         logger.warning("no boot notification within timeout period. Requesting CP self-reset")
         result = await cp.call(call.Reset(type=ResetEnumType.immediate))
         logger.warning(f"{result=}")
-    else:
-        #result = await cp.call(call.GetBaseReport(request_id=time_based_id(),
-        #                                          report_base=ReportBaseEnumType.configuration_inventory))
-        #logger.warning(f"Base report {result=}")
-        result = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
-                                                                      variable=VariableType(name="SerialNumber"))]))
-        logger.warning(f"Charger S/N variable {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
     print("start_task.result",start_task.result())
