@@ -140,6 +140,7 @@ async def on_connect(websocket):
     logger.warning(f"Charger measurands set {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
+    cp.close_connection()
     print("start_task.result",start_task.result())
 
 
