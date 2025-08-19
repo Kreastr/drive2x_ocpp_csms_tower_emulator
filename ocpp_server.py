@@ -9,7 +9,8 @@ from ocpp.v16.enums import RegistrationStatus
 from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType, VariableType
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType, VariableType, \
+    SetVariableDataType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
     ResetEnumType, IdTokenEnumType
 from logging import getLogger
@@ -177,5 +178,21 @@ async def report_full():
         return {"result": await latest_cp.call(
             call.GetBaseReport(request_id=time_based_id(),
                                report_base=ReportBaseEnumType.full_inventory))}
+
+
+@app.get("/setpoint/{value}")
+async def setpoint(value : int):
+    if latest_cp is None:
+        return {"status": "error"}
+    else:
+        if value > 4000:
+            value = 4000
+        if value < -2000:
+            value = -2000
+        return {"result": await latest_cp.call(
+            call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=value,
+                                                                     component=ComponentType(name="V2XChargingCtrlr", evse=1),
+                                                                     variable=VariableType(name="Setpoint"))]))}
+
 asyncio.create_task(main())
 
