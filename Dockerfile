@@ -9,5 +9,5 @@ COPY *.py /app
 
 WORKDIR /app
 
-CMD python ocpp_server.py
+CMD uvicorn ocpp_server:app
 
