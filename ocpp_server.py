@@ -119,29 +119,30 @@ async def on_connect(websocket):
 
     cp.id = result.get_variable_result[0]["attribute_value"]
     charge_points[cp.id] = cp
-    result : call_result.SetVariables = await cp.call(
-        call.SetVariables(set_variable_data=[SetVariableDataType(
-                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                 component=ComponentType(name="AlignedDataCtrlr"),
-                                                 variable=VariableType(name="Measurands")),
-                                             SetVariableDataType(
-                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                 component=ComponentType(name="AlignedDataCtrlr"),
-                                                 variable=VariableType(name="TxEndedMeasurands")),
-                                             SetVariableDataType(
-                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                 component=ComponentType(name="SampledDataCtrlr"),
-                                                 variable=VariableType(name="TxStartedMeasurands")),
-                                             SetVariableDataType(
-                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                 component=ComponentType(name="SampledDataCtrlr"),
-                                                 variable=VariableType(name="TxUpdatedMeasurands")),
-                                             SetVariableDataType(
-                                                 attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                 component=ComponentType(name="SampledDataCtrlr"),
-                                                 variable=VariableType(name="TxEndedMeasurands"))
-                                             ]))
-    logger.warning(f"Charger measurands set {result=}")
+    if 0:
+        result : call_result.SetVariables = await cp.call(
+            call.SetVariables(set_variable_data=[SetVariableDataType(
+                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                     component=ComponentType(name="AlignedDataCtrlr"),
+                                                     variable=VariableType(name="Measurands")),
+                                                 SetVariableDataType(
+                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                     component=ComponentType(name="AlignedDataCtrlr"),
+                                                     variable=VariableType(name="TxEndedMeasurands")),
+                                                 SetVariableDataType(
+                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                     component=ComponentType(name="SampledDataCtrlr"),
+                                                     variable=VariableType(name="TxStartedMeasurands")),
+                                                 SetVariableDataType(
+                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                     component=ComponentType(name="SampledDataCtrlr"),
+                                                     variable=VariableType(name="TxUpdatedMeasurands")),
+                                                 SetVariableDataType(
+                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                                                     component=ComponentType(name="SampledDataCtrlr"),
+                                                     variable=VariableType(name="TxEndedMeasurands"))
+                                                 ]))
+        logger.warning(f"Charger measurands set {result=}")
     while not start_task.done():
         await asyncio.sleep(1)
     cp.close_connection()
