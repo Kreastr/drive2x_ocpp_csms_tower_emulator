@@ -293,4 +293,4 @@ async def index():
     ui.label(text="Charge Point status")
     cp_card_container=ui.grid()
     ui.button("Reset SoC", on_click=lambda: None)
-ui.run(host="0.0.0.0", port=7500)
+ui.run(host="0.0.0.0", port=8000)
