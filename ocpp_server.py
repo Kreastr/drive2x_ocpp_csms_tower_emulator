@@ -136,8 +136,12 @@ async def on_connect(websocket):
     cp.id = result.get_variable_result[0]["attribute_value"]
     charge_points[cp.id] = cp
     with cp_card_container:
+        if "X-Real-IP" in websocket.request.headers:
+            real_ip = websocket.request.headers["X-Real-IP"]
+        else:
+            real_ip = websocket.remote_address[0]
         CPCard(cp).state.update({
-            "remote_ip":websocket.remote_address[0]})
+            "remote_ip": real_ip})
 
     await set_measurement_variables(cp)
     while not start_task.done():
