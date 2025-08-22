@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import cast, Self
 from uuid import uuid4
 
@@ -51,6 +51,17 @@ class OCPPServerHandler(ChargePoint):
         self.transactions = set()
         self.boot_notifications = []
         self.remote_ip = None
+        self.online = False
+        self.shutdown = False
+        self.timeout = datetime.now()
+        self.onl_task = asyncio.create_task(self.online_status_task())
+
+    async def online_status_task(self):
+        while not self.shutdown:
+            await asyncio.sleep(1)
+            if self.timeout < datetime.now():
+                self.online = False
+
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
@@ -76,6 +87,8 @@ class OCPPServerHandler(ChargePoint):
     async def on_heartbeat(self, **data):
         self.log_event(("heartbeat", (data)))
         logger.warning(f"id={self.id} on_heartbeat {data=}")
+        self.timeout = datetime.now() + timedelta(seconds=30)
+        self.online = True
         return call_result.Heartbeat(
             current_time=get_time_str()
         )
@@ -115,7 +128,9 @@ class OCPPServerHandler(ChargePoint):
         self.events.append(event_data)
 
     async def close_connection(self):
+        self.shutdown = True
         await self._connection.close()
+        await self.onl_task
 
 
 
@@ -147,14 +162,14 @@ async def on_connect(websocket):
         with client:
             for old in ElementFilter(kind=CPCard, marker=cp.id):
                 old.delete()
-            for grid in  ElementFilter(kind=ui.grid,marker="cp_card_container"):
+            for grid in ElementFilter(kind=ui.grid,marker="cp_card_container"):
                 with grid:
                     CPCard(cp).mark(cp.id)
 
     await set_measurement_variables(cp)
     while not start_task.done():
         await asyncio.sleep(1)
-    cp.close_connection()
+    await cp.close_connection()
     print("start_task.result",start_task.result())
 
 
