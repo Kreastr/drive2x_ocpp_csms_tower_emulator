@@ -19,7 +19,7 @@ from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationSta
     ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
 from logging import getLogger
 
-from nicegui import ui, app, background_tasks
+from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
 cp_card_container : ui.grid | None = None
 charge_points : dict[str, Any] = dict()
@@ -138,13 +138,16 @@ async def on_connect(websocket):
 
     cp.id = result.get_variable_result[0]["attribute_value"]
     charge_points[cp.id] = cp
-    with cp_card_container:
-        if "X-Real-IP" in websocket.request.headers:
-            real_ip = websocket.request.headers["X-Real-IP"]
-        else:
-            real_ip = websocket.remote_address[0]
-        charge_point_cards[cp.id] = CPCard(cp)
-        cp.remote_ip = real_ip
+    if "X-Real-IP" in websocket.request.headers:
+        real_ip = websocket.request.headers["X-Real-IP"]
+    else:
+        real_ip = websocket.remote_address[0]
+    cp.remote_ip = real_ip
+    #for old in ElementFilter(kind=CPCard, marker=cp.id):
+    #    old.delete()
+    for grid in  ElementFilter(kind=ui.grid,marker="cp_card_container"):
+        with grid:
+            CPCard(cp).mark(cp.id)
 
     await set_measurement_variables(cp)
     while not start_task.done():
@@ -292,13 +295,10 @@ class CPCard(Element):
 
 @ui.page("/")
 async def index():
-    global cp_card_container
     background_tasks.create_lazy(main(),name="main")
     ui.label(text="Charge Point status")
-    if cp_card_container is None:
-        cp_card_container=ui.grid()
-        with cp_card_container:
-            for cpid in charge_points:
-                charge_point_cards[cpid] = CPCard(charge_points[cpid])
+    with ui.grid().mark("cp_card_container"):
+        for cpid in charge_points:
+            CPCard(charge_points[cpid]).mark("")
     ui.button("Reset SoC", on_click=lambda: None)
 ui.run(host="0.0.0.0", port=8000)
