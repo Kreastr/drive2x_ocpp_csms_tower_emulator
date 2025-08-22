@@ -18,7 +18,6 @@ from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoT
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
     ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
 from logging import getLogger
-from fastapi import FastAPI
 
 from nicegui import ui, app, background_tasks
 
@@ -184,9 +183,7 @@ async def main():
     await server.serve_forever()
     logging.warning("main exit")
 
-app = FastAPI()
-
-@app.get("/")
+@app.get("/cp")
 async def index():
     return {"charge_points": list(charge_points)}
 
