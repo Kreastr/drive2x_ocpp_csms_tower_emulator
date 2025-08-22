@@ -21,6 +21,10 @@ from logging import getLogger
 
 from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.
+
 cp_card_container : ui.grid | None = None
 charge_points : dict[str, Any] = dict()
 charge_point_cards : dict[str, Any] = dict()
@@ -37,7 +41,7 @@ ui.add_css('''
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
+logger.setFormatter(formatter)
 def get_time_str():
     return datetime.now().isoformat()
 
@@ -49,10 +53,12 @@ class OCPPServerHandler(ChargePoint):
         self.booted_ok = False
         self.events = []
         self.transactions = set()
+        self.current_tx = None
         self.boot_notifications = []
         self.remote_ip = None
         self.online = False
         self.shutdown = False
+        self.tx_status = ""
         self.timeout = datetime.now()
         self.onl_task = asyncio.create_task(self.online_status_task())
 
@@ -116,6 +122,8 @@ class OCPPServerHandler(ChargePoint):
         if "transaction_info" in data:
             if "transaction_id" in data["transaction_info"]:
                 self.transactions |= {data["transaction_info"]["transaction_id"]}
+                self.current_tx = data["transaction_info"]["transaction_id"]
+        #self.tx_status 
         return call_result.TransactionEvent(**response)
 
     @on(Action.notify_report)
@@ -236,15 +244,18 @@ async def transactions(cp_id : str):
     else:
         return {"events": charge_points[cp_id].transactions}
 
+async def do_remote_start(cp_id, evse_id):
+    await charge_points[cp_id].call(
+            call.RequestStartTransaction(evse_id=evse_id,
+                                         remote_start_id=time_based_id(),
+                                         id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
+
 @app.get("/cp/{cp_id}/remote_start")
 async def remote_start(cp_id : str):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await charge_points[cp_id].call(
-            call.RequestStartTransaction(evse_id=1,
-                                         remote_start_id=time_based_id(),
-                                         id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))}
+        return {"result": await do_remote_start(cp_id, 1)}
 
 
 @app.get("/cp/{cp_id}/remote_stop/{transaction_id}")
@@ -299,6 +310,7 @@ class CPCard(Element):
             ui.label().bind_text(self.cp, "id")
             ui.label("Remote IP")
             ui.label().bind_text(self.cp, "remote_ip")
+            ui.button("Remote Start", on_click=lambda : do_remote_start(self.cp.id, 1))
 
     def bind_online_from(self, var, name):
         bind_from(self_obj=self, self_name="online",
@@ -318,5 +330,4 @@ async def index():
     with ui.grid().mark("cp_card_container"):
         for cpid in charge_points:
             CPCard(charge_points[cpid]).mark("")
-    ui.button("Reset SoC", on_click=lambda: None)
 ui.run(host="0.0.0.0", port=8000)
