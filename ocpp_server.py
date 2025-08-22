@@ -1,9 +1,13 @@
 import asyncio
 import logging
+from abc import ABCMeta, abstractmethod
 from datetime import datetime
+from typing import cast, Self
 from uuid import uuid4
 
 import websockets
+from nicegui.binding import BindableProperty, bind_from
+from nicegui.element import Element
 from ocpp.routing import on
 from ocpp.v16.enums import RegistrationStatus
 from ocpp.v201 import ChargePoint, call
@@ -15,6 +19,19 @@ from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationSta
     ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
 from logging import getLogger
 from fastapi import FastAPI
+
+from nicegui import ui, app, background_tasks
+
+cp_card_container : ui.grid
+
+ui.add_css('''
+    .online {
+        background: green;
+    }
+    .offline {
+        background: red;
+    }
+''')
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -119,34 +136,41 @@ async def on_connect(websocket):
 
     cp.id = result.get_variable_result[0]["attribute_value"]
     charge_points[cp.id] = cp
-    if 0:
-        result : call_result.SetVariables = await cp.call(
-            call.SetVariables(set_variable_data=[SetVariableDataType(
-                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                     component=ComponentType(name="AlignedDataCtrlr"),
-                                                     variable=VariableType(name="Measurands")),
-                                                 SetVariableDataType(
-                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                     component=ComponentType(name="AlignedDataCtrlr"),
-                                                     variable=VariableType(name="TxEndedMeasurands")),
-                                                 SetVariableDataType(
-                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                     component=ComponentType(name="SampledDataCtrlr"),
-                                                     variable=VariableType(name="TxStartedMeasurands")),
-                                                 SetVariableDataType(
-                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                     component=ComponentType(name="SampledDataCtrlr"),
-                                                     variable=VariableType(name="TxUpdatedMeasurands")),
-                                                 SetVariableDataType(
-                                                     attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
-                                                     component=ComponentType(name="SampledDataCtrlr"),
-                                                     variable=VariableType(name="TxEndedMeasurands"))
-                                                 ]))
-        logger.warning(f"Charger measurands set {result=}")
+    with cp_card_container:
+        CPCard(cp).state.update({
+            "remote_ip":websocket.remote_address[0]})
+
+    await set_measurement_variables(cp)
     while not start_task.done():
         await asyncio.sleep(1)
     cp.close_connection()
     print("start_task.result",start_task.result())
+
+
+async def set_measurement_variables(cp):
+    result: call_result.SetVariables = await cp.call(
+        call.SetVariables(set_variable_data=[SetVariableDataType(
+            attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+            component=ComponentType(name="AlignedDataCtrlr"),
+            variable=VariableType(name="Measurands")),
+            SetVariableDataType(
+                attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                component=ComponentType(name="AlignedDataCtrlr"),
+                variable=VariableType(name="TxEndedMeasurands")),
+            SetVariableDataType(
+                attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                component=ComponentType(name="SampledDataCtrlr"),
+                variable=VariableType(name="TxStartedMeasurands")),
+            SetVariableDataType(
+                attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                component=ComponentType(name="SampledDataCtrlr"),
+                variable=VariableType(name="TxUpdatedMeasurands")),
+            SetVariableDataType(
+                attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
+                component=ComponentType(name="SampledDataCtrlr"),
+                variable=VariableType(name="TxEndedMeasurands"))
+        ]))
+    logger.warning(f"Charger measurands set {result=}")
 
 
 def time_based_id():
@@ -227,8 +251,49 @@ async def setpoint(cp_id : str, value : int):
             value = -2000
         return {"result": await charge_points[cp_id].call(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
-                                                                     component=ComponentType(name="V2XChargingCtrlr", instance="1" , evse=EVSEType(id=1)),
+                                                                     component=ComponentType(name="V2XChargingCtrlr", instance="1", evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}
 
-asyncio.create_task(main())
 
+
+
+class CPCard(Element):
+    online = BindableProperty(
+        on_change=lambda sender, value: cast(Self, sender)._handle_online_change(value))
+
+    def __init__(self, cp, **kwargs):
+        super().__init__(tag="div")
+        self.cp = cp
+        self.state = dict(id="provisional",
+                          online=False,
+                          remote_ip=None)
+        self.state.update(kwargs)
+        self.card = ui.card()
+        self.bind_online_from(self.state, "online")
+        self._handle_online_change(self.state["online"])
+        with self.card:
+            ui.label("ID")
+            ui.label().bind_text(self.cp, "id")
+            ui.label("Remote IP")
+            ui.label().bind_text(self.state, "remote_ip")
+
+    def bind_online_from(self, var, name):
+        bind_from(self_obj=self, self_name="online",
+                  other_obj=var, other_name=name)
+
+    def _handle_online_change(self, card_online_status):
+        logger.warning(f"online changes {card_online_status}")
+        self.card.classes(remove="bg-green bg-red")
+        self.card.classes(add="bg-green" if card_online_status else "bg-red")
+        self.card.update()
+
+
+@ui.page("/")
+async def index():
+    global cp_card_container
+    background_tasks.create_lazy(main(),name="main")
+    #cd=CPCard()
+    ui.label(text="Charge Point status")
+    cp_card_container=ui.grid()
+    ui.button("Reset SoC", on_click=lambda: None)
+ui.run(host="0.0.0.0", port=7500)

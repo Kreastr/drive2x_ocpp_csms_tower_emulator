@@ -1,12 +1,11 @@
 import asyncio
 import logging
 import ssl
-from collections import defaultdict
+import sys
 from copy import deepcopy
 from datetime import datetime
-from email.policy import default
-from time import sleep
 from uuid import uuid4
+from zipimport import cp437_table
 
 import certifi
 import websockets
@@ -20,9 +19,12 @@ from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, Compon
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
-
+from nicegui import ui, app, background_tasks
+from ocpp.v201 import enums
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+plug_tgl = None
 
 def get_time_str():
     return datetime.now().isoformat()
@@ -41,6 +43,9 @@ class OCPPClient(ChargePoint):
         self.soc_kwh = 50.0
         self.total_capacity_kwh = 70.0
         self._tx_seq_no = 0
+
+        self.hb_task = asyncio.create_task(self.heartbeat_task())
+        self.st_task = asyncio.create_task(self.status_task())
 
     @property
     def seq_no(self):
@@ -74,34 +79,49 @@ class OCPPClient(ChargePoint):
                                                                                      )
                                                     ))
 
-            while True:
-                if self.auth_status is None:
-                    await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
-                                                          timestamp=get_time_str(),
-                                                          trigger_reason=TriggerReasonEnumType.cable_plugged_in,
-                                                          seq_no=self.seq_no,
-                                                          transaction_info=TransactionType(transaction_id=tx_id
-                                                                                         )
-                                                          ))
-                    break
-                if not self.cable_connected:
-                    await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
-                                                          timestamp=get_time_str(),
-                                                          trigger_reason=TriggerReasonEnumType.cable_plugged_in,
-                                                          seq_no=self.seq_no,
-                                                          transaction_info=TransactionType(transaction_id=tx_id
-                                                                                         )
-                                                          ))
-                    break
+        while True:
+            if self.auth_status is None:
+                await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
+                                                      timestamp=get_time_str(),
+                                                      trigger_reason=TriggerReasonEnumType.authorized,
+                                                      seq_no=self.seq_no,
+                                                      transaction_info=TransactionType(transaction_id=tx_id
+                                                                                     )
+                                                      ))
+                break
+            if not self.cable_connected:
+                await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
+                                                      timestamp=get_time_str(),
+                                                      trigger_reason=TriggerReasonEnumType.cable_plugged_in,
+                                                      seq_no=self.seq_no,
+                                                      transaction_info=TransactionType(transaction_id=tx_id
+                                                                                     )
+                                                      ))
+                break
 
-                await asyncio.sleep(1)
-        await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
-                                        timestamp=get_time_str(),
-                                        trigger_reason=TriggerReasonEnumType.authorized,
-                                        seq_no=self.seq_no,
-                                        transaction_info=TransactionType(transaction_id=tx_id
-                                                                         )
-                                        ))
+            await asyncio.sleep(1)
+
+    async def heartbeat_task(self):
+        while True:
+            await asyncio.sleep(10)
+            heartbeat = Heartbeat()
+            await self.call(heartbeat)
+
+    async def status_task(self):
+        prev_status = self.cable_connected
+        await self.post_status_notification()
+        while True:
+            await asyncio.sleep(1)
+            if prev_status != self.cable_connected:
+                await self.post_status_notification()
+                prev_status = self.cable_connected
+
+    async def post_status_notification(self):
+        status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
+                                                 connector_status=ConnectorStatusEnumType.occupied if self.cable_connected else ConnectorStatusEnumType.available,
+                                                 evse_id=1,
+                                                 connector_id=1)
+        await self.call(status_notification)
 
     @on(Action.request_stop_transaction)
     async def request_stop_transaction(self, **data):
@@ -171,17 +191,27 @@ class OCPPClient(ChargePoint):
                                                      attribute_status=SetVariableStatusEnumType.accepted))
         return call_result.SetVariables(results)
 
-
+@ui.page("/")
 async def main():
-    uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+    uri = "ws://localhost:9000"
+    #"wss://emotion-test.eu/ocpp/1"
+    #"wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
-    async with websockets.connect(uri, ssl=ctx,
+    async with websockets.connect(uri, #ssl=ctx,
             subprotocols=["ocpp2.0.1"],    # <-- or "ocpp2.0.1"
             open_timeout=20) as ws:              # optional: make errors clearer)
-        serial_number = "CP_ACME_BAT_00001"
+        serial_number = "CP_ACME_BAT_" + (sys.argv[1] if len(sys.argv) > 1 else "0000")
         cp = OCPPClient(serial_number, ws)
-        asyncio.create_task(cp.start())
+
+        while plug_tgl is None:
+            await asyncio.sleep(1)
+
+        logger.warning("plug_tgl is ready")
+
+        plug_tgl.bind_value(cp, "cable_connected")
+
+        cp_task = asyncio.create_task(cp.start())
 
         boot_notification = BootNotification(
             charging_station=ChargingStationType(vendor_name="ACME Inc",
@@ -192,21 +222,25 @@ async def main():
             custom_data={"vendorId": "ACME labs", "sn": 234}
         )
         boot_notification.extra_field = 5
-        await cp.call(boot_notification)
+        result : call_result.BootNotification = await cp.call(boot_notification)
+        logger.warning(result)
+        if result.status != enums.RegistrationStatusEnumType.accepted:
+            raise Exception("Boot notification rejected")
 
-        while True:
-            await asyncio.sleep(30)
-            heartbeat = Heartbeat()
-            await cp.call(heartbeat)
-            status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
-                                                     connector_status=ConnectorStatusEnumType.occupied,
-                                                     evse_id=0,
-                                                     connector_id=0)
-            await cp.call(status_notification)
+        await cp_task
+        await cp.hb_task
+        await cp.st_task
 
+@ui.page("/")
+async def index():
+    background_tasks.create_lazy(main(),name="main")
+    ui.navigate.to("/status")
 
-        #await cp.send_periodic_soc()
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
+@ui.page("/status")
+async def status():
+    global plug_tgl
+    ui.label("Power plug status")
+    plug_tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"})
+    ui.label("SoC")
+    ui.button("Reset SoC", on_click=lambda: None)
+ui.run(host="0.0.0.0", port=8500)
