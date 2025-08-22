@@ -293,7 +293,8 @@ class CPCard(Element):
 async def index():
     global cp_card_container
     background_tasks.create_lazy(main(),name="main")
-    #cd=CPCard()
+    for cpid in charge_points:
+        CPCard(charge_points[cpid])
     ui.label(text="Charge Point status")
     cp_card_container=ui.grid()
     ui.button("Reset SoC", on_click=lambda: None)
