@@ -23,7 +23,6 @@ from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.
 
 cp_card_container : ui.grid | None = None
 charge_points : dict[str, Any] = dict()
