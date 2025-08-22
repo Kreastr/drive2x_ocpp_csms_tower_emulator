@@ -129,6 +129,7 @@ class OCPPServerHandler(ChargePoint):
 
     async def close_connection(self):
         self.shutdown = True
+        self.online = False 
         await self._connection.close()
         await self.onl_task
 
