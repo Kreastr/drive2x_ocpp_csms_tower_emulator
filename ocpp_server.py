@@ -40,7 +40,7 @@ ui.add_css('''
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.setFormatter(formatter)
+logging.lastResort.setFormatter(formatter)
 def get_time_str():
     return datetime.now().isoformat()
 
