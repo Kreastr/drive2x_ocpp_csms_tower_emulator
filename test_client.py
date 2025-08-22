@@ -193,12 +193,12 @@ class OCPPClient(ChargePoint):
 
 @ui.page("/")
 async def main():
-    uri = "ws://localhost:9000"
+    #uri = "ws://localhost:9000"
     #"wss://emotion-test.eu/ocpp/1"
-    #"wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+    uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
-    async with websockets.connect(uri, #ssl=ctx,
+    async with websockets.connect(uri, ssl=ctx,
             subprotocols=["ocpp2.0.1"],    # <-- or "ocpp2.0.1"
             open_timeout=20) as ws:              # optional: make errors clearer)
         serial_number = "CP_ACME_BAT_" + (sys.argv[1] if len(sys.argv) > 1 else "0000")
@@ -243,4 +243,4 @@ async def status():
     plug_tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"})
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
-ui.run(host="0.0.0.0", port=8500)
+ui.run(host="0.0.0.0", port=7500)
