@@ -143,11 +143,13 @@ async def on_connect(websocket):
     else:
         real_ip = websocket.remote_address[0]
     cp.remote_ip = real_ip
-    #for old in ElementFilter(kind=CPCard, marker=cp.id):
-    #    old.delete()
-    for grid in  ElementFilter(kind=ui.grid,marker="cp_card_container"):
-        with grid:
-            CPCard(cp).mark(cp.id)
+    for client in app.clients('/'):
+        with client:
+        #for old in ElementFilter(kind=CPCard, marker=cp.id):
+        #    old.delete()
+        for grid in  ElementFilter(kind=ui.grid,marker="cp_card_container"):
+            with grid:
+                CPCard(cp).mark(cp.id)
 
     await set_measurement_variables(cp)
     while not start_task.done():
