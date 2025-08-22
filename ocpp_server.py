@@ -288,11 +288,11 @@ class CPCard(Element):
     def __init__(self, cp, **kwargs):
         super().__init__(tag="div")
         self.cp = cp
-        self.state = dict(id="provisional",online=False)
+        self.state = dict(id="provisional")
         self.state.update(kwargs)
         self.card = ui.card()
-        self.bind_online_from(self.state, "online")
-        self._handle_online_change(self.state["online"])
+        self.bind_online_from(self.cp, "online")
+        self._handle_online_change(self.cp.online)
         with self.card:
             ui.label("ID")
             ui.label().bind_text(self.cp, "id")
