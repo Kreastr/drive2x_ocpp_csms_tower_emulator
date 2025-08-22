@@ -47,6 +47,7 @@ class OCPPServerHandler(ChargePoint):
         self.events = []
         self.transactions = set()
         self.boot_notifications = []
+        self.remote_ip = None
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
@@ -140,8 +141,8 @@ async def on_connect(websocket):
             real_ip = websocket.request.headers["X-Real-IP"]
         else:
             real_ip = websocket.remote_address[0]
-        CPCard(cp).state.update({
-            "remote_ip": real_ip})
+        CPCard(cp)
+        cp.remote_ip = real_ip
 
     await set_measurement_variables(cp)
     while not start_task.done():
@@ -265,9 +266,7 @@ class CPCard(Element):
     def __init__(self, cp, **kwargs):
         super().__init__(tag="div")
         self.cp = cp
-        self.state = dict(id="provisional",
-                          online=False,
-                          remote_ip=None)
+        self.state = dict(id="provisional")
         self.state.update(kwargs)
         self.card = ui.card()
         self.bind_online_from(self.state, "online")
@@ -276,7 +275,7 @@ class CPCard(Element):
             ui.label("ID")
             ui.label().bind_text(self.cp, "id")
             ui.label("Remote IP")
-            ui.label().bind_text(self.state, "remote_ip")
+            ui.label().bind_text(self.cp, "remote_ip")
 
     def bind_online_from(self, var, name):
         bind_from(self_obj=self, self_name="online",
@@ -293,9 +292,10 @@ class CPCard(Element):
 async def index():
     global cp_card_container
     background_tasks.create_lazy(main(),name="main")
-    for cpid in charge_points:
-        CPCard(charge_points[cpid])
     ui.label(text="Charge Point status")
     cp_card_container=ui.grid()
+    with cp_card_container:
+        for cpid in charge_points:
+            CPCard(charge_points[cpid])
     ui.button("Reset SoC", on_click=lambda: None)
 ui.run(host="0.0.0.0", port=8000)
