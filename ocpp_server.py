@@ -20,8 +20,11 @@ from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationSta
 from logging import getLogger
 
 from nicegui import ui, app, background_tasks
+from typing import Any
+cp_card_container : ui.grid | None = None
+charge_points : dict[str, Any] = dict()
+charge_point_cards : dict[str, Any] = dict()
 
-cp_card_container : ui.grid
 
 ui.add_css('''
     .online {
@@ -115,7 +118,6 @@ class OCPPServerHandler(ChargePoint):
         await self._connection.close()
 
 
-charge_points : dict[str, OCPPServerHandler] = dict()
 
 
 async def on_connect(websocket):
@@ -141,7 +143,7 @@ async def on_connect(websocket):
             real_ip = websocket.request.headers["X-Real-IP"]
         else:
             real_ip = websocket.remote_address[0]
-        CPCard(cp)
+        charge_point_cards[cp.id] = CPCard(cp)
         cp.remote_ip = real_ip
 
     await set_measurement_variables(cp)
@@ -293,9 +295,10 @@ async def index():
     global cp_card_container
     background_tasks.create_lazy(main(),name="main")
     ui.label(text="Charge Point status")
-    cp_card_container=ui.grid()
-    with cp_card_container:
-        for cpid in charge_points:
-            CPCard(charge_points[cpid])
+    if cp_card_container is None:
+        cp_card_container=ui.grid()
+        with cp_card_container:
+            for cpid in charge_points:
+                charge_point_cards[cpid] = CPCard(charge_points[cpid])
     ui.button("Reset SoC", on_click=lambda: None)
 ui.run(host="0.0.0.0", port=8000)
