@@ -360,8 +360,9 @@ class CPCard(Element):
         self.card.update()
 
     def on_new_connector(self, connector_id):
-        with self.connector_container:
-            ui.label().bind_text(self.cp.connectors[connector_id], "connector_status", forward=lambda x: f"{connector_id} is {x}")
+        with (self.connector_container):
+            new_label = ui.label(text=f"{connector_id}: {self.cp.connectors[connector_id].connector_status}")
+            new_label.bind_text(self.cp.connectors[connector_id], "connector_status", forward=lambda x: f"{connector_id} is {x}")
 
 
 @ui.page("/")
@@ -370,5 +371,5 @@ async def index():
     ui.label(text="Charge Point status")
     with ui.grid().mark("cp_card_container"):
         for cpid in charge_points:
-            CPCard(charge_points[cpid]).mark("")
+            CPCard(charge_points[cpid]).mark(cpid)
 ui.run(host="0.0.0.0", port=8000)
