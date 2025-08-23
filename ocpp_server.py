@@ -22,6 +22,13 @@ from logging import getLogger
 from nicegui import ui, app, background_tasks, ElementFilter, binding
 from typing import Any
 
+
+async def broadcast_to(op, page, **filters):
+    for client in app.clients(page):
+        with client:
+            for old in ElementFilter(**filters):
+                op(old)
+
 @binding.bindable_dataclass
 class ConnectorStatus:
     connector_id : int = -1
@@ -98,6 +105,7 @@ class OCPPServerHandler(ChargePoint):
 
         if conn_status.connector_id not in self.connectors:
             self.connectors[conn_status.connector_id] = conn_status
+            broadcast_to(kind=CPCard, marker=self.id, op=lambda x: x.on_new_connector(conn_status.connector_id), page="/")
         else:
             self.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
         return call_result.StatusNotification(
@@ -181,19 +189,29 @@ async def on_connect(websocket):
     else:
         real_ip = websocket.remote_address[0]
     cp.remote_ip = real_ip
-    for client in app.clients('/'):
-        with client:
-            for old in ElementFilter(kind=CPCard, marker=cp.id):
-                old.delete()
-            for grid in ElementFilter(kind=ui.grid,marker="cp_card_container"):
-                with grid:
-                    CPCard(cp).mark(cp.id)
+
+
+    await broadcast_to(kind = CPCard,
+                       marker = cp.id,
+                       op = lambda x: x.delete(),
+                       page="/")
+
+    def add_card(grid):
+        with grid:
+            CPCard(cp).mark(cp.id)
+
+    await broadcast_to(kind = ui.grid,
+                       marker = "cp_card_container",
+                       op = add_card,
+                       page="/")
 
     await set_measurement_variables(cp)
     while not start_task.done():
         await asyncio.sleep(1)
     await cp.close_connection()
     print("start_task.result",start_task.result())
+
+
 
 
 async def set_measurement_variables(cp):
@@ -324,6 +342,9 @@ class CPCard(Element):
             ui.label().bind_text(self.cp, "id")
             ui.label("Remote IP")
             ui.label().bind_text(self.cp, "remote_ip")
+            ui.separator()
+            self.connector_container = ui.column()
+            ui.separator()
             ui.button("Remote Start", on_click=lambda : do_remote_start(self.cp.id, 1))
 
     def bind_online_from(self, var, name):
@@ -335,6 +356,10 @@ class CPCard(Element):
         self.card.classes(remove="bg-green bg-red")
         self.card.classes(add="bg-green" if card_online_status else "bg-red")
         self.card.update()
+
+    def on_new_connector(self, connector_id):
+        with self.connector_container:
+            ui.label().bind_text(self.cp.connectors[connector_id], "connector_status", forward=lambda x: f"{connector_id} is {x}")
 
 
 @ui.page("/")
