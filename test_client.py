@@ -196,19 +196,26 @@ cp : OCPPClient | None = None
 @ui.page("/")
 async def main():
     global cp
-    #uri = "ws://localhost:9000"
+    uri = "ws://localhost:9000"
+    if len(sys.argv) > 1:
+        uri = sys.argv[1]
+    if len(sys.argv) > 2:
+        uri = sys.argv[2]
+        serial_number = "CP_ACME_BAT_" + sys.argv[2]
+    else:
+        serial_number = "CP_ACME_BAT_0000"
+        
     #"wss://emotion-test.eu/ocpp/1"
-    uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+    #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
-    async with websockets.connect(uri, ssl=ctx,
-            subprotocols=["ocpp2.0.1"],    # <-- or "ocpp2.0.1"
-            open_timeout=20) as ws:              # optional: make errors clearer)
-        serial_number = "CP_ACME_BAT_" + (sys.argv[1] if len(sys.argv) > 1 else "0000")
+    ws_args = dict(subprotocols=["ocpp2.0.1"],
+               open_timeout=5)
+    if uri.startswith("wss://"):
+        ws_args["ssl"] = ctx
+    async with websockets.connect(uri, **ws_args) as ws:
         cp = OCPPClient(serial_number, ws)
 
-        #while plug_tgl is None:
-        #    await asyncio.sleep(1)
         for client in app.clients('/'):
             with client:
                 for tgl in ElementFilter(kind=ui.toggle,marker="plug_tgl"):
