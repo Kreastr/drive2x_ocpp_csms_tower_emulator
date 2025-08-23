@@ -207,7 +207,8 @@ async def on_connect(websocket):
                        op = add_card,
                        page="/")
 
-    await set_measurement_variables(cp)
+    if 0:
+        await set_measurement_variables(cp)
     while not start_task.done():
         await asyncio.sleep(1)
     await cp.close_connection()
@@ -349,6 +350,9 @@ class CPCard(Element):
             ui.separator()
             ui.button("Remote Start", on_click=lambda : do_remote_start(self.cp.id, 1))
 
+        for connid in self.cp.connectors:
+            self.on_new_connector(connid)
+
     def bind_online_from(self, var, name):
         bind_from(self_obj=self, self_name="online",
                   other_obj=var, other_name=name)
@@ -360,9 +364,10 @@ class CPCard(Element):
         self.card.update()
 
     def on_new_connector(self, connector_id):
+        logger.warnimg(f"on new comnector {connector_id}")
         with (self.connector_container):
             new_label = ui.label(text=f"{connector_id}: {self.cp.connectors[connector_id].connector_status}")
-            new_label.bind_text(self.cp.connectors[connector_id], "connector_status", forward=lambda x: f"{connector_id} is {x}")
+            #new_label.bind_text(self.cp.connectors[connector_id], "connector_status", forward=lambda x: f"{connector_id} is {x}")
 
 
 @ui.page("/")
