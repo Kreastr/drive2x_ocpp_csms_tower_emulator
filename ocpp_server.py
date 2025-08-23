@@ -364,7 +364,7 @@ class CPCard(Element):
         self.card.update()
 
     def on_new_connector(self, connector_id):
-        logger.warnimg(f"on new comnector {connector_id}")
+        logger.warning(f"on new comnector {connector_id}")
         with (self.connector_container):
             new_label = ui.label(text=f"{connector_id}: {self.cp.connectors[connector_id].connector_status}")
             #new_label.bind_text(self.cp.connectors[connector_id], "connector_status", forward=lambda x: f"{connector_id} is {x}")
