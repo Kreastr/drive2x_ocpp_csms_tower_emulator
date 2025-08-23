@@ -19,12 +19,11 @@ from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, Compon
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
-from nicegui import ui, app, background_tasks
+from nicegui import ui, app, background_tasks, ElementFilter
 from ocpp.v201 import enums
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-plug_tgl = None
 
 def get_time_str():
     return datetime.now().isoformat()
@@ -191,8 +190,12 @@ class OCPPClient(ChargePoint):
                                                      attribute_status=SetVariableStatusEnumType.accepted))
         return call_result.SetVariables(results)
 
+
+cp : OCPPClient | None = None
+
 @ui.page("/")
 async def main():
+    global cp
     #uri = "ws://localhost:9000"
     #"wss://emotion-test.eu/ocpp/1"
     uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
@@ -204,12 +207,12 @@ async def main():
         serial_number = "CP_ACME_BAT_" + (sys.argv[1] if len(sys.argv) > 1 else "0000")
         cp = OCPPClient(serial_number, ws)
 
-        while plug_tgl is None:
-            await asyncio.sleep(1)
-
-        logger.warning("plug_tgl is ready")
-
-        plug_tgl.bind_value(cp, "cable_connected")
+        #while plug_tgl is None:
+        #    await asyncio.sleep(1)
+        for client in app.clients('/'):
+            with client:
+                for tgl in ElementFilter(kind=ui.toggle,marker="plug_tgl"):
+                    tgl.bind_value(cp, "cable_connected")
 
         cp_task = asyncio.create_task(cp.start())
 
@@ -234,13 +237,10 @@ async def main():
 @ui.page("/")
 async def index():
     background_tasks.create_lazy(main(),name="main")
-    ui.navigate.to("/status")
-
-@ui.page("/status")
-async def status():
-    global plug_tgl
     ui.label("Power plug status")
-    plug_tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"})
+    tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark("plug_tgl")
+    if cp is not None:
+        tgl.bind_value(cp, "cable_connected")
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
 ui.run(host="0.0.0.0", port=7500)
