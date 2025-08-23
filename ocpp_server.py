@@ -19,8 +19,14 @@ from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationSta
     ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
 from logging import getLogger
 
-from nicegui import ui, app, background_tasks, ElementFilter
+from nicegui import ui, app, background_tasks, ElementFilter, binding
 from typing import Any
+
+@binding.bindable_dataclass
+class ConnectorStatus:
+    connector_id : int = -1
+    connector_status : str = "Unknown"
+
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -45,6 +51,8 @@ def get_time_str():
     return datetime.now().isoformat()
 
 
+
+
 class OCPPServerHandler(ChargePoint):
 
     def __init__(self, *vargs, **kwargs):
@@ -56,6 +64,7 @@ class OCPPServerHandler(ChargePoint):
         self.boot_notifications = []
         self.remote_ip = None
         self.online = False
+        self.connectors = dict()
         self.shutdown = False
         self.tx_status = ""
         self.timeout = datetime.now()
@@ -85,6 +94,12 @@ class OCPPServerHandler(ChargePoint):
     async def on_status_notification(self, **data):
         self.log_event(("status_notification", (data)))
         logger.warning(f"id={self.id} on_status_notification {data=}")
+        conn_status = ConnectorStatus(**data)
+
+        if conn_status.connector_id not in self.connectors:
+            self.connectors[conn_status.connector_id] = conn_status
+        else:
+            self.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
         return call_result.StatusNotification(
         )
 
