@@ -31,8 +31,10 @@ async def broadcast_to(op, page, **filters):
 
 @binding.bindable_dataclass
 class ConnectorStatus:
-    connector_id : int = -1
+    connector_id : int = 0
     connector_status : str = "Unknown"
+    timestamp : str = "1970.01.01"
+    evse_id : int = 0
 
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
