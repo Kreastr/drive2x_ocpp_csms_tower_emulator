@@ -107,7 +107,7 @@ class OCPPServerHandler(ChargePoint):
 
         if conn_status.connector_id not in self.connectors:
             self.connectors[conn_status.connector_id] = conn_status
-            await broadcast_to(lambda x: x.on_new_connector(conn_status.connector_id), "/", kind=CPCard, marker=self.cp.id)
+            await broadcast_to(lambda x: x.on_new_connector(conn_status.connector_id), "/", kind=CPCard, marker=self.id)
         else:
             self.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
         return call_result.StatusNotification(
@@ -367,7 +367,7 @@ class CPCard(Element):
         logger.warning(f"on new connector {connector_id}")
         with (self.connector_container):
             new_label = ui.label(text=f"{connector_id}: {self.cp.connectors[connector_id].connector_status}")
-            new_label.bind_text(self.cp.connectors[connector_id], "connector_status")
+            new_label.bind_text_from(self.cp.connectors[connector_id], "connector_status", backward=lambda x, cid=connector_id: f"{cid}: {x}")
 
 
 @ui.page("/")

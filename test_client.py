@@ -21,12 +21,22 @@ from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, 
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
 from nicegui import ui, app, background_tasks, ElementFilter
 from ocpp.v201 import enums
+
+from itertools import count
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
 def get_time_str():
     return datetime.now().isoformat()
+
+@dataclass
+class ConnectorModel:
+    id : int
+    auth : bool = False
+    cable_connected : bool = False
+    soc_wh : float = 50000.0
+    usable_capacity : float = 70000.0
 
 class OCPPClient(ChargePoint):
 
@@ -36,28 +46,26 @@ class OCPPClient(ChargePoint):
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
-        self.auth_status = None
-        self.cable_connected = False
-        self.tx_task = None
-        self.soc_kwh = 50.0
-        self.total_capacity_kwh = 70.0
-        self._tx_seq_no = 0
+        self.connectors  = dict((i+1, ConnectorModel(i+1)) for i in range(3))
+        self.exit_flag = False
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
         self.st_task = asyncio.create_task(self.status_task())
+        self.tx_terminator_task = asyncio.create_task(self.transaction_terminator_task())
 
-    @property
-    def seq_no(self):
-        self._tx_seq_no += 1
-        return self._tx_seq_no - 1
+    async def transaction_terminator_task():
+        while not self.exit_flag:
+            await asyncio.sleep(1)
+        
 
     async def transaction_task(self, remote_start_id):
-        self._tx_seq_no = 0
+        _seq_no = count(start=0,step=1)
+
         tx_id = str(uuid4())
         await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                         timestamp=get_time_str(),
                                         trigger_reason=TriggerReasonEnumType.authorized,
-                                        seq_no=self.seq_no,
+                                        seq_no=next(_seq_no),
                                         transaction_info=TransactionType(transaction_id=tx_id,
                                                                          remote_start_id=remote_start_id,
                                                                          ),
@@ -73,7 +81,7 @@ class OCPPClient(ChargePoint):
             await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
                                                   timestamp=get_time_str(),
                                                   trigger_reason=TriggerReasonEnumType.cable_plugged_in,
-                                                  seq_no=self.seq_no,
+                                                  seq_no=next(_seq_no),
                                                   transaction_info=TransactionType(transaction_id=tx_id
                                                                                      )
                                                     ))
@@ -83,7 +91,7 @@ class OCPPClient(ChargePoint):
                 await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
                                                       timestamp=get_time_str(),
                                                       trigger_reason=TriggerReasonEnumType.authorized,
-                                                      seq_no=self.seq_no,
+                                                      seq_no=next(_seq_no),
                                                       transaction_info=TransactionType(transaction_id=tx_id
                                                                                      )
                                                       ))
@@ -92,7 +100,7 @@ class OCPPClient(ChargePoint):
                 await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
                                                       timestamp=get_time_str(),
                                                       trigger_reason=TriggerReasonEnumType.cable_plugged_in,
-                                                      seq_no=self.seq_no,
+                                                      seq_no=next(_seq_no),
                                                       transaction_info=TransactionType(transaction_id=tx_id
                                                                                      )
                                                       ))
@@ -124,9 +132,12 @@ class OCPPClient(ChargePoint):
 
     @on(Action.request_stop_transaction)
     async def request_stop_transaction(self, **data):
+        if self.tx_task is None:
+            return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected)
         logger.warning(f"on request_stop_transaction {data}")
         self.auth_status = None
         await self.tx_task
+        self.tx_task = None
         return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
 
     @on(Action.request_start_transaction)
