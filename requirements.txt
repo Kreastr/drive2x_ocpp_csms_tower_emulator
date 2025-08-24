@@ -5,3 +5,4 @@ uvicorn==0.35.0
 nicegui==2.22.2
 python_slugify==8.0.4
 pyee==13.0.0
+ply==3.11
