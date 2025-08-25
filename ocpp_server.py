@@ -22,6 +22,8 @@ from logging import getLogger
 from nicegui import ui, app, background_tasks, ElementFilter, binding
 from typing import Any
 
+from websockets import Subprotocol
+
 
 async def broadcast_to(op, page, **filters):
     for client in app.clients(page):
@@ -53,9 +55,13 @@ ui.add_css('''
     }
 ''')
 
-logger = getLogger(__name__)
+l2 = getLogger(__name__)
+assert l2 is not None
+logger : logging.Logger = l2
 logger.setLevel(logging.DEBUG)
-logging.lastResort.setFormatter(formatter)
+lr : logging.Handler | None = logging.lastResort
+assert lr is not None
+lr.setFormatter(formatter)
 def get_time_str():
     return datetime.now().isoformat()
 
@@ -175,16 +181,18 @@ async def on_connect(websocket):
     start = cp.start()
     start_task = asyncio.create_task(start)
 
-    result : call_result.GetVariables = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
+    result : call_result.GetVariables | None = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                                   variable=VariableType(name="SerialNumber"))]))
+    assert result is not None
     logger.warning(f"Charger S/N variable {result=}")
-    if result.get_variable_result[0]["attribute_status"] != GetVariableStatusEnumType.accepted:
+    if result.get_variable_result[0].attribute_status != GetVariableStatusEnumType.accepted:
         cp.log_event("Failed to read CP serial number. Refusing to operate.")
         await cp.close_connection()
         return
 
 
-    cp.id = result.get_variable_result[0]["attribute_value"]
+    cp.id = result.get_variable_result[0].attribute_value
+    assert cp.id is not None
     charge_points[cp.id] = cp
     if "X-Real-IP" in websocket.request.headers:
         real_ip = websocket.request.headers["X-Real-IP"]
@@ -249,13 +257,13 @@ def time_based_id():
 
 async def main():
     logging.warning("main start")
-    server = await websockets.serve(on_connect, '0.0.0.0', 9000, subprotocols=['ocpp2.0.1'])
+    server = await websockets.serve(on_connect, '0.0.0.0', 9000, subprotocols=[Subprotocol('ocpp2.0.1')])
     logging.warning("main server ready")
     await server.serve_forever()
     logging.warning("main exit")
 
 @app.get("/cp")
-async def index():
+async def cp_list():
     return {"charge_points": list(charge_points)}
 
 @app.get("/cp/{cp_id}/events/")

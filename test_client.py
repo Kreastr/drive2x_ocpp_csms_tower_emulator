@@ -2,10 +2,11 @@ import asyncio
 import logging
 import ssl
 import sys
+import traceback
 from copy import deepcopy
 from datetime import datetime
+from http.cookiejar import LoadError
 from uuid import uuid4
-from zipimport import cp437_table
 
 import certifi
 import websockets
@@ -27,17 +28,21 @@ from itertools import count
 from atfsm import AFSM, test_data_1 
 from dataclasses import dataclass
 
-from pyee import AsyncIOEventEmitter
+from pyee.asyncio import AsyncIOEventEmitter
+
+TxFSMState = None
+TxFSMCondition = None
+TxFSMEvent = None
 
 transaction_uml = """@startuml
 [*] -> Idle
 Idle -> Authorized : on authorized
-Authorized -> Reject Authorizatoin : on authorized
-Reject Authorization -> Authorized
-Idle -> Cable Connected : if cable connected
-Cable Connected -> Idle : if cable disconnected
+Authorized -> RejectAuthorization : on authorized
+RejectAuthorization -> Authorized
+Idle -> CableConnected : if cable connected
+CableConnected -> Idle : if cable disconnected
 Authorized -> Transaction : if cable connected
-Cable Connected -> Transaction : on authorized
+CableConnected -> Transaction : on authorized
 Transaction -> Transaction : on every report interval
 Transaction -> Idle : if cable disconnected
 Transaction -> Idle : on deauthorized
@@ -63,9 +68,16 @@ class ConnectorModel:
     usable_capacity : float = 70000.0
 
 def get_transaction_fsm(connector : ConnectorModel):
-    fsm = AFSM(uml=transaction_uml)
+    global TxFSMState, TxFSMCondition, TxFSMEvent
+    try:
+        from txfsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
+        fsm = AFSM[TxFSMState, TxFSMCondition, TxFSMEvent](uml=transaction_uml, se_factory=TxFSMState)
+    except ImportError as e:
+        traceback.print_exc()
+        fsm = AFSM(uml=transaction_uml, se_factory=lambda x: str(x))
+    fsm.write_enums("TxFSM")
 
-    fsm.apply_to_all_conditions("if_cable_connected", lambda x: True)
+    fsm.apply_to_all_conditions(TxFSMCondition.if_cable_connected, lambda x: True)
     fsm.apply_to_all_conditions("if_cable_disconnected", lambda x: False)
     return fsm
 
@@ -84,7 +96,7 @@ class OCPPClient(ChargePoint):
         self.st_task = asyncio.create_task(self.status_task())
         self._events = AsyncIOEventEmitter()
         self.tx_tasks = dict(map(lambda k,v: (
-            k, asyncio.create_task(self.transaction_task(v)), self.connectors))
+            k, asyncio.create_task(self.transaction_task(v)), self.connectors)))
 
 
     async def transaction_task(self, connector : ConnectorModel):
@@ -295,7 +307,11 @@ async def index():
     tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark("plug_tgl")
     if cp is not None:
         tgl.bind_value(cp, "cable_connected")
-        await get_transaction_fsm(cp)
+        get_transaction_fsm(cp)
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
+
+# Dummy call to generate enum modules on every run
+get_transaction_fsm(ConnectorModel(id=0))
+
 ui.run(host="0.0.0.0", port=7500)

@@ -1,21 +1,40 @@
 import asyncio
 import dataclasses
+import filecmp
+import os
+import re
+import shutil
+from dataclasses import dataclass
 import logging
 from collections.abc import Callable
 from enum import auto, Enum
+from os import unlink
 from typing import Any, Generic, TypeVar, Type
 
-from slugify import slugify
 from pyee.asyncio import AsyncIOEventEmitter
 
 from logging import getLogger
+
+from state_base import StateBase
+from beartype.claw import beartype_package
+
+from slugify import slugify as helper_slugify
+
+def slugify(x : str, separator="_"):
+    for_caps=re.compile(r"([a-z0-9])([A-Z])")
+    for_numbers=re.compile(r"([a-zA-Z])([0-9])")
+    x = re.sub(for_caps, r"\1"+separator+r"\2", x)
+    x = re.sub(for_numbers, r"\1"+separator+r"\2", x)
+    return helper_slugify(x,separator=separator)
+
+
+beartype_package("ocpp")
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-SE = TypeVar("SE")
-TE = TypeVar("TE")
+SE = TypeVar("SE", bound=StateBase)
 EE = TypeVar("EE")
 CE = TypeVar("CE")
 
@@ -121,17 +140,17 @@ import ply.lex as lex
 lexer = lex.lex()
 
 
-@dataclasses.dataclass
+@dataclass
 class TransitionEvent(Generic[SE, EE]):
-    name : EE
-    target_state : SE
+    name : str
+    target_state : str
 
-@dataclasses.dataclass
+@dataclass
 class TransitionCondition(Generic[SE, CE]):
-    name : CE
-    target_state : SE
+    name : str
+    target_state : str
 
-@dataclasses.dataclass
+@dataclass
 class StateInfo(Generic[SE, CE, EE]):
     name : SE | None = None
     transition_events : list[TransitionEvent[SE, EE]] = dataclasses.field(default_factory=list)
@@ -142,7 +161,7 @@ class StateInfo(Generic[SE, CE, EE]):
     on_loop : str | None = None
     default_transition : SE | None = None
     condition_context : Any = None
-    conditions : dict[CE, Callable[[Any], bool]] = dataclasses.field(default_factory=dict)
+    conditions : dict[str, Callable[[Any], bool]] = dataclasses.field(default_factory=dict)
 
 
 def p_document(p):
@@ -192,7 +211,7 @@ def p_expression_default(p):
     p[0] = ("add_transition", tuple(p), fname)
 
 
-def add_transition(sm_states, p, fname, SE, CE, EE):
+def add_transition(sm_states, p, fname, _se, _ce, _ee):
     if p[1] is not None:
         if p[1] not in sm_states:
             sm_states[p[1]] = StateInfo()
@@ -217,12 +236,12 @@ def add_transition(sm_states, p, fname, SE, CE, EE):
             f"States cannot have more than one default transition. In state {p[1]}")
         sm_states[p[1]].default_transition = p[3]
     elif fname.lower().startswith("on ") or fname.lower().startswith("when "):
-        ti = TransitionEvent[SE, EE](
+        ti = TransitionEvent[_se, _ee](
                             name=slugify(fname, separator="_"),
                             target_state=p[3])
         sm_states[p[1]].transition_events.append(ti)
     elif fname.lower().startswith("if "):
-        ti = TransitionCondition[SE, CE](
+        ti = TransitionCondition[_se, _ce](
                             name=slugify(fname, separator="_"),
                             target_state=p[3])
         sm_states[p[1]].transition_conditions.append(ti)
@@ -311,17 +330,18 @@ import ply.yacc as yacc
 
 class AFSM(Generic[SE, CE, EE]):
 
-    def __init__(self, uml, debug_ply=False):
+    def __init__(self, uml, se_factory : Callable[[str], SE], debug_ply=False):
         self.uml = uml
         self._events = AsyncIOEventEmitter()
 
         self.terminated = False
 
         self.sm_states : dict[SE, StateInfo[SE, CE, EE]] = dict()
+        self.se_factory = se_factory
 
         parser = yacc.yacc()
 
-        ast = parser.parse(test_data_1, debug=debug_ply)
+        ast = parser.parse(uml, debug=debug_ply)
 
         for command in ast:
             if command[0] == "declare_state":
@@ -343,37 +363,59 @@ class AFSM(Generic[SE, CE, EE]):
                 assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
                                                               f"was left uninitialized. Add one to .conditions.")
 
+        logger.warning(f"FSM initial state is { self.current_state }")
         assert self.current_state is not None, "FSM did not have any state marked as initial. Please add one using transition from [*] pseudo-state"
 
         print(self.current_state, self.sm_states)
 
     def write_enums(self, module_name):
-        with open(module_name+"_enums.py", "w") as f:
+        actual_name = slugify(module_name, separator="_") + "_enums.py"
+        shadow_name = actual_name + ".shadow"
+        with open(shadow_name, "w") as f:
             f.write("from enum import Enum\n")
+            f.write(f"""from state_base import StateBase
+
+class {module_name}State(StateBase, str, Enum):
+""")
+            stub = True
+            for st in self.sm_states:
+                if st is not None:
+                    f.write(f"    {st}='{st}'\n")
+                    stub = False
+            if stub:
+                f.write(f"    pass'\n")
+            f.write(f"""
+class {module_name}Condition(str, Enum):
+""")
+            stub = True
+            stv : StateInfo[SE, CE, EE]
+            uniques = set()
+            for st, stv in self.sm_states.items():
+                for tr in stv.transition_conditions:
+                    if tr.name not in uniques:
+                        uniques |= {tr.name}
+                        f.write(f"    {tr.name}='{tr.name}'\n")
+                        stub = False
+            if stub:
+                f.write(f"    pass'\n")
             f.write(f"""
 
-class {module_name}State(str, Enum):
-    
-    @property
-    def on_enter(self):
-        return str(self)+"_on_enter"
-
-    @property
-    def on_exit(self):
-        return str(self)+"_on_exit"
-
-    @property
-    def on_loop(self):
-        return str(self)+"_on_loop"
-
 class {module_name}Event(str, Enum):
-    pass
-
-class {module_name}Condition(str, Enum):
-    pass
-
 """)
-
+            stub = True
+            uniques = set()
+            for st, stv in self.sm_states.items():
+                for tr in stv.transition_events:
+                    if tr.name not in uniques:
+                        uniques |= {tr.name}
+                        f.write(f"    {tr.name}='{tr.name}'\n")
+                        stub = False
+            if stub:
+                f.write(f"    pass'\n")
+        if not filecmp.cmp(shadow_name, actual_name, shallow=False):
+            shutil.move(shadow_name, actual_name)
+        else:
+            unlink(shadow_name)
 
     def subscribe(self, event, callback):
         self._events.on(event, callback)
@@ -383,11 +425,11 @@ class {module_name}Condition(str, Enum):
             st.condition_context = context
 
 
-    def apply_to_all_conditions(self, name : CE, callback):
+    def apply_to_all_conditions(self, condition_name : CE, callback):
         for k, st in self.sm_states.items():
             for transition in st.transition_conditions:
-                if transition.name == name:
-                    st.conditions[name] = callback
+                if transition == condition_name:
+                    st.conditions[transition.name] = callback
 
 
     async def loop(self):
@@ -402,9 +444,8 @@ class {module_name}Condition(str, Enum):
             assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
                                                           f"was left uninitialized. Add one to .conditions.")
             #assert isinstance(transition.name, Type[CE])
-            event : CE = transition.name
-            if st.conditions[event](st.condition_context):
-                await self.transition_to_new_state(st, transition)
+            if st.conditions[ transition.name ](st.condition_context):
+                await self.transition_to_new_state(st, self.se_factory(transition.target_state) if transition.target_state is not None else None)
                 logger.warning(f"FSM after conditional transition is { self.current_state }")
                 return
         if st.default_transition is not None:
@@ -413,7 +454,7 @@ class {module_name}Condition(str, Enum):
 
 
 
-    async def on(self, event):
+    async def on(self, event : EE):
         if self.current_state is None:
             logger.warning(f"Attempted to handle an event before current_state is set.")
             return
@@ -421,35 +462,39 @@ class {module_name}Condition(str, Enum):
             logger.error("Attempted looping a finished FSM")
             return
         logger.warning(f"FSM on event {event}")
-        self._events.emit(event, event)
+        self._events.emit(str(event), event)
         st = self.sm_states[self.current_state]
         for transition in st.transition_events:
             if transition.name == event:
-                await self.transition_to_new_state(st, transition)
+                await self.transition_to_new_state(st, self.se_factory(transition.target_state))
                 logger.warning(f"FSM after event state is { self.current_state }")
                 break
 
 
-    async def transition_to_new_state(self, st, transition):
+    async def transition_to_new_state(self, st, target_state : SE | None):
         if self.current_state is None:
             logger.error("Attempted transitioning a FSM without current_state")
             return
 
+        assert isinstance(target_state, StateBase) or target_state is None, f"{type(target_state)}"
+
         if self.terminated:
             logger.error("Attempted transitioning a finished FSM")
             return
-        if transition.target_state is None:
+        if target_state is None:
             logger.warning("FSM reached its termination point")
             self.terminated = True
-            self.current_state = transition.target_state
+            self.current_state = target_state
             self._events.emit("on_terminated", "on_terminated")
             return
-        if transition.target_state == self.current_state:
+
+        self_current_state : SE = self.current_state
+        if target_state == self_current_state:
 
             if st.on_loop is not None:
-                self._events.emit(st.on_loop, st.on_loop, self.current_state)
+                self._events.emit(st.on_loop, st.on_loop, self_current_state)
             else:
-                self._events.emit(self.current_state.on_loop, self.current_state.on_loop, self.current_state)
+                self._events.emit(self_current_state.on_loop, self_current_state.on_loop, self_current_state)
         else:
 
             if st.on_exit is not None:
@@ -457,25 +502,29 @@ class {module_name}Condition(str, Enum):
             else:
                 self._events.emit(self.current_state.on_exit, self.current_state.on_exit, self.current_state)
 
-            self.current_state = transition.target_state
+            self.current_state = target_state
+            self_current_state : SE = self.current_state
 
-            st = self.sm_states[self.current_state]
+            st = self.sm_states[self_current_state]
             if st.on_enter is not None:
-                self._events.emit(st.on_enter, st.on_enter, self.current_state)
+                self._events.emit(st.on_enter, st.on_enter, self_current_state)
             else:
-                self._events.emit(self.current_state.on_enter, self.current_state.on_enter,
-                                  self.current_state)
+                self._events.emit(self_current_state.on_enter, self_current_state.on_enter,
+                                  self_current_state)
 
 from testfsm_enums import testfsmState, testfsmCondition, testfsmEvent
 
 async def main():
-    fsm = AFSM[testfsmState, testfsmCondition, testfsmEvent](uml=test_data_1, debug_ply=True)
+    fsm : AFSM[testfsmState, testfsmCondition, testfsmEvent] = AFSM[testfsmState, testfsmCondition, testfsmEvent](uml=test_data_1,
+                                                                                                                  se_factory=testfsmState,
+                                                                                                                  debug_ply=True)
     fsm.write_enums("testfsm")
-    fsm.sm_states["state2"].conditions["if_aborted"] = lambda x: True
-    fsm.subscribe("state1_on_exit", lambda event, old_state: logger.warning(f"{event=}, {old_state=}"))
-    fsm.subscribe("state2_on_enter", lambda event, new_state: logger.warning(f"{event=}, {new_state=}"))
-    await fsm.on("on_succeeded")
+    fsm.sm_states[testfsmState.state_2].conditions[testfsmCondition.if_aborted] = lambda x: False
+    fsm.subscribe(testfsmState.state_1.on_exit, lambda event, old_state: logger.warning(f"{event=}, {old_state=}"))
+    fsm.subscribe(testfsmState.state_2.on_enter, lambda event, new_state: logger.warning(f"{event=}, {new_state=}"))
+    await fsm.on(testfsmEvent.on_succeeded)
     await fsm.loop()
+    await fsm.on(testfsmEvent.on_succeeded)
     await fsm.loop()
 
 if __name__ == "__main__":

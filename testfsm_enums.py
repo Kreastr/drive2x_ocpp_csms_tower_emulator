@@ -1,23 +1,18 @@
 from enum import Enum
+from state_base import StateBase
 
-
-class testfsmState(str, Enum):
-    
-    @property
-    def on_enter(self):
-        return str(self)+"_on_enter"
-
-    @property
-    def on_exit(self):
-        return str(self)+"_on_exit"
-
-    @property
-    def on_loop(self):
-        return str(self)+"_on_loop"
-
-class testfsmEvent(str, Enum):
-    pass
+class testfsmState(StateBase, str, Enum):
+    state_1='state_1'
+    state_2='state_2'
+    state_3='state_3'
 
 class testfsmCondition(str, Enum):
-    pass
+    if_aborted='if_aborted'
 
+
+class testfsmEvent(str, Enum):
+    on_succeeded='on_succeeded'
+    on_aborted_2='on_aborted_2'
+    on_failed='on_failed'
+    on_succeeded_save_result='on_succeeded_save_result'
+    on_aborted='on_aborted'
