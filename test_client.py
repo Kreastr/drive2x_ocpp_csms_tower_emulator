@@ -23,6 +23,30 @@ from nicegui import ui, app, background_tasks, ElementFilter
 from ocpp.v201 import enums
 
 from itertools import count
+
+from atfsm import AFSM, test_data_1 
+from dataclasses import dataclass
+
+from pyee import AsyncIOEventEmitter
+
+transaction_uml = """@startuml
+[*] -> Idle
+Idle -> Authorized : on authorized
+Authorized -> Reject Authorizatoin : on authorized
+Reject Authorization -> Authorized
+Idle -> Cable Connected : if cable connected
+Cable Connected -> Idle : if cable disconnected
+Authorized -> Transaction : if cable connected
+Cable Connected -> Transaction : on authorized
+Transaction -> Transaction : on every report interval
+Transaction -> Idle : if cable disconnected
+Transaction -> Idle : on deauthorized
+Authorized -> Idle : on deauthorized
+@enduml
+"""
+
+
+
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -38,6 +62,13 @@ class ConnectorModel:
     soc_wh : float = 50000.0
     usable_capacity : float = 70000.0
 
+def get_transaction_fsm(connector : ConnectorModel):
+    fsm = AFSM(uml=transaction_uml)
+
+    fsm.apply_to_all_conditions("if_cable_connected", lambda x: True)
+    fsm.apply_to_all_conditions("if_cable_disconnected", lambda x: False)
+    return fsm
+
 class OCPPClient(ChargePoint):
 
     def __init__(self, *vargs, **kwargs):
@@ -51,17 +82,22 @@ class OCPPClient(ChargePoint):
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
         self.st_task = asyncio.create_task(self.status_task())
-        self.tx_terminator_task = asyncio.create_task(self.transaction_terminator_task())
+        self._events = AsyncIOEventEmitter()
+        self.tx_tasks = dict(map(lambda k,v: (
+            k, asyncio.create_task(self.transaction_task(v)), self.connectors))
 
-    async def transaction_terminator_task():
-        while not self.exit_flag:
-            await asyncio.sleep(1)
-        
 
-    async def transaction_task(self, remote_start_id):
+    async def transaction_task(self, connector : ConnectorModel):
+        fsm = get_transaction_fsm(connector)
+
+
         _seq_no = count(start=0,step=1)
 
         tx_id = str(uuid4())
+
+        while True:
+            await asyncio.sleep(1)
+
         await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                         timestamp=get_time_str(),
                                         trigger_reason=TriggerReasonEnumType.authorized,
@@ -259,6 +295,7 @@ async def index():
     tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark("plug_tgl")
     if cp is not None:
         tgl.bind_value(cp, "cable_connected")
+        await get_transaction_fsm(cp)
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
 ui.run(host="0.0.0.0", port=7500)

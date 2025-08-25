@@ -3,7 +3,7 @@ import dataclasses
 import logging
 from collections.abc import Callable
 from enum import auto, Enum
-from typing import Any
+from typing import Any, Generic, TypeVar, Type
 
 from slugify import slugify
 from pyee.asyncio import AsyncIOEventEmitter
@@ -12,6 +12,13 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+SE = TypeVar("SE")
+TE = TypeVar("TE")
+EE = TypeVar("EE")
+CE = TypeVar("CE")
+
 
 test_data_1 = """@startuml
 scale 600 width
@@ -113,28 +120,29 @@ def t_colons_error(t):
 import ply.lex as lex
 lexer = lex.lex()
 
-class TransitionType(str, Enum):
-
-    EVENT = "EVENT"
-    CONDITION = "CONDITION"
 
 @dataclasses.dataclass
-class TransitionInfo:
-    transition_type : TransitionType
-    name : str
-    target_state : str
+class TransitionEvent(Generic[SE, EE]):
+    name : EE
+    target_state : SE
 
 @dataclasses.dataclass
-class StateInfo:
-    transitions : list[TransitionInfo] = dataclasses.field(default_factory=list)
+class TransitionCondition(Generic[SE, CE]):
+    name : CE
+    target_state : SE
+
+@dataclasses.dataclass
+class StateInfo(Generic[SE, CE, EE]):
+    name : SE | None = None
+    transition_events : list[TransitionEvent[SE, EE]] = dataclasses.field(default_factory=list)
+    transition_conditions : list[TransitionCondition[SE, CE]] = dataclasses.field(default_factory=list)
     is_initial : bool = False
-    name : str = "Unnamed"
     on_enter : str | None = None
     on_exit : str | None = None
     on_loop : str | None = None
-    default_transition : str | None = None
+    default_transition : SE | None = None
     condition_context : Any = None
-    conditions : dict[str, Callable[[Any], bool]] = dataclasses.field(default_factory=dict)
+    conditions : dict[CE, Callable[[Any], bool]] = dataclasses.field(default_factory=dict)
 
 
 def p_document(p):
@@ -184,7 +192,7 @@ def p_expression_default(p):
     p[0] = ("add_transition", tuple(p), fname)
 
 
-def add_transition(sm_states, p, fname):
+def add_transition(sm_states, p, fname, SE, CE, EE):
     if p[1] is not None:
         if p[1] not in sm_states:
             sm_states[p[1]] = StateInfo()
@@ -204,53 +212,52 @@ def add_transition(sm_states, p, fname):
                                                      f"states are {p[3]} and {k}.")
         return
 
-    ti = None
     if fname == "default":
         assert  sm_states[p[1]].default_transition is None, (
             f"States cannot have more than one default transition. In state {p[1]}")
         sm_states[p[1]].default_transition = p[3]
     elif fname.lower().startswith("on ") or fname.lower().startswith("when "):
-        ti = TransitionInfo(transition_type=TransitionType.EVENT,
+        ti = TransitionEvent[SE, EE](
                             name=slugify(fname, separator="_"),
                             target_state=p[3])
+        sm_states[p[1]].transition_events.append(ti)
     elif fname.lower().startswith("if "):
-        ti = TransitionInfo(transition_type=TransitionType.CONDITION,
+        ti = TransitionCondition[SE, CE](
                             name=slugify(fname, separator="_"),
                             target_state=p[3])
+        sm_states[p[1]].transition_conditions.append(ti)
     else:
         raise Exception(f"Invalid syntax. State comment must "
                         f"start with on/when/if. In state {p[1]}. Bad value was: {fname}")
-    if ti is not None:
-        sm_states[p[1]].transitions.append(ti)
 
 
 def p_expression_as(p):
-    '''expression : NAME WS STRING WS NAME WS NAME NEWLINE
+    '''expression : state_name string state_name NAME NEWLINE
     '''
     assert p[1] == "state", f"unknown syntax {''.join(p)}"
-    assert p[5] == "as", f"unknown syntax {''.join(p)}"
-    p[0] = ("declare_state", p[3], p[7])
+    assert p[3] == "as", f"unknown syntax {''.join(p)}"
+    p[0] = ("declare_state", p[2], p[4])
 
 
-def declare_state(sm_states, p3, p7):
+def declare_state(sm_states, p3, p7, state_info_cls):
     if p7 not in sm_states:
-        sm_states[p7] = StateInfo()
+        sm_states[p7] = state_info_cls()
     sm_states[p7].name = p3
 
 
 def p_expression_colon(p):
-    '''expression : NAME WS COLON STRING
+    '''expression : state_name COLON STRING
     '''
     valid_prefices = ["enter ", "exit ", "loop "]
     for valid_prefix in valid_prefices:
-        if p[4].lower().startswith(valid_prefix):
-            p[0] = ("state_actions", p[1], p[4].split(" ")[0], slugify(" ".join(p[4].split(" ")[1:]), separator="_"))
+        if p[3].lower().startswith(valid_prefix):
+            p[0] = ("state_actions", p[1], p[3].split(" ")[0], slugify(" ".join(p[3].split(" ")[1:]), separator="_"))
             return
     raise Exception(f"Invalid syntax in state {p[1]} action {p[4]} must start with one of: {valid_prefices}")
 
-def state_actions(sm_states, p1, slot, action):
+def state_actions(sm_states, p1, slot, action, state_info_cls):
     if p1 not in sm_states:
-        sm_states[p1] = StateInfo()
+        sm_states[p1] = state_info_cls()
     if slot == "enter":
         sm_states[p1].on_enter = action
     if slot == "exit":
@@ -259,16 +266,23 @@ def state_actions(sm_states, p1, slot, action):
         sm_states[p1].on_loop = action
 
 def p_expression_other(p):
-    '''expression : NAME WS STRING WS NAME NEWLINE
+    '''expression : state_name string state_name NEWLINE
     '''
     p[0] = None
 
+def p_string(p):
+    '''string : STRING WS
+              | STRING
+    '''
+    p[0] = p[1]
+
 def p_state_name(p):
     '''state_name : NAME WS
-                  | NAME NEWLINE
+                  | state_name WS
                   | START_END WS
                   | START_END NEWLINE
                   | START_END
+                  | NAME
     '''
     if p[1] == r"[*]":
         p[0] = None
@@ -289,89 +303,138 @@ def p_colon_string(p):
     p[0] = p[2]
 
 def p_error(t):
-    print("Syntax error at ")
-    print(t)
+    if t is not None:
+        raise Exception(f"Syntax error at {t}")
 
 
 import ply.yacc as yacc
 
-class AFSM:
+class AFSM(Generic[SE, CE, EE]):
 
-    def __init__(self, uml):
+    def __init__(self, uml, debug_ply=False):
         self.uml = uml
         self._events = AsyncIOEventEmitter()
 
         self.terminated = False
 
-        self.sm_states : dict[str, StateInfo] = dict()
+        self.sm_states : dict[SE, StateInfo[SE, CE, EE]] = dict()
 
         parser = yacc.yacc()
 
-        ast = parser.parse(test_data_1)
+        ast = parser.parse(test_data_1, debug=debug_ply)
 
         for command in ast:
             if command[0] == "declare_state":
-                declare_state(self.sm_states, *command[1:])
+                declare_state(self.sm_states, command[1], command[2], StateInfo[SE, CE, EE])
             elif command[0] == "state_actions":
-                state_actions(self.sm_states, *command[1:])
+                state_actions(self.sm_states, command[1], command[2], command[3], StateInfo[SE, CE, EE])
             elif command[0] == "add_transition":
-                add_transition(self.sm_states, *command[1:])
+                add_transition(self.sm_states, command[1], command[2], SE, CE, EE)
             else:
                 raise Exception(f"Unknown command {command[0]}")
 
-        self.current_state = None
+        self.current_state : SE | None = None
 
         for k, st in self.sm_states.items():
             if st.is_initial:
                 self.current_state = k
                 break
-            for transition in st.transitions:
-                if transition.transition_type == TransitionType.CONDITION:
-                    assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
+            for transition in st.transition_conditions:
+                assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
                                                               f"was left uninitialized. Add one to .conditions.")
 
         assert self.current_state is not None, "FSM did not have any state marked as initial. Please add one using transition from [*] pseudo-state"
 
         print(self.current_state, self.sm_states)
 
+    def write_enums(self, module_name):
+        with open(module_name+"_enums.py", "w") as f:
+            f.write("from enum import Enum\n")
+            f.write(f"""
+
+class {module_name}State(str, Enum):
+    
+    @property
+    def on_enter(self):
+        return str(self)+"_on_enter"
+
+    @property
+    def on_exit(self):
+        return str(self)+"_on_exit"
+
+    @property
+    def on_loop(self):
+        return str(self)+"_on_loop"
+
+class {module_name}Event(str, Enum):
+    pass
+
+class {module_name}Condition(str, Enum):
+    pass
+
+""")
+
 
     def subscribe(self, event, callback):
         self._events.on(event, callback)
+
+    def apply_context_to_all_states(self, context):
+        for k, st in self.sm_states.items():
+            st.condition_context = context
+
+
+    def apply_to_all_conditions(self, name : CE, callback):
+        for k, st in self.sm_states.items():
+            for transition in st.transition_conditions:
+                if transition.name == name:
+                    st.conditions[name] = callback
+
 
     async def loop(self):
         if self.terminated:
             logger.error("Attempted looping a finished FSM")
             return
+        if self.current_state is None:
+            raise Exception("Trying to loop before current_state is set is not allowed.")
         st = self.sm_states[self.current_state]
-        for transition in st.transitions:
-            if transition.transition_type == TransitionType.CONDITION:
-                assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
+        transition : TransitionCondition[SE, CE]
+        for transition in st.transition_conditions:
+            assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
                                                           f"was left uninitialized. Add one to .conditions.")
-                if st.conditions[transition.name](st.condition_context):
-                    await self.transition_to_new_state(st, transition)
-                    logger.warning(f"FSM after conditional transition is { self.current_state }")
-                    return
+            #assert isinstance(transition.name, Type[CE])
+            event : CE = transition.name
+            if st.conditions[event](st.condition_context):
+                await self.transition_to_new_state(st, transition)
+                logger.warning(f"FSM after conditional transition is { self.current_state }")
+                return
         if st.default_transition is not None:
-            await self.transition_to_new_state(st, transition)
+            await self.transition_to_new_state(st, st.default_transition)
             logger.warning(f"FSM after default transition is { self.current_state }")
 
 
 
     async def on(self, event):
+        if self.current_state is None:
+            logger.warning(f"Attempted to handle an event before current_state is set.")
+            return
         if self.terminated:
             logger.error("Attempted looping a finished FSM")
             return
         logger.warning(f"FSM on event {event}")
         self._events.emit(event, event)
         st = self.sm_states[self.current_state]
-        for transition in st.transitions:
-            if transition.transition_type == TransitionType.EVENT and transition.name == event:
+        for transition in st.transition_events:
+            if transition.name == event:
                 await self.transition_to_new_state(st, transition)
                 logger.warning(f"FSM after event state is { self.current_state }")
                 break
 
 
     async def transition_to_new_state(self, st, transition):
+        if self.current_state is None:
+            logger.error("Attempted transitioning a FSM without current_state")
+            return
+
         if self.terminated:
             logger.error("Attempted transitioning a finished FSM")
             return
@@ -386,13 +449,13 @@ class AFSM:
             if st.on_loop is not None:
                 self._events.emit(st.on_loop, st.on_loop, self.current_state)
             else:
-                self._events.emit(self.current_state + "_on_loop", self.current_state + "_on_loop", self.current_state)
+                self._events.emit(self.current_state.on_loop, self.current_state.on_loop, self.current_state)
         else:
 
             if st.on_exit is not None:
                 self._events.emit(st.on_exit, st.on_exit, self.current_state)
             else:
-                self._events.emit(self.current_state + "_on_exit", self.current_state + "_on_exit", self.current_state)
+                self._events.emit(self.current_state.on_exit, self.current_state.on_exit, self.current_state)
 
             self.current_state = transition.target_state
 
@@ -400,12 +463,14 @@ class AFSM:
             if st.on_enter is not None:
                 self._events.emit(st.on_enter, st.on_enter, self.current_state)
             else:
-                self._events.emit(self.current_state + "_on_enter", self.current_state + "_on_enter",
+                self._events.emit(self.current_state.on_enter, self.current_state.on_enter,
                                   self.current_state)
 
+from testfsm_enums import testfsmState, testfsmCondition, testfsmEvent
 
 async def main():
-    fsm = AFSM(uml=test_data_1)
+    fsm = AFSM[testfsmState, testfsmCondition, testfsmEvent](uml=test_data_1, debug_ply=True)
+    fsm.write_enums("testfsm")
     fsm.sm_states["state2"].conditions["if_aborted"] = lambda x: True
     fsm.subscribe("state1_on_exit", lambda event, old_state: logger.warning(f"{event=}, {old_state=}"))
     fsm.subscribe("state2_on_enter", lambda event, new_state: logger.warning(f"{event=}, {new_state=}"))
@@ -413,4 +478,5 @@ async def main():
     await fsm.loop()
     await fsm.loop()
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
