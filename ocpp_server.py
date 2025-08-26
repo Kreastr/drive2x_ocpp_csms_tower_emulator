@@ -13,7 +13,7 @@ from ocpp.v16.enums import RegistrationStatus
 from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
 from ocpp.v201.call import GetVariables
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType, IdTokenInfoType, IdTokenType, VariableType, \
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, GetVariableResultType, IdTokenInfoType, IdTokenType, VariableType, \
     SetVariableDataType, EVSEType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
     ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
@@ -184,6 +184,7 @@ async def on_connect(websocket):
     result : call_result.GetVariables | None = await cp.call(call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                                   variable=VariableType(name="SerialNumber"))]))
     assert result is not None
+    result.get_variable_result = list(map(lambda x: GetVariableResultType(**x), result.get_variable_result))
     logger.warning(f"Charger S/N variable {result=}")
     if result.get_variable_result[0].attribute_status != GetVariableStatusEnumType.accepted:
         cp.log_event("Failed to read CP serial number. Refusing to operate.")

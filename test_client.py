@@ -30,9 +30,8 @@ from dataclasses import dataclass
 
 from pyee.asyncio import AsyncIOEventEmitter
 
-TxFSMState = None
-TxFSMCondition = None
-TxFSMEvent = None
+from typing import Any, Callable, Iterator, TypeVar, Generic
+
 
 transaction_uml = """@startuml
 [*] -> Idle
@@ -50,6 +49,11 @@ Authorized -> Idle : on deauthorized
 @enduml
 """
 
+
+_fsm = AFSM(uml=transaction_uml, se_factory=lambda x: str(x))
+_fsm.write_enums("TxFSM")
+    
+from txfsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
 
 
 logger = getLogger(__name__)
@@ -69,17 +73,50 @@ class ConnectorModel:
 
 def get_transaction_fsm(connector : ConnectorModel):
     global TxFSMState, TxFSMCondition, TxFSMEvent
-    try:
-        from txfsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
-        fsm = AFSM[TxFSMState, TxFSMCondition, TxFSMEvent](uml=transaction_uml, se_factory=TxFSMState)
-    except ImportError as e:
-        traceback.print_exc()
-        fsm = AFSM(uml=transaction_uml, se_factory=lambda x: str(x))
-    fsm.write_enums("TxFSM")
+    fsm = AFSM[TxFSMState, TxFSMCondition, TxFSMEvent](uml=transaction_uml, se_factory=TxFSMState)
 
     fsm.apply_to_all_conditions(TxFSMCondition.if_cable_connected, lambda x: True)
-    fsm.apply_to_all_conditions("if_cable_disconnected", lambda x: False)
+    fsm.apply_to_all_conditions(TxFSMCondition.if_cable_disconnected, lambda x: False)
     return fsm
+
+ERT = TypeVar("ERT")
+class ResettableIterator(Generic[ERT]):
+
+    def __init__(self, factory: Callable[[], Iterator[ERT]]) -> None:
+        self._factory = factory
+        self._current : Iterator[ERT] | None = None
+        self.reset()
+
+    def __iter__(self) -> Iterator[ERT]:
+        if self._current is None:
+            raise Exception("Iterator is not ready")
+        return self._current
+
+
+    def __next__(self) -> ERT:
+        if self._current is None:
+            raise Exception("Iterator is not ready")
+        return next(self._current)
+    
+    def reset(self) -> None:
+        self._current = self._factory()
+
+ET = TypeVar("ET")
+class ResettableValue(Generic[ET]):
+
+    def __init__(self, factory: Callable[[], ET]) -> None:
+        self._factory = factory
+        self._current : ET | None = None
+        self.reset()
+
+    def value(self) -> ET:
+        if self._current is None:
+            raise Exception("Value is not ready")
+        return self._current
+    
+    def reset(self) -> None:
+        self._current = self._factory()
+
 
 class OCPPClient(ChargePoint):
 
@@ -95,17 +132,20 @@ class OCPPClient(ChargePoint):
         self.hb_task = asyncio.create_task(self.heartbeat_task())
         self.st_task = asyncio.create_task(self.status_task())
         self._events = AsyncIOEventEmitter()
-        self.tx_tasks = dict(map(lambda k,v: (
-            k, asyncio.create_task(self.transaction_task(v)), self.connectors)))
+        self.tx_tasks = dict(map(lambda x: (
+            x[0], asyncio.create_task(self.transaction_task(x[1]))), self.connectors.items()))
 
 
     async def transaction_task(self, connector : ConnectorModel):
         fsm = get_transaction_fsm(connector)
 
 
-        _seq_no = count(start=0,step=1)
+        _seq_no = ResettableIterator[int](factory=lambda:count(start=0,step=1))
+        
 
-        tx_id = str(uuid4())
+        tx_id = ResettableValue[str](factory= lambda : str(uuid4()))
+
+        #fsm.on(
 
         while True:
             await asyncio.sleep(1)
@@ -268,7 +308,7 @@ async def main():
     #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
-    ws_args = dict(subprotocols=["ocpp2.0.1"],
+    ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],
                open_timeout=5)
     if uri.startswith("wss://"):
         ws_args["ssl"] = ctx
@@ -290,7 +330,6 @@ async def main():
             reason=BootReasonEnumType.power_up,
             custom_data={"vendorId": "ACME labs", "sn": 234}
         )
-        boot_notification.extra_field = 5
         result : call_result.BootNotification = await cp.call(boot_notification)
         logger.warning(result)
         if result.status != enums.RegistrationStatusEnumType.accepted:
@@ -307,7 +346,6 @@ async def index():
     tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark("plug_tgl")
     if cp is not None:
         tgl.bind_value(cp, "cable_connected")
-        get_transaction_fsm(cp)
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
 

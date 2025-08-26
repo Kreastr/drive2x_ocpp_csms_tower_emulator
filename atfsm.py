@@ -16,9 +16,10 @@ from pyee.asyncio import AsyncIOEventEmitter
 from logging import getLogger
 
 from state_base import StateBase
-from beartype.claw import beartype_package
+from beartype import beartype
 
 from slugify import slugify as helper_slugify
+from pathlib import Path
 
 def slugify(x : str, separator="_"):
     for_caps=re.compile(r"([a-z0-9])([A-Z])")
@@ -28,7 +29,6 @@ def slugify(x : str, separator="_"):
     return helper_slugify(x,separator=separator)
 
 
-beartype_package("ocpp")
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -328,6 +328,7 @@ def p_error(t):
 
 import ply.yacc as yacc
 
+@beartype
 class AFSM(Generic[SE, CE, EE]):
 
     def __init__(self, uml, se_factory : Callable[[str], SE], debug_ply=False):
@@ -412,7 +413,7 @@ class {module_name}Event(str, Enum):
                         stub = False
             if stub:
                 f.write(f"    pass'\n")
-        if not filecmp.cmp(shadow_name, actual_name, shallow=False):
+        if not Path(actual_name).exists() or not filecmp.cmp(shadow_name, actual_name, shallow=False):
             shutil.move(shadow_name, actual_name)
         else:
             unlink(shadow_name)
