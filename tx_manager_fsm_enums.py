@@ -1,0 +1,27 @@
+from enum import Enum
+from state_base import StateBase
+
+class TxManagerFSMState(StateBase, str, Enum):
+    unknown='unknown'
+    occupied='occupied'
+    available='available'
+    authorized='authorized'
+    ready='ready'
+    charging='charging'
+    discharging='discharging'
+    terminating='terminating'
+
+class TxManagerFSMCondition(str, Enum):
+    if_occupied='if_occupied'
+    if_available='if_available'
+    if_charge_setpoint='if_charge_setpoint'
+    if_discharge_setpoint='if_discharge_setpoint'
+    if_idle_setpoint='if_idle_setpoint'
+
+
+class TxManagerFSMEvent(str, Enum):
+    on_start_tx_event='on_start_tx_event'
+    on_authorized='on_authorized'
+    on_deauthorized='on_deauthorized'
+    on_terminate='on_terminate'
+    on_end_tx_event='on_end_tx_event'

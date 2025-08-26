@@ -16,7 +16,7 @@ from logging import getLogger
 
 from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification, SetVariables
 from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType, GetVariableDataType, \
-    GetVariableResultType, VariableType, SetVariableResultType, TransactionType
+    GetVariableResultType, StatusInfoType, VariableType, SetVariableResultType, TransactionType
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
@@ -25,7 +25,7 @@ from ocpp.v201 import enums
 
 from itertools import count
 
-from atfsm import AFSM, test_data_1 
+from atfsm import AFSM 
 from dataclasses import dataclass
 
 from pyee.asyncio import AsyncIOEventEmitter
@@ -36,21 +36,33 @@ from typing import Any, Callable, Iterator, TypeVar, Generic
 transaction_uml = """@startuml
 [*] -> Idle
 Idle -> Authorized : on authorized
-Authorized -> RejectAuthorization : on authorized
-RejectAuthorization -> Authorized
 Idle -> CableConnected : if cable connected
 CableConnected -> Idle : if cable disconnected
 Authorized -> Transaction : if cable connected
 CableConnected -> Transaction : on authorized
-Transaction -> Transaction : on every report interval
+Transaction -> Transaction : on report interval
 Transaction -> Idle : if cable disconnected
 Transaction -> Idle : on deauthorized
 Authorized -> Idle : on deauthorized
 @enduml
 """
 
+@dataclass
+class ConnectorModel:
+    id : int
+    auth : bool = False
+    cable_connected : bool = False
+    soc_wh : float = 50000.0
+    usable_capacity : float = 70000.0
 
-_fsm = AFSM(uml=transaction_uml, se_factory=lambda x: str(x))
+@dataclass
+class TxFSMContext:
+    connector : ConnectorModel
+    auth_status : Any = None
+    remote_id : int = -1
+
+
+_fsm = AFSM(uml=transaction_uml, context=TxFSMContext(ConnectorModel(1)), se_factory=lambda x: str(x))
 _fsm.write_enums("TxFSM")
     
 from txfsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
@@ -63,20 +75,14 @@ logger.setLevel(logging.DEBUG)
 def get_time_str():
     return datetime.now().isoformat()
 
-@dataclass
-class ConnectorModel:
-    id : int
-    auth : bool = False
-    cable_connected : bool = False
-    soc_wh : float = 50000.0
-    usable_capacity : float = 70000.0
 
-def get_transaction_fsm(connector : ConnectorModel):
+def get_transaction_fsm(context : TxFSMContext):
     global TxFSMState, TxFSMCondition, TxFSMEvent
-    fsm = AFSM[TxFSMState, TxFSMCondition, TxFSMEvent](uml=transaction_uml, se_factory=TxFSMState)
+    fsm = AFSM[TxFSMState, TxFSMCondition, 
+                                                                      TxFSMEvent, TxFSMContext](uml=transaction_uml, 
+                                                                                                context=context,
+                                                                                                se_factory=TxFSMState)
 
-    fsm.apply_to_all_conditions(TxFSMCondition.if_cable_connected, lambda x: True)
-    fsm.apply_to_all_conditions(TxFSMCondition.if_cable_disconnected, lambda x: False)
     return fsm
 
 ERT = TypeVar("ERT")
@@ -108,7 +114,8 @@ class ResettableValue(Generic[ET]):
         self._factory = factory
         self._current : ET | None = None
         self.reset()
-
+    
+    @property
     def value(self) -> ET:
         if self._current is None:
             raise Exception("Value is not ready")
@@ -126,18 +133,24 @@ class OCPPClient(ChargePoint):
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
-        self.connectors  = dict((i+1, ConnectorModel(i+1)) for i in range(3))
+        self.task_contexts  = dict((i+1, TxFSMContext(ConnectorModel(i+1))) for i in range(3))
         self.exit_flag = False
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
         self.st_task = asyncio.create_task(self.status_task())
         self._events = AsyncIOEventEmitter()
+
+        self.tx_fsms : dict[int, AFSM[TxFSMState, TxFSMCondition, TxFSMEvent, TxFSMContext]] = dict(map(lambda x: (
+            x[0], get_transaction_fsm(x[1])), self.task_contexts.items()))
         self.tx_tasks = dict(map(lambda x: (
-            x[0], asyncio.create_task(self.transaction_task(x[1]))), self.connectors.items()))
+            x[0], asyncio.create_task(self.transaction_task(x[1], 
+                                                            self.tx_fsms[x[0]]))), 
+                                      self.task_contexts.items()))
 
 
-    async def transaction_task(self, connector : ConnectorModel):
-        fsm = get_transaction_fsm(connector)
+    async def transaction_task(self, context : TxFSMContext, fsm : AFSM[TxFSMState, TxFSMCondition, TxFSMEvent, TxFSMContext]):
+
+        
 
 
         _seq_no = ResettableIterator[int](factory=lambda:count(start=0,step=1))
@@ -145,20 +158,44 @@ class OCPPClient(ChargePoint):
 
         tx_id = ResettableValue[str](factory= lambda : str(uuid4()))
 
-        #fsm.on(
+        async def setup_transaction(*vargs):
+            _seq_no.reset()
+            tx_id.reset()
+
+        async def inform_on_remote_start(*vargs):
+
+            await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                        timestamp=get_time_str(),
+                                        trigger_reason=TriggerReasonEnumType.remote_start,
+                                        seq_no=next(_seq_no),
+                                        transaction_info=TransactionType(transaction_id=tx_id.value,
+                                                                         remote_start_id=context.remote_id,
+                                                                         ),
+                                        id_token=context.auth_status
+                                        ))
+
+        async def inform_on_first_plugged_in(*vargs):
+
+            await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                        timestamp=get_time_str(),
+                                        trigger_reason=TriggerReasonEnumType.cable_plugged_in,
+                                        seq_no=next(_seq_no),
+                                        transaction_info=TransactionType(transaction_id=tx_id.value,
+                                                                         ),
+                                        id_token=context.auth_status
+                                        ))
+
+        fsm.on(TxFSMState.idle.on_exit, setup_transaction)
+        fsm.on(TxFSMState.authorized.on_enter, inform_on_remote_start)
+        fsm.on(TxFSMState.cableconnected.on_enter, inform_on_first_plugged_in)
+
+        
+
+        fsm.apply_to_all_conditions(TxFSMCondition.if_cable_connected, lambda c, x: c.connector.cable_connected)
+        fsm.apply_to_all_conditions(TxFSMCondition.if_cable_disconnected, lambda c, x: not c.connector.cable_connected)
 
         while True:
             await asyncio.sleep(1)
-
-        await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
-                                        timestamp=get_time_str(),
-                                        trigger_reason=TriggerReasonEnumType.authorized,
-                                        seq_no=next(_seq_no),
-                                        transaction_info=TransactionType(transaction_id=tx_id,
-                                                                         remote_start_id=remote_start_id,
-                                                                         ),
-                                        id_token=self.auth_status
-                                        ))
 
         while not self.cable_connected:
             if self.auth_status is None:
@@ -203,13 +240,16 @@ class OCPPClient(ChargePoint):
             await self.call(heartbeat)
 
     async def status_task(self):
+        """
         prev_status = self.cable_connected
-        await self.post_status_notification()
+        await self.post_status_notification()"""
         while True:
             await asyncio.sleep(1)
+            """
             if prev_status != self.cable_connected:
                 await self.post_status_notification()
                 prev_status = self.cable_connected
+                """
 
     async def post_status_notification(self):
         status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
@@ -220,19 +260,43 @@ class OCPPClient(ChargePoint):
 
     @on(Action.request_stop_transaction)
     async def request_stop_transaction(self, **data):
-        if self.tx_task is None:
-            return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected)
         logger.warning(f"on request_stop_transaction {data}")
-        self.auth_status = None
-        await self.tx_task
-        self.tx_task = None
+        if "evse_id" in data:
+            evse_id = int(data["evse_id"])
+        else:
+            evse_id = 1
+        ctxt = self.task_contexts[evse_id]
+        fsm = self.tx_fsms[evse_id]
+
+        if ctxt.auth_status is None:
+            return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected)
+        ctxt.auth_status = None
+        
+        await fsm.handle(TxFSMEvent.on_deauthorized)
+
         return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
 
     @on(Action.request_start_transaction)
     async def request_start_transaction(self, remote_start_id, id_token, **data):
         logger.warning(f"on request_start_transaction {(remote_start_id, id_token, data)}")
-        self.auth_status = id_token
-        self.tx_task = asyncio.create_task(self.transaction_task(remote_start_id))
+        #self.auth_status = id_token
+        #self.tx_task = asyncio.create_task(self.transaction_task(remote_start_id))
+        if "evse_id" in data:
+            evse_id = int(data["evse_id"])
+        else:
+            evse_id = 1
+        ctxt = self.task_contexts[evse_id]
+        fsm = self.tx_fsms[evse_id]
+
+        if ctxt.auth_status is not None:
+            return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected,
+                                                       transaction_id=None,
+                                                      )
+        ctxt.auth_status = id_token
+        
+        await fsm.handle(TxFSMEvent.on_authorized)
+
+        
         return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.accepted,
                                                    transaction_id=None
                                                    )

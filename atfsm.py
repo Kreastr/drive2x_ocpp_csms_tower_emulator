@@ -9,7 +9,7 @@ import logging
 from collections.abc import Callable
 from enum import auto, Enum
 from os import unlink
-from typing import Any, Generic, TypeVar, Type
+from typing import Any, Generic, TypeVar, get_args
 
 from pyee.asyncio import AsyncIOEventEmitter
 
@@ -37,7 +37,7 @@ logger.setLevel(logging.DEBUG)
 SE = TypeVar("SE", bound=StateBase)
 EE = TypeVar("EE")
 CE = TypeVar("CE")
-
+FSM_ST = TypeVar("FSM_ST")
 
 test_data_1 = """@startuml
 scale 600 width
@@ -151,7 +151,7 @@ class TransitionCondition(Generic[SE, CE]):
     target_state : str
 
 @dataclass
-class StateInfo(Generic[SE, CE, EE]):
+class StateInfo(Generic[SE, CE, EE, FSM_ST]):
     name : SE | None = None
     transition_events : list[TransitionEvent[SE, EE]] = dataclasses.field(default_factory=list)
     transition_conditions : list[TransitionCondition[SE, CE]] = dataclasses.field(default_factory=list)
@@ -161,7 +161,7 @@ class StateInfo(Generic[SE, CE, EE]):
     on_loop : str | None = None
     default_transition : SE | None = None
     condition_context : Any = None
-    conditions : dict[str, Callable[[Any], bool]] = dataclasses.field(default_factory=dict)
+    conditions : dict[str, Callable[[FSM_ST, Any], bool]] = dataclasses.field(default_factory=dict)
 
 
 def p_document(p):
@@ -329,15 +329,19 @@ def p_error(t):
 import ply.yacc as yacc
 
 @beartype
-class AFSM(Generic[SE, CE, EE]):
+class AFSM(Generic[SE, CE, EE, FSM_ST]):
 
-    def __init__(self, uml, se_factory : Callable[[str], SE], debug_ply=False):
+    def __init__(self, uml, se_factory : Callable[[str], SE], context : FSM_ST, debug_ply=False):
         self.uml = uml
         self._events = AsyncIOEventEmitter()
 
         self.terminated = False
 
-        self.sm_states : dict[SE, StateInfo[SE, CE, EE]] = dict()
+        self.sm_states : dict[SE, StateInfo[SE, CE, EE, FSM_ST]] = dict()
+
+        self.context : FSM_ST = context
+
+
         self.se_factory = se_factory
 
         parser = yacc.yacc()
@@ -346,9 +350,9 @@ class AFSM(Generic[SE, CE, EE]):
 
         for command in ast:
             if command[0] == "declare_state":
-                declare_state(self.sm_states, command[1], command[2], StateInfo[SE, CE, EE])
+                declare_state(self.sm_states, command[1], command[2], StateInfo[SE, CE, EE, FSM_ST])
             elif command[0] == "state_actions":
-                state_actions(self.sm_states, command[1], command[2], command[3], StateInfo[SE, CE, EE])
+                state_actions(self.sm_states, command[1], command[2], command[3], StateInfo[SE, CE, EE, FSM_ST])
             elif command[0] == "add_transition":
                 add_transition(self.sm_states, command[1], command[2], SE, CE, EE)
             else:
@@ -358,6 +362,8 @@ class AFSM(Generic[SE, CE, EE]):
 
         for k, st in self.sm_states.items():
             if st.is_initial:
+                if isinstance(k, str):
+                    k = self.se_factory(k)
                 self.current_state = k
                 break
             for transition in st.transition_conditions:
@@ -418,7 +424,7 @@ class {module_name}Event(str, Enum):
         else:
             unlink(shadow_name)
 
-    def subscribe(self, event, callback):
+    def on(self, event, callback):
         self._events.on(event, callback)
 
     def apply_context_to_all_states(self, context):
@@ -445,7 +451,7 @@ class {module_name}Event(str, Enum):
             assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
                                                           f"was left uninitialized. Add one to .conditions.")
             #assert isinstance(transition.name, Type[CE])
-            if st.conditions[ transition.name ](st.condition_context):
+            if st.conditions[ transition.name ](self.context, st.condition_context):
                 await self.transition_to_new_state(st, self.se_factory(transition.target_state) if transition.target_state is not None else None)
                 logger.warning(f"FSM after conditional transition is { self.current_state }")
                 return
@@ -455,7 +461,7 @@ class {module_name}Event(str, Enum):
 
 
 
-    async def on(self, event : EE):
+    async def handle(self, event : EE):
         if self.current_state is None:
             logger.warning(f"Attempted to handle an event before current_state is set.")
             return
@@ -463,7 +469,7 @@ class {module_name}Event(str, Enum):
             logger.error("Attempted looping a finished FSM")
             return
         logger.warning(f"FSM on event {event}")
-        self._events.emit(str(event), event)
+        self._events.emit(str(event), event, self.current_state)
         st = self.sm_states[self.current_state]
         for transition in st.transition_events:
             if transition.name == event:
@@ -515,17 +521,22 @@ class {module_name}Event(str, Enum):
 
 from testfsm_enums import testfsmState, testfsmCondition, testfsmEvent
 
+class testContext:
+    pass
+
 async def main():
-    fsm : AFSM[testfsmState, testfsmCondition, testfsmEvent] = AFSM[testfsmState, testfsmCondition, testfsmEvent](uml=test_data_1,
-                                                                                                                  se_factory=testfsmState,
-                                                                                                                  debug_ply=True)
+    fsm : AFSM[testfsmState, testfsmCondition, testfsmEvent, testContext] = AFSM[testfsmState, testfsmCondition, 
+                                                                                 testfsmEvent, testContext](uml=test_data_1,
+                                                                                                            context=testContext(),
+                                                                                                            se_factory=testfsmState,
+                                                                                                            debug_ply=True)
     fsm.write_enums("testfsm")
-    fsm.sm_states[testfsmState.state_2].conditions[testfsmCondition.if_aborted] = lambda x: False
-    fsm.subscribe(testfsmState.state_1.on_exit, lambda event, old_state: logger.warning(f"{event=}, {old_state=}"))
-    fsm.subscribe(testfsmState.state_2.on_enter, lambda event, new_state: logger.warning(f"{event=}, {new_state=}"))
-    await fsm.on(testfsmEvent.on_succeeded)
+    fsm.sm_states[testfsmState.state_2].conditions[testfsmCondition.if_aborted] = lambda x, x2: False
+    fsm.on(testfsmState.state_1.on_exit, lambda event, old_state: logger.warning(f"{event=}, {old_state=}"))
+    fsm.on(testfsmState.state_2.on_enter, lambda event, new_state: logger.warning(f"{event=}, {new_state=}"))
+    await fsm.handle(testfsmEvent.on_succeeded)
     await fsm.loop()
-    await fsm.on(testfsmEvent.on_succeeded)
+    await fsm.handle(testfsmEvent.on_succeeded)
     await fsm.loop()
 
 if __name__ == "__main__":

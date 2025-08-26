@@ -24,6 +24,63 @@ from typing import Any
 
 from websockets import Subprotocol
 
+from atfsm import AFSM
+
+from dataclasses import dataclass
+
+@dataclass 
+class TxManagerContext:
+    pass
+
+transaction_manager_uml = """@startuml
+[*] -> Unknown
+Unknown -> Occupied : if occupied
+Available -> Occupied : if occupied
+Unknown -> Available : if available
+Occupied -> Available : if available
+Available -> Authorized : on authorized
+Occupied -> Ready : on start tx event
+Authorized -> Ready : on start tx event
+Authorized -> Unknown : on deauthorized
+Ready -> Charging : if charge setpoint
+Discharging -> Charging : if charge setpoint
+Ready -> Discharging : if discharge setpoint
+Charging -> Discharging : if discharge setpoint
+Charging -> Ready : if idle setpoint
+Discharging -> Ready : if idle setpoint
+Charging -> Terminating : on terminate
+Discharging -> Terminating : on terminate
+Ready -> Terminating : on terminate
+Terminating -> Unknown : on end tx event
+@enduml
+"""
+
+_fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))
+_fsm.write_enums("TxManagerFSM")
+    
+from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
+
+
+logger = getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
+def get_time_str():
+    return datetime.now().isoformat()
+
+
+def get_transaction_fsm(context : TxFSMContext):
+    global TxFSMState, TxFSMCondition, TxFSMEvent
+    fsm = AFSM[TxFSMState, TxFSMCondition, 
+                                                                      TxFSMEvent, TxFSMContext](uml=transaction_uml, 
+                                                                                                context=context,
+                                                                                                se_factory=TxFSMState)
+
+    return fsm
+
+
+def get_connector_manager_fsm():
+    return None
 
 async def broadcast_to(op, page, **filters):
     for client in app.clients(page):
@@ -288,18 +345,21 @@ async def transactions(cp_id : str):
     else:
         return {"events": charge_points[cp_id].transactions}
 
+async def do_remote_stop(*vargs):
+    pass
+
 async def do_remote_start(cp_id, evse_id):
     await charge_points[cp_id].call(
             call.RequestStartTransaction(evse_id=evse_id,
                                          remote_start_id=time_based_id(),
                                          id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
 
-@app.get("/cp/{cp_id}/remote_start")
-async def remote_start(cp_id : str):
+@app.get("/cp/{cp_id}/remote_start/{evse_id}")
+async def remote_start(cp_id : str, evse_id : int):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await do_remote_start(cp_id, 1)}
+        return {"result": await do_remote_start(cp_id, evse_id)}
 
 
 @app.get("/cp/{cp_id}/remote_stop/{transaction_id}")
@@ -357,7 +417,10 @@ class CPCard(Element):
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
-            ui.button("Remote Start", on_click=lambda : do_remote_start(self.cp.id, 1))
+            async def rsb():
+                logger.warning(f"remote start result {await do_remote_start(self.cp.id, 1)}")
+            ui.button("Remote Start", on_click=rsb)
+            ui.button("Remote Stop", on_click=lambda : do_remote_stop(self.cp.id, 1))
 
         for connid in self.cp.connectors:
             self.on_new_connector(connid)
