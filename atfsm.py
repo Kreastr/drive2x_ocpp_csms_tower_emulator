@@ -22,6 +22,7 @@ from slugify import slugify as helper_slugify
 from pathlib import Path
 
 def slugify(x : str, separator="_"):
+    assert type(x) is str
     for_caps=re.compile(r"([a-z0-9])([A-Z])")
     for_numbers=re.compile(r"([a-zA-Z])([0-9])")
     x = re.sub(for_caps, r"\1"+separator+r"\2", x)
@@ -60,6 +61,21 @@ test_data_2 = """@startuml
 
 @enduml
 """
+
+test_data_3 = """@startuml
+[*] --> Unknown
+Unknown --> Identified : on serial number obtained
+Unknown --> Rejected : on boot notification
+Rejected --> [*]
+Identified --> Booted : on boot notification
+Identified --> Booted : on cached boot notification
+Identified --> Failed : on boot timeout
+Failed --> [*]
+Booted --> Closing : on reboot confirmed
+Closing --> [*]
+@enduml
+"""
+
 states = (('quoteds', 'exclusive'),
           ('colons', 'exclusive'),)
 
@@ -296,14 +312,13 @@ def p_string(p):
     p[0] = p[1]
 
 def p_state_name(p):
-    '''state_name : NAME WS
-                  | state_name WS
-                  | START_END WS
-                  | START_END NEWLINE
+    '''state_name : state_name WS
                   | START_END
                   | NAME
     '''
-    if p[1] == r"[*]":
+    if p[1] is None:
+        p[0] = None
+    elif p[1] == r"[*]":
         p[0] = None
     else:
         p[0] = slugify(p[1], separator="_")
@@ -404,7 +419,7 @@ class {module_name}Condition(str, Enum):
                         f.write(f"    {tr.name}='{tr.name}'\n")
                         stub = False
             if stub:
-                f.write(f"    pass'\n")
+                f.write(f"    pass\n")
             f.write(f"""
 
 class {module_name}Event(str, Enum):

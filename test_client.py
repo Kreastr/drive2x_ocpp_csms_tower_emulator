@@ -35,15 +35,15 @@ from typing import Any, Callable, Iterator, TypeVar, Generic
 
 transaction_uml = """@startuml
 [*] -> Idle
-Idle -> Authorized : on authorized
-Idle -> CableConnected : if cable connected
-CableConnected -> Idle : if cable disconnected
-Authorized -> Transaction : if cable connected
-CableConnected -> Transaction : on authorized
-Transaction -> Transaction : on report interval
-Transaction -> Idle : if cable disconnected
-Transaction -> Idle : on deauthorized
-Authorized -> Idle : on deauthorized
+Idle --> Authorized : on authorized
+Idle --> CableConnected : if cable connected
+CableConnected --> Idle : if cable disconnected
+Authorized --> Transaction : if cable connected
+CableConnected --> Transaction : on authorized
+Transaction --> Transaction : on report interval
+Transaction --> Idle : if cable disconnected
+Transaction --> Idle : on deauthorized
+Authorized --> Idle : on deauthorized
 @enduml
 """
 
@@ -67,6 +67,7 @@ _fsm.write_enums("TxFSM")
     
 from txfsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
 
+TxFSMType = AFSM[TxFSMState, TxFSMCondition, TxFSMEvent, TxFSMContext]
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -77,11 +78,9 @@ def get_time_str():
 
 
 def get_transaction_fsm(context : TxFSMContext):
-    global TxFSMState, TxFSMCondition, TxFSMEvent
-    fsm = AFSM[TxFSMState, TxFSMCondition, 
-                                                                      TxFSMEvent, TxFSMContext](uml=transaction_uml, 
-                                                                                                context=context,
-                                                                                                se_factory=TxFSMState)
+    fsm = TxFSMType(uml=transaction_uml,
+                    context=context,
+                    se_factory=TxFSMState)
 
     return fsm
 
@@ -137,24 +136,22 @@ class OCPPClient(ChargePoint):
         self.exit_flag = False
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
-        self.st_task = asyncio.create_task(self.status_task())
         self._events = AsyncIOEventEmitter()
 
-        self.tx_fsms : dict[int, AFSM[TxFSMState, TxFSMCondition, TxFSMEvent, TxFSMContext]] = dict(map(lambda x: (
+        self.tx_fsms : dict[int, TxFSMType] = dict(map(lambda x: (
             x[0], get_transaction_fsm(x[1])), self.task_contexts.items()))
         self.tx_tasks = dict(map(lambda x: (
             x[0], asyncio.create_task(self.transaction_task(x[1], 
                                                             self.tx_fsms[x[0]]))), 
                                       self.task_contexts.items()))
+        self.st_tasks = dict(map(lambda x: (
+            x[0], asyncio.create_task(self.status_task(x[1].connector))),
+                                      self.task_contexts.items()))
 
 
-    async def transaction_task(self, context : TxFSMContext, fsm : AFSM[TxFSMState, TxFSMCondition, TxFSMEvent, TxFSMContext]):
-
-        
-
+    async def transaction_task(self, context : TxFSMContext, fsm : TxFSMType):
 
         _seq_no = ResettableIterator[int](factory=lambda:count(start=0,step=1))
-        
 
         tx_id = ResettableValue[str](factory= lambda : str(uuid4()))
 
@@ -239,23 +236,23 @@ class OCPPClient(ChargePoint):
             heartbeat = Heartbeat()
             await self.call(heartbeat)
 
-    async def status_task(self):
-        """
-        prev_status = self.cable_connected
-        await self.post_status_notification()"""
+    async def status_task(self, connector : ConnectorModel):
+
+        prev_status = connector.cable_connected
+        await self.post_status_notification(connector)
         while True:
             await asyncio.sleep(1)
-            """
-            if prev_status != self.cable_connected:
-                await self.post_status_notification()
-                prev_status = self.cable_connected
-                """
 
-    async def post_status_notification(self):
+            if prev_status != connector.cable_connected:
+                await self.post_status_notification(connector)
+                prev_status = connector.cable_connected
+
+
+    async def post_status_notification(self, connector : ConnectorModel):
         status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
-                                                 connector_status=ConnectorStatusEnumType.occupied if self.cable_connected else ConnectorStatusEnumType.available,
-                                                 evse_id=1,
-                                                 connector_id=1)
+                                                 connector_status=ConnectorStatusEnumType.occupied if connector.cable_connected else ConnectorStatusEnumType.available,
+                                                 evse_id=connector.id,
+                                                 connector_id=connector.id)
         await self.call(status_notification)
 
     @on(Action.request_stop_transaction)
@@ -381,8 +378,11 @@ async def main():
 
         for client in app.clients('/'):
             with client:
-                for tgl in ElementFilter(kind=ui.toggle,marker="plug_tgl"):
-                    tgl.bind_value(cp, "cable_connected")
+                for cont in  ElementFilter(kind=ui.column, marker="power_plug_container"):
+                    with cont:
+                        for cid in cp.task_contexts:
+                            tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
+                            tgl.bind_value(cp.task_contexts[cid].connector, "cable_connected")
 
         cp_task = asyncio.create_task(cp.start())
 
@@ -401,15 +401,18 @@ async def main():
 
         await cp_task
         await cp.hb_task
-        await cp.st_task
+        for k, t in cp.st_tasks.items():
+            await t
 
 @ui.page("/")
 async def index():
     background_tasks.create_lazy(main(),name="main")
     ui.label("Power plug status")
-    tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark("plug_tgl")
-    if cp is not None:
-        tgl.bind_value(cp, "cable_connected")
+    with ui.column().mark("power_plug_container"):
+        if cp is not None:
+            for cid in cp.task_contexts:
+                tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
+                tgl.bind_value(cp.task_contexts[cid].connector, "cable_connected")
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
 
