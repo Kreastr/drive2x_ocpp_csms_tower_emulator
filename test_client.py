@@ -60,6 +60,7 @@ class TxFSMContext:
     connector : ConnectorModel
     auth_status : Any = None
     remote_id : int = -1
+    cp_interface : ChargePoint | None = None
 
 
 _fsm = AFSM(uml=transaction_uml, context=TxFSMContext(ConnectorModel(1)), se_factory=lambda x: str(x))
@@ -77,12 +78,60 @@ def get_time_str():
     return datetime.now().isoformat()
 
 
-def get_transaction_fsm(context : TxFSMContext):
-    fsm = TxFSMType(uml=transaction_uml,
-                    context=context,
-                    se_factory=TxFSMState)
+class TxFSM(TxFSMType):
+    def __init__(self, context : TxFSMContext):
+        super().__init__(uml=transaction_uml,
+                         context=context,
+                         se_factory=TxFSMState)
 
-    return fsm
+        self._seq_no = ResettableIterator[int](factory=lambda: count(start=0, step=1))
+
+        self.tx_id = ResettableValue[str](factory=lambda: str(uuid4()))
+
+        self.on(TxFSMState.idle.on_exit, self.setup_transaction)
+        self.on(TxFSMState.authorized.on_enter, self.inform_on_remote_start)
+        self.on(TxFSMState.cableconnected.on_enter, self.inform_on_first_plugged_in)
+
+        self.apply_to_all_conditions(TxFSMCondition.if_cable_connected, self.if_cable_connected)
+        self.apply_to_all_conditions(TxFSMCondition.if_cable_disconnected, self.if_cable_disconnected)
+
+    @staticmethod
+    def if_cable_connected(ctxt : TxFSMContext, optional : Any):
+        return ctxt.connector.cable_connected
+
+    @staticmethod
+    def if_cable_disconnected(ctxt : TxFSMContext, optional : Any):
+        return not ctxt.connector.cable_connected
+    
+    
+    async def setup_transaction(self, *vargs):
+        self._seq_no.reset()
+        self.tx_id.reset()
+        
+    async def call(self, *vargs, **kwargs):
+        assert self.context.cp_interface is not None
+        await self.context.cp_interface.call(*vargs, **kwargs)
+
+    async def inform_on_remote_start(self, *vargs):
+        await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                              timestamp=get_time_str(),
+                                              trigger_reason=TriggerReasonEnumType.remote_start,
+                                              seq_no=next(self._seq_no),
+                                              transaction_info=TransactionType(transaction_id=self.tx_id.value,
+                                                                               remote_start_id=self.context.remote_id,
+                                                                               ),
+                                              id_token=self.context.auth_status
+                                              ))
+
+    async def inform_on_first_plugged_in(self, *vargs):
+        await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                              timestamp=get_time_str(),
+                                              trigger_reason=TriggerReasonEnumType.cable_plugged_in,
+                                              seq_no=next(self._seq_no),
+                                              transaction_info=TransactionType(transaction_id=self.tx_id.value,
+                                                                               ),
+                                              id_token=self.context.auth_status
+                                              ))
 
 ERT = TypeVar("ERT")
 class ResettableIterator(Generic[ERT]):
@@ -139,7 +188,7 @@ class OCPPClient(ChargePoint):
         self._events = AsyncIOEventEmitter()
 
         self.tx_fsms : dict[int, TxFSMType] = dict(map(lambda x: (
-            x[0], get_transaction_fsm(x[1])), self.task_contexts.items()))
+            x[0], TxFSM(x[1])), self.task_contexts.items()))
         self.tx_tasks = dict(map(lambda x: (
             x[0], asyncio.create_task(self.transaction_task(x[1], 
                                                             self.tx_fsms[x[0]]))), 
@@ -150,49 +199,11 @@ class OCPPClient(ChargePoint):
 
 
     async def transaction_task(self, context : TxFSMContext, fsm : TxFSMType):
-
-        _seq_no = ResettableIterator[int](factory=lambda:count(start=0,step=1))
-
-        tx_id = ResettableValue[str](factory= lambda : str(uuid4()))
-
-        async def setup_transaction(*vargs):
-            _seq_no.reset()
-            tx_id.reset()
-
-        async def inform_on_remote_start(*vargs):
-
-            await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
-                                        timestamp=get_time_str(),
-                                        trigger_reason=TriggerReasonEnumType.remote_start,
-                                        seq_no=next(_seq_no),
-                                        transaction_info=TransactionType(transaction_id=tx_id.value,
-                                                                         remote_start_id=context.remote_id,
-                                                                         ),
-                                        id_token=context.auth_status
-                                        ))
-
-        async def inform_on_first_plugged_in(*vargs):
-
-            await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
-                                        timestamp=get_time_str(),
-                                        trigger_reason=TriggerReasonEnumType.cable_plugged_in,
-                                        seq_no=next(_seq_no),
-                                        transaction_info=TransactionType(transaction_id=tx_id.value,
-                                                                         ),
-                                        id_token=context.auth_status
-                                        ))
-
-        fsm.on(TxFSMState.idle.on_exit, setup_transaction)
-        fsm.on(TxFSMState.authorized.on_enter, inform_on_remote_start)
-        fsm.on(TxFSMState.cableconnected.on_enter, inform_on_first_plugged_in)
-
+        fsm.context.cp_interface = self
         
-
-        fsm.apply_to_all_conditions(TxFSMCondition.if_cable_connected, lambda c, x: c.connector.cable_connected)
-        fsm.apply_to_all_conditions(TxFSMCondition.if_cable_disconnected, lambda c, x: not c.connector.cable_connected)
-
         while True:
             await asyncio.sleep(1)
+            await fsm.loop()
 
         while not self.cable_connected:
             if self.auth_status is None:
@@ -417,6 +428,6 @@ async def index():
     ui.button("Reset SoC", on_click=lambda: None)
 
 # Dummy call to generate enum modules on every run
-get_transaction_fsm(ConnectorModel(id=0))
+TxFSM(ConnectorModel(id=0))
 
 ui.run(host="0.0.0.0", port=7500)

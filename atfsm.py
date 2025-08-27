@@ -450,7 +450,7 @@ class {module_name}Event(str, Enum):
     def apply_to_all_conditions(self, condition_name : CE, callback):
         for k, st in self.sm_states.items():
             for transition in st.transition_conditions:
-                if transition == condition_name:
+                if transition.name == condition_name.name:
                     st.conditions[transition.name] = callback
 
 

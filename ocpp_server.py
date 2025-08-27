@@ -28,8 +28,6 @@ from atfsm import AFSM
 
 from dataclasses import dataclass, field
 
-from test_client import OCPPClient
-
 
 @binding.bindable_dataclass
 class ConnectorStatus:
@@ -38,12 +36,76 @@ class ConnectorStatus:
     timestamp : str = "1970.01.01"
     evse_id : int = 0
     tx_id = str
+    cp_interface : ChargePoint | None = None
 
 
 @dataclass 
 class TxManagerContext:
     connector : ConnectorStatus = field(default_factory=ConnectorStatus)
 
+
+transaction_manager_uml = """@startuml
+[*] -> Unknown
+Unknown --> Occupied : if occupied
+Available --> Occupied : if occupied
+Unknown --> Available : if available
+Occupied --> Available : if available
+Available --> Authorized : on authorized
+Occupied --> Ready : on start tx event
+Authorized --> Ready : on start tx event
+Authorized --> Unknown : on deauthorized
+Ready --> Charging : if charge setpoint
+Discharging --> Charging : if charge setpoint
+Ready --> Discharging : if discharge setpoint
+Charging --> Discharging : if discharge setpoint
+Charging --> Ready : if idle setpoint
+Discharging --> Ready : if idle setpoint
+Charging --> Terminating : on terminate
+Discharging --> Terminating : on terminate
+Ready --> Terminating : on terminate
+Terminating --> Unknown : on end tx event
+@enduml
+"""
+
+_fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))
+_fsm.write_enums("TxManagerFSM")
+
+from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
+
+TxManagerFSMType = AFSM[TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent, TxManagerContext]
+
+
+class TxFSMS(TxManagerFSMType):
+    
+    def __init__(self):
+        super().__init__(transaction_manager_uml,
+                         se_factory=TxManagerFSMState,
+                         context=TxManagerContext())
+        self.apply_to_all_conditions(TxManagerFSMCondition.if_available, self.if_available)
+        self.apply_to_all_conditions(TxManagerFSMCondition.if_occupied, self.if_occupied)
+        
+        self.on(TxManagerFSMState.authorized.on_enter, self.send_auth_to_cp)
+        
+    async def send_auth_to_cp(self, *vargs):
+        if self.context.cp_interface is not None:
+            result = await self.context.cp_interface.call(
+                    call.RequestStartTransaction(evse_id=self.context.connector.evse_id,
+                                                 remote_start_id=time_based_id(),
+                                                 id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
+            logger.warning(f"send_auth_to_cp {result=}")
+        else:
+            await self.handle(TxManagerFSMEvent.on_deauthorized)
+    
+    @staticmethod
+    def if_available(ctxt : TxManagerContext, optional : Any):
+        logger.warning("Testing if available")
+        return ctxt.connector.connector_status == "Available"
+
+    @staticmethod
+    def if_occupied(ctxt : TxManagerContext, optional : Any):
+        logger.warning("Testing if occupied")
+        return ctxt.connector.connector_status == "Occupied"
+    
 @dataclass
 class ChargePointContext:
     transactions : set[Any] = field(default_factory=set)
@@ -56,6 +118,9 @@ class ChargePointContext:
     tx_status = ""
     timeout : datetime = field(default_factory=datetime.now)
     id : str = "provisional"
+
+
+    transaction_fsms: defaultdict[int, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMS))
 
     connection_task : Any = None
 
@@ -99,35 +164,6 @@ def get_charge_point_fsm(context : ChargePointContext) -> ChargePointFSMType:
 
     return fsm
 
-transaction_manager_uml = """@startuml
-[*] -> Unknown
-Unknown --> Occupied : if occupied
-Available --> Occupied : if occupied
-Unknown --> Available : if available
-Occupied --> Available : if available
-Available --> Authorized : on authorized
-Occupied --> Ready : on start tx event
-Authorized --> Ready : on start tx event
-Authorized --> Unknown : on deauthorized
-Ready --> Charging : if charge setpoint
-Discharging --> Charging : if charge setpoint
-Ready --> Discharging : if discharge setpoint
-Charging --> Discharging : if discharge setpoint
-Charging --> Ready : if idle setpoint
-Discharging --> Ready : if idle setpoint
-Charging --> Terminating : on terminate
-Discharging --> Terminating : on terminate
-Ready --> Terminating : on terminate
-Terminating --> Unknown : on end tx event
-@enduml
-"""
-
-_fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))
-_fsm.write_enums("TxManagerFSM")
-    
-from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
-
-TxManagerFSMType = AFSM[TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent, TxManagerContext]
 
 
 
@@ -176,7 +212,7 @@ class OCPPServerHandler(ChargePoint):
         self.events = []
         self.onl_task = asyncio.create_task(self.online_status_task())
         self.fsm = get_charge_point_fsm(ChargePointContext())
-        self.transaction_fsm : defaultdict[int, TxManagerFSMType] = defaultdict(default_factory=TxManagerFSMType)
+        
 
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
         self.fsm.on(ChargePointFSMState.unknown.on_exit, self.add_to_ui)
@@ -251,6 +287,9 @@ class OCPPServerHandler(ChargePoint):
             await asyncio.sleep(1)
             if self.fsm.context.timeout < datetime.now():
                 self.fsm.context.online = False
+            for k,v in self.fsm.context.transaction_fsms.items():
+                v.loop()
+            self.fsm.loop()
 
 
     @on(Action.boot_notification)
@@ -290,14 +329,23 @@ class OCPPServerHandler(ChargePoint):
         self.log_event(("status_notification", (data)))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {data=}")
         conn_status = ConnectorStatus(**data)
+        
+        
 
-        tx_fsm = self.transaction_fsm[conn_status.connector_id]
+        tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.connector_id]
 
-        if conn_status.connector_status:
-            await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+        tx_fsm.context.connector.connector_status = conn_status.connector_status
+        tx_fsm.context.connector.evse_id = conn_status.evse_id
+
+        logger.warning(" tx_fsm.loop")
+        await tx_fsm.loop()
+        
+        #if conn_status.connector_status == "Occupied":
+        #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
         if conn_status.connector_id not in self.fsm.context.connectors:
             self.fsm.context.connectors[conn_status.connector_id] = conn_status
+            self.fsm.context.transaction_fsms[conn_status.connector_id].context.cp_interface = self
             await broadcast_to(lambda x: x.on_new_connector(conn_status.connector_id), "/", kind=CPCard, marker=self.fsm.context.id)
         else:
             self.fsm.context.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
@@ -348,7 +396,7 @@ class OCPPServerHandler(ChargePoint):
 
         connector_id = data["transaction_info"]["evse"]["connector_id"]
 
-        tx_fsm = self.transaction_fsm[connector_id]
+        tx_fsm = self.fsm.context.transaction_fsms[connector_id]
 
         if data["transaction_info"]["transaction_id"] != tx_fsm.context.tx_id:
             tx_fsm.context.tx_id = data["transaction_info"]["transaction_id"]
@@ -363,7 +411,7 @@ class OCPPServerHandler(ChargePoint):
         #self.tx_status
         return call_result.TransactionEvent(**response)
 
-        return call_result.TransactionEvent()
+        #return call_result.TransactionEvent()
 
     @on(Action.notify_report)
     async def on_notify_report(self, **data):
@@ -380,6 +428,12 @@ class OCPPServerHandler(ChargePoint):
         await self._connection.close()
         await self.onl_task
 
+    
+    async def do_remote_stop(self, evse_id):
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_deauthorized)
+    
+    async def do_remote_start(self, evse_id):
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized)
 
 cp_card_container : ui.grid | None = None
 charge_points : dict[str, OCPPServerHandler] = dict()
@@ -474,21 +528,13 @@ async def transactions(cp_id : str):
     else:
         return {"events": charge_points[cp_id].fsm.context.transactions}
 
-async def do_remote_stop(*vargs):
-    pass
-
-async def do_remote_start(cp_id, evse_id):
-    await charge_points[cp_id].call(
-            call.RequestStartTransaction(evse_id=evse_id,
-                                         remote_start_id=time_based_id(),
-                                         id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
 
 @app.get("/cp/{cp_id}/remote_start/{evse_id}")
 async def remote_start(cp_id : str, evse_id : int):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await do_remote_start(cp_id, evse_id)}
+        return {"result": await charge_points[cp_id].do_remote_start(evse_id)}
 
 
 @app.get("/cp/{cp_id}/remote_stop/{transaction_id}")
@@ -547,10 +593,6 @@ class CPCard(Element):
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
-            async def rsb():
-                logger.warning(f"remote start result {await do_remote_start(self.cp_context.id, 1)}")
-            ui.button("Remote Start", on_click=rsb)
-            ui.button("Remote Stop", on_click=lambda : do_remote_stop(self.cp_context.id, 1))
 
         for connid in self.cp_context.connectors:
             self.on_new_connector(connid)
@@ -568,8 +610,16 @@ class CPCard(Element):
     def on_new_connector(self, connector_id):
         logger.warning(f"on new connector {connector_id}")
         with self.connector_container:
-            new_label = ui.label(text=f"{connector_id}: {self.cp_context.connectors[connector_id].connector_status}")
-            new_label.bind_text_from(self.cp_context.connectors[connector_id], "connector_status", backward=lambda x, cid=connector_id: f"{cid}: {x}")
+            with ui.row(align_items='center'):
+                new_label = ui.label(text=f"{connector_id}: {self.cp_context.connectors[connector_id].connector_status}")
+                new_label.bind_text_from(self.cp_context.connectors[connector_id], "connector_status", backward=lambda x, cid=connector_id: f"{cid}: {x}")
+                tx_fsm = self.cp_context.transaction_fsms[connector_id]
+                tx_label = ui.label(text=f"{str(tx_fsm.current_state)}")
+                tx_label.bind_text_from(tx_fsm, "current_state")
+                async def rsb():
+                    logger.warning(f"remote start result {await charge_points[self.cp_context.id].do_remote_start(connector_id)}")
+                ui.button("Remote Start", on_click=rsb)
+                ui.button("Remote Stop", on_click=lambda : charge_points[self.cp_context.id].do_remote_stop(connector_id))
 
 
 @ui.page("/")
