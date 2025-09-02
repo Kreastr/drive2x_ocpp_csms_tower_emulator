@@ -2,3 +2,5 @@
 /.idea/
 /parser.out
 /parsetab.py
+/atfsm/parsetab.py
+/atfsm/parser.out

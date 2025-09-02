@@ -15,7 +15,7 @@ from pyee.asyncio import AsyncIOEventEmitter
 
 from logging import getLogger
 
-from state_base import StateBase
+from .state_base import StateBase
 from beartype import beartype
 
 from slugify import slugify as helper_slugify
@@ -390,12 +390,15 @@ class AFSM(Generic[SE, CE, EE, FSM_ST]):
 
         print(self.current_state, self.sm_states)
 
-    def write_enums(self, module_name):
-        actual_name = slugify(module_name, separator="_") + "_enums.py"
+    def write_enums(self, module_name, location=None):
+        if location is None:
+            actual_name = slugify(module_name, separator="_") + "_enums.py"
+        else:
+            actual_name = location
         shadow_name = actual_name + ".shadow"
         with open(shadow_name, "w") as f:
             f.write("from enum import Enum\n")
-            f.write(f"""from state_base import StateBase
+            f.write(f"""from atfsm.state_base import StateBase
 
 class {module_name}State(StateBase, str, Enum):
 """)

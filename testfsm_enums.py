@@ -1,5 +1,5 @@
 from enum import Enum
-from state_base import StateBase
+from atfsm.state_base import StateBase
 
 class testfsmState(StateBase, str, Enum):
     state_1='state_1'

@@ -1,5 +1,5 @@
 from enum import Enum
-from state_base import StateBase
+from atfsm.state_base import StateBase
 
 class TxManagerFSMState(StateBase, str, Enum):
     unknown='unknown'
@@ -20,8 +20,8 @@ class TxManagerFSMCondition(str, Enum):
 
 
 class TxManagerFSMEvent(str, Enum):
-    on_start_tx_event='on_start_tx_event'
     on_authorized='on_authorized'
+    on_start_tx_event='on_start_tx_event'
     on_deauthorized='on_deauthorized'
     on_terminate='on_terminate'
     on_end_tx_event='on_end_tx_event'

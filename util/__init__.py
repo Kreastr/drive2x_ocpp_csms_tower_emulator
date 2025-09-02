@@ -1,0 +1,70 @@
+import logging
+from _pydatetime import datetime
+from _typing import TypeVar, Generic
+from logging import getLogger
+from typing import Callable, Iterator
+
+ET = TypeVar("ET")
+
+
+class ResettableValue(Generic[ET]):
+
+    def __init__(self, factory: Callable[[], ET]) -> None:
+        self._factory = factory
+        self._current : ET | None = None
+        self.reset()
+    
+    @property
+    def value(self) -> ET:
+        if self._current is None:
+            raise Exception("Value is not ready")
+        return self._current
+    
+    def reset(self) -> None:
+        self._current = self._factory()
+
+
+ERT = TypeVar("ERT")
+
+
+class ResettableIterator(Generic[ERT]):
+
+    def __init__(self, factory: Callable[[], Iterator[ERT]]) -> None:
+        self._factory = factory
+        self._current : Iterator[ERT] | None = None
+        self.reset()
+
+    def __iter__(self) -> Iterator[ERT]:
+        if self._current is None:
+            raise Exception("Iterator is not ready")
+        return self._current
+
+
+    def __next__(self) -> ERT:
+        if self._current is None:
+            raise Exception("Iterator is not ready")
+        return next(self._current)
+    
+    def reset(self) -> None:
+        self._current = self._factory()
+
+
+def get_time_str():
+    return datetime.now().isoformat()
+
+
+def setup_logging(name):
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    l2 = getLogger(name)
+    assert l2 is not None
+    logger: logging.Logger = l2
+    logger.setLevel(logging.DEBUG)
+    lr: logging.Handler | None = logging.lastResort
+    assert lr is not None
+    lr.setFormatter(formatter)
+    return logger
+
+
+def time_based_id():
+    return int((datetime.now() - datetime(2025, 1, 1)).total_seconds() * 10)

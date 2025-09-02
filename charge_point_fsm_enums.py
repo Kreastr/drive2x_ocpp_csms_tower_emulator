@@ -1,5 +1,5 @@
 from enum import Enum
-from state_base import StateBase
+from atfsm.state_base import StateBase
 
 class ChargePointFSMState(StateBase, str, Enum):
     created='created'
@@ -22,5 +22,5 @@ class ChargePointFSMEvent(str, Enum):
     on_boot_notification='on_boot_notification'
     on_cached_boot_notification='on_cached_boot_notification'
     on_boot_timeout='on_boot_timeout'
-    on_transaction_request='on_transaction_request'
+    on_transaction_manager_request='on_transaction_manager_request'
     on_reboot_confirmed='on_reboot_confirmed'

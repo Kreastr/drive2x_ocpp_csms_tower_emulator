@@ -2,21 +2,18 @@ import asyncio
 import logging
 import ssl
 import sys
-import traceback
 from copy import deepcopy
 from datetime import datetime
-from http.cookiejar import LoadError
 from uuid import uuid4
 
 import certifi
 import websockets
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
-from logging import getLogger
 
-from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification, SetVariables
+from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification
 from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType, GetVariableDataType, \
-    GetVariableResultType, StatusInfoType, VariableType, SetVariableResultType, TransactionType
+    GetVariableResultType, VariableType, SetVariableResultType, TransactionType
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
@@ -25,57 +22,17 @@ from ocpp.v201 import enums
 
 from itertools import count
 
-from atfsm import AFSM 
-from dataclasses import dataclass
-
 from pyee.asyncio import AsyncIOEventEmitter
 
-from typing import Any, Callable, Iterator, TypeVar, Generic
+from typing import Any
 
-
-transaction_uml = """@startuml
-[*] -> Idle
-Idle --> Authorized : on authorized
-Idle --> CableConnected : if cable connected
-CableConnected --> Idle : if cable disconnected
-Authorized --> Transaction : if cable connected
-CableConnected --> Transaction : on authorized
-Transaction --> Transaction : on report interval
-Transaction --> Idle : if cable disconnected
-Transaction --> Idle : on deauthorized
-Authorized --> Idle : on deauthorized
-@enduml
-"""
-
-@dataclass
-class ConnectorModel:
-    id : int
-    auth : bool = False
-    cable_connected : bool = False
-    soc_wh : float = 50000.0
-    usable_capacity : float = 70000.0
-
-@dataclass
-class TxFSMContext:
-    connector : ConnectorModel
-    auth_status : Any = None
-    remote_id : int = -1
-    cp_interface : ChargePoint | None = None
-
-
-_fsm = AFSM(uml=transaction_uml, context=TxFSMContext(ConnectorModel(1)), se_factory=lambda x: str(x))
-_fsm.write_enums("TxFSM")
-    
-from txfsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
-
-TxFSMType = AFSM[TxFSMState, TxFSMCondition, TxFSMEvent, TxFSMContext]
-
-logger = getLogger(__name__)
+from client.data import ConnectorModel, TxFSMContext
+from client.transaction_model import TxFSMType
+from client.transaction_model.transaction_uml import transaction_uml
+from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
+from util import ResettableValue, ResettableIterator, get_time_str, setup_logging
+logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
-
-
-def get_time_str():
-    return datetime.now().isoformat()
 
 
 class TxFSM(TxFSMType):
@@ -133,45 +90,6 @@ class TxFSM(TxFSMType):
                                               id_token=self.context.auth_status
                                               ))
 
-ERT = TypeVar("ERT")
-class ResettableIterator(Generic[ERT]):
-
-    def __init__(self, factory: Callable[[], Iterator[ERT]]) -> None:
-        self._factory = factory
-        self._current : Iterator[ERT] | None = None
-        self.reset()
-
-    def __iter__(self) -> Iterator[ERT]:
-        if self._current is None:
-            raise Exception("Iterator is not ready")
-        return self._current
-
-
-    def __next__(self) -> ERT:
-        if self._current is None:
-            raise Exception("Iterator is not ready")
-        return next(self._current)
-    
-    def reset(self) -> None:
-        self._current = self._factory()
-
-ET = TypeVar("ET")
-class ResettableValue(Generic[ET]):
-
-    def __init__(self, factory: Callable[[], ET]) -> None:
-        self._factory = factory
-        self._current : ET | None = None
-        self.reset()
-    
-    @property
-    def value(self) -> ET:
-        if self._current is None:
-            raise Exception("Value is not ready")
-        return self._current
-    
-    def reset(self) -> None:
-        self._current = self._factory()
-
 
 class OCPPClient(ChargePoint):
 
@@ -181,7 +99,7 @@ class OCPPClient(ChargePoint):
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
-        self.task_contexts  = dict((i+1, TxFSMContext(ConnectorModel(i+1))) for i in range(3))
+        self.task_contexts  = dict((i + 1, TxFSMContext(ConnectorModel(i + 1))) for i in range(3))
         self.exit_flag = False
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
@@ -217,7 +135,7 @@ class OCPPClient(ChargePoint):
                                                   seq_no=next(_seq_no),
                                                   transaction_info=TransactionType(transaction_id=tx_id
                                                                                      )
-                                                    ))
+                                                  ))
 
         while True:
             if self.auth_status is None:

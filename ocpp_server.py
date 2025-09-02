@@ -1,10 +1,7 @@
 import asyncio
 import logging
-from abc import ABCMeta, abstractmethod
-from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import cast, Self
-from uuid import uuid4
 
 import websockets
 from nicegui.binding import BindableProperty, bind_from
@@ -12,167 +9,24 @@ from nicegui.element import Element
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call
 from ocpp.v201 import call_result
-from ocpp.v201.call import GetVariables
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType, GetVariableResultType, IdTokenInfoType, IdTokenType, VariableType, \
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, GetVariableResultType, IdTokenInfoType, VariableType, \
     SetVariableDataType, EVSEType
 from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, ReportBaseEnumType, \
-    ResetEnumType, IdTokenEnumType, GetVariableStatusEnumType
-from logging import getLogger
+    ResetEnumType, GetVariableStatusEnumType
 
-from nicegui import ui, app, background_tasks, ElementFilter, binding
+from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
 
 from websockets import Subprotocol
 
-from atfsm import AFSM
+from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
+from server.charge_point_model import get_charge_point_fsm, ChargePointFSMType
+from server.data import ChargePointContext
+from server.data.connector_status import ConnectorStatus
+from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
+from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
+from util import get_time_str, setup_logging, time_based_id
 
-from dataclasses import dataclass, field
-
-
-@binding.bindable_dataclass
-class ConnectorStatus:
-    connector_id : int = 0
-    connector_status : str = "Unknown"
-    timestamp : str = "1970.01.01"
-    evse_id : int = 0
-    tx_id = str
-    cp_interface : ChargePoint | None = None
-
-
-@dataclass 
-class TxManagerContext:
-    connector : ConnectorStatus = field(default_factory=ConnectorStatus)
-
-
-transaction_manager_uml = """@startuml
-[*] -> Unknown
-Unknown --> Occupied : if occupied
-Available --> Occupied : if occupied
-Unknown --> Available : if available
-Occupied --> Available : if available
-Available --> Authorized : on authorized
-Occupied --> Ready : on start tx event
-Authorized --> Ready : on start tx event
-Authorized --> Unknown : on deauthorized
-Ready --> Charging : if charge setpoint
-Discharging --> Charging : if charge setpoint
-Ready --> Discharging : if discharge setpoint
-Charging --> Discharging : if discharge setpoint
-Charging --> Ready : if idle setpoint
-Discharging --> Ready : if idle setpoint
-Charging --> Terminating : on terminate
-Discharging --> Terminating : on terminate
-Ready --> Terminating : on terminate
-Terminating --> Unknown : on end tx event
-@enduml
-"""
-
-_fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))
-_fsm.write_enums("TxManagerFSM")
-
-from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
-
-TxManagerFSMType = AFSM[TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent, TxManagerContext]
-
-
-class TxFSMS(TxManagerFSMType):
-    
-    def __init__(self):
-        super().__init__(transaction_manager_uml,
-                         se_factory=TxManagerFSMState,
-                         context=TxManagerContext())
-        self.apply_to_all_conditions(TxManagerFSMCondition.if_available, self.if_available)
-        self.apply_to_all_conditions(TxManagerFSMCondition.if_occupied, self.if_occupied)
-        
-        self.on(TxManagerFSMState.authorized.on_enter, self.send_auth_to_cp)
-        
-    async def send_auth_to_cp(self, *vargs):
-        if self.context.cp_interface is not None:
-            result = await self.context.cp_interface.call(
-                    call.RequestStartTransaction(evse_id=self.context.connector.evse_id,
-                                                 remote_start_id=time_based_id(),
-                                                 id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
-            logger.warning(f"send_auth_to_cp {result=}")
-        else:
-            await self.handle(TxManagerFSMEvent.on_deauthorized)
-    
-    @staticmethod
-    def if_available(ctxt : TxManagerContext, optional : Any):
-        logger.warning("Testing if available")
-        return ctxt.connector.connector_status == "Available"
-
-    @staticmethod
-    def if_occupied(ctxt : TxManagerContext, optional : Any):
-        logger.warning("Testing if occupied")
-        return ctxt.connector.connector_status == "Occupied"
-    
-@dataclass
-class ChargePointContext:
-    transactions : set[Any] = field(default_factory=set)
-    current_tx : dict[int, str] = field(default_factory=dict)
-    boot_notifications : list[Any] = field(default_factory=list)
-    remote_ip = None
-    online = False
-    shutdown = False
-    connectors : dict[int, Any] = field(default_factory=dict)
-    tx_status = ""
-    timeout : datetime = field(default_factory=datetime.now)
-    id : str = "provisional"
-
-
-    transaction_fsms: defaultdict[int, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMS))
-
-    connection_task : Any = None
-
-charge_point_uml = """@startuml
-[*] --> Created
-Created --> Unknown : on start
-Unknown --> Identified : on serial number obtained
-Unknown --> Rejected : on serial number not obtained
-Unknown --> Booted : on boot notification 
-Rejected --> [*]
-Identified --> Booted : on boot notification
-Identified --> Booted : on cached boot notification
-Identified --> Failed : on boot timeout
-Failed --> [*]
-Booted --> RunningTransaction : on transaction request
-RunningTransaction --> RunningTransaction
-RunningTransaction --> Booted : if no active transactions
-Booted --> Closing : on reboot confirmed
-Closing --> [*]
-@enduml
-"""
-
-"""
-Booted --> Failed : if heartbeat timeout
-Unknown --> Failed : if heartbeat timeout
-Identified --> Failed : if heartbeat timeout
-RunningTransaction --> Failed : if heartbeat timeout
-"""
-
-_fsm = AFSM(uml=charge_point_uml, context=ChargePointContext(), se_factory=lambda x: str(x))
-_fsm.write_enums("ChargePointFSM")
-
-from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMCondition, ChargePointFSMEvent
-
-ChargePointFSMType = AFSM[ChargePointFSMState, ChargePointFSMCondition, ChargePointFSMEvent, ChargePointContext]
-
-def get_charge_point_fsm(context : ChargePointContext) -> ChargePointFSMType:
-    fsm = ChargePointFSMType(uml=charge_point_uml,
-                           context=context,
-                           se_factory=ChargePointFSMState)
-
-    return fsm
-
-
-
-
-def get_connector_manager_fsm(context : TxManagerContext) -> TxManagerFSMType:
-    fsm = TxManagerFSMType(uml=transaction_manager_uml,
-                           context=context,
-                           se_factory=TxManagerFSMState)
-
-    return fsm
 
 async def broadcast_to(op, page, **filters):
     for client in app.clients(page):
@@ -181,26 +35,8 @@ async def broadcast_to(op, page, **filters):
                 op(old)
 
 
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-ui.add_css('''
-    .online {
-        background: green;
-    }
-    .offline {
-        background: red;
-    }
-''')
-
-l2 = getLogger(__name__)
-assert l2 is not None
-logger : logging.Logger = l2
-logger.setLevel(logging.DEBUG)
-lr : logging.Handler | None = logging.lastResort
-assert lr is not None
-lr.setFormatter(formatter)
-def get_time_str():
-    return datetime.now().isoformat()
+logger = setup_logging(__name__)
 
 boot_notification_cache = dict()
 
@@ -289,7 +125,7 @@ class OCPPServerHandler(ChargePoint):
                 self.fsm.context.online = False
             for k,v in self.fsm.context.transaction_fsms.items():
                 v.loop()
-            self.fsm.loop()
+            await self.fsm.loop()
 
 
     @on(Action.boot_notification)
@@ -490,10 +326,6 @@ async def set_measurement_variables(cp):
                 variable=VariableType(name="TxEndedMeasurands"))
         ]))
     logger.warning(f"Charger measurands set {result=}")
-
-
-def time_based_id():
-    return int((datetime.now() - datetime(2025, 1, 1)).total_seconds() * 10)
 
 
 async def main():
