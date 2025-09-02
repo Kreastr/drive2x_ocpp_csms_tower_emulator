@@ -5,7 +5,7 @@ COPY requirements.txt /app
 
 RUN pip install -r /app/requirements.txt
 
-COPY *.py /app
+COPY . /app
 
 WORKDIR /app
 
