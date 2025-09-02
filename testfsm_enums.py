@@ -5,6 +5,7 @@ class testfsmState(StateBase, str, Enum):
     state_1='state_1'
     state_2='state_2'
     state_3='state_3'
+    state_4='state_4'
 
 class testfsmCondition(str, Enum):
     if_aborted='if_aborted'

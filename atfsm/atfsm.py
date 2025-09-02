@@ -4,6 +4,7 @@ import filecmp
 import os
 import re
 import shutil
+from collections import deque
 from dataclasses import dataclass
 import logging
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from pyee.asyncio import AsyncIOEventEmitter
 
 from logging import getLogger
 
+from util import setup_logging
 from .state_base import StateBase
 from beartype import beartype
 
@@ -31,7 +33,7 @@ def slugify(x : str, separator="_"):
 
 
 
-logger = getLogger(__name__)
+logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
 
 
@@ -39,6 +41,21 @@ SE = TypeVar("SE", bound=StateBase)
 EE = TypeVar("EE")
 CE = TypeVar("CE")
 FSM_ST = TypeVar("FSM_ST")
+transaction_uml = """@startuml
+[*] -> Idle
+Idle --> Authorized : on authorized
+Idle --> CableConnected : if cable connected
+CableConnected --> Idle : if cable disconnected
+Authorized --> TransactionAuthFirst : if cable connected
+CableConnected --> TransactionCableFirst : on authorized
+TransactionCableFirst --> Transaction
+TransactionAuthFirst --> Transaction
+Transaction --> Transaction : on report interval
+Transaction --> Idle : if cable disconnected
+Transaction --> Idle : on deauthorized
+Authorized --> Idle : on deauthorized
+@enduml
+"""
 
 test_data_1 = """@startuml
 scale 600 width
@@ -53,6 +70,8 @@ State3 : loop Just a test
 State3 --> State3 : on Failed
 State3 --> [*] : on Succeeded / Save Result
 State3 --> [*] : on Aborted
+State3 --> State4 
+State4 --> State3
 
 @enduml
 """
@@ -351,6 +370,8 @@ class AFSM(Generic[SE, CE, EE, FSM_ST]):
         self._events = AsyncIOEventEmitter()
 
         self.terminated = False
+        self.in_transit = False
+        self.deferred_events = deque()
 
         self.sm_states : dict[SE, StateInfo[SE, CE, EE, FSM_ST]] = dict()
 
@@ -373,6 +394,10 @@ class AFSM(Generic[SE, CE, EE, FSM_ST]):
             else:
                 raise Exception(f"Unknown command {command[0]}")
 
+        for k, v in self.sm_states.items():
+            if v.default_transition:
+                v.default_transition = self.se_factory(v.default_transition) 
+            
         self.current_state : SE | None = None
 
         for k, st in self.sm_states.items():
@@ -463,6 +488,9 @@ class {module_name}Event(str, Enum):
             return
         if self.current_state is None:
             raise Exception("Trying to loop before current_state is set is not allowed.")
+        
+        await self.handle_deferred_signals()
+        
         st = self.sm_states[self.current_state]
         transition : TransitionCondition[SE, CE]
         for transition in st.transition_conditions:
@@ -474,7 +502,7 @@ class {module_name}Event(str, Enum):
                 logger.warning(f"FSM after conditional transition is { self.current_state }")
                 return
         if st.default_transition is not None:
-            await self.transition_to_new_state(st, st.default_transition)
+            await self.transition_to_new_state(st, self.se_factory(st.default_transition))
             logger.warning(f"FSM after default transition is { self.current_state }")
 
 
@@ -486,6 +514,9 @@ class {module_name}Event(str, Enum):
         if self.terminated:
             logger.error("Attempted looping a finished FSM")
             return
+        if self.in_transit:
+            await self.handle_as_deferred(event)
+            return
         logger.warning(f"FSM on event {event}")
         self._events.emit(str(event), event, self.current_state)
         st = self.sm_states[self.current_state]
@@ -495,6 +526,15 @@ class {module_name}Event(str, Enum):
                 logger.warning(f"FSM after event state is { self.current_state }")
                 break
 
+    async def handle_as_deferred(self, event):
+        logger.info(f"Got new event {event} during state transit. Deferring.")
+        self.deferred_events.append(event)
+
+    async def handle_deferred_signals(self):
+        while self.deferred_events:
+            event = self.deferred_events.popleft()
+            logger.info(f"Processing deferred event {event}")
+            await self.handle(event)
 
     async def transition_to_new_state(self, st, target_state : SE | None):
         if self.current_state is None:
@@ -506,11 +546,15 @@ class {module_name}Event(str, Enum):
         if self.terminated:
             logger.error("Attempted transitioning a finished FSM")
             return
+
+        self.in_transit = True
         if target_state is None:
             logger.warning("FSM reached its termination point")
             self.terminated = True
             self.current_state = target_state
             self._events.emit("on_terminated", "on_terminated")
+            self.in_transit = False
+            await self.handle_deferred_signals()
             return
 
         self_current_state : SE = self.current_state
@@ -536,13 +580,20 @@ class {module_name}Event(str, Enum):
             else:
                 self._events.emit(self_current_state.on_enter, self_current_state.on_enter,
                                   self_current_state)
+        self.in_transit = False
+        await self.handle_deferred_signals()
 
-from testfsm_enums import testfsmState, testfsmCondition, testfsmEvent
 
 class testContext:
     pass
 
 async def main():
+    fsm : AFSM = AFSM(uml=test_data_1,
+                      context=testContext(),
+                      se_factory=str,
+                      debug_ply=True)
+    fsm.write_enums("testfsm")
+    from testfsm_enums import testfsmState, testfsmCondition, testfsmEvent
     fsm : AFSM[testfsmState, testfsmCondition, testfsmEvent, testContext] = AFSM[testfsmState, testfsmCondition, 
                                                                                  testfsmEvent, testContext](uml=test_data_1,
                                                                                                             context=testContext(),
@@ -557,5 +608,3 @@ async def main():
     await fsm.handle(testfsmEvent.on_succeeded)
     await fsm.loop()
 
-if __name__ == "__main__":
-    asyncio.run(main())

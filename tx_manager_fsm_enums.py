@@ -5,11 +5,13 @@ class TxManagerFSMState(StateBase, str, Enum):
     unknown='unknown'
     occupied='occupied'
     available='available'
+    authorizing='authorizing'
     authorized='authorized'
     ready='ready'
     charging='charging'
     discharging='discharging'
     terminating='terminating'
+    fault='fault'
 
 class TxManagerFSMCondition(str, Enum):
     if_occupied='if_occupied'
@@ -22,6 +24,9 @@ class TxManagerFSMCondition(str, Enum):
 class TxManagerFSMEvent(str, Enum):
     on_authorized='on_authorized'
     on_start_tx_event='on_start_tx_event'
+    on_authorize_accept='on_authorize_accept'
+    on_authorize_reject='on_authorize_reject'
     on_deauthorized='on_deauthorized'
-    on_terminate='on_terminate'
+    on_termination_fault='on_termination_fault'
     on_end_tx_event='on_end_tx_event'
+    on_clear_fault='on_clear_fault'

@@ -1,6 +1,23 @@
 from atfsm.atfsm import AFSM
 from client.data import TxFSMContext, ConnectorModel
-from client.transaction_model.transaction_uml import transaction_uml
+
+transaction_uml = """@startuml
+[*] -> Idle
+Idle --> Authorized : on authorized
+Idle --> CableConnected : if cable connected
+CableConnected --> Idle : if cable disconnected
+Authorized --> TransactionAuthFirst : if cable connected
+CableConnected --> TransactionCableFirst : on authorized
+TransactionCableFirst --> Transaction
+TransactionAuthFirst --> Transaction
+Transaction --> Transaction : on report interval
+Transaction --> StopTransactionDisconnected : if cable disconnected
+StopTransactionDisconnected -> Idle
+Transaction --> StopTransactionDeauthorized : on deauthorized
+StopTransactionDeauthorized --> Idle
+Authorized --> Idle : on deauthorized
+@enduml
+"""
 _fsm = AFSM(uml=transaction_uml, context=TxFSMContext(ConnectorModel(1)), se_factory=lambda x: str(x))
 
 _fsm.write_enums("TxFSM")

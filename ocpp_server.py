@@ -23,9 +23,10 @@ from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
 from server.charge_point_model import get_charge_point_fsm, ChargePointFSMType
 from server.data import ChargePointContext
 from server.data.connector_status import ConnectorStatus
+from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
-from util import get_time_str, setup_logging, time_based_id
+from util import get_time_str, setup_logging, time_based_id, any_of
 
 
 async def broadcast_to(op, page, **filters):
@@ -37,6 +38,7 @@ async def broadcast_to(op, page, **filters):
 
 
 logger = setup_logging(__name__)
+logger.setLevel(logging.DEBUG)
 
 boot_notification_cache = dict()
 
@@ -51,11 +53,11 @@ class OCPPServerHandler(ChargePoint):
         
 
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
-        self.fsm.on(ChargePointFSMState.unknown.on_exit, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.try_cached_boot_notification)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.start_boot_timeout)
         self.fsm.on(ChargePointFSMState.failed.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.closing.on_enter, self.close_connection)
+        self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
 
     async def set_online(self, *vargs):
@@ -121,10 +123,13 @@ class OCPPServerHandler(ChargePoint):
     async def online_status_task(self):
         while not self.fsm.context.shutdown:
             await asyncio.sleep(1)
-            if self.fsm.context.timeout < datetime.now():
+            try:
+                if self.fsm.context.timeout < datetime.now():
+                    self.fsm.context.online = False
+            except:
                 self.fsm.context.online = False
             for k,v in self.fsm.context.transaction_fsms.items():
-                v.loop()
+                await v.loop()
             await self.fsm.loop()
 
 
@@ -132,6 +137,9 @@ class OCPPServerHandler(ChargePoint):
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         self.fsm.context.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
+
+        self.fsm.context.id = charging_station["serial_number"]
+
         logger.warning(f"id={self.fsm.context.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
 
         if self.fsm.current_state == ChargePointFSMState.unknown and "serial_number" not in charging_station:
@@ -165,26 +173,31 @@ class OCPPServerHandler(ChargePoint):
         self.log_event(("status_notification", (data)))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {data=}")
         conn_status = ConnectorStatus(**data)
+
+        if self.fsm.current_state in [ChargePointFSMState.identified,
+                                      ChargePointFSMState.booted,
+                                      ChargePointFSMState.running_transaction,
+                                      ChargePointFSMState.closing]:
         
-        
 
-        tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.connector_id]
+            tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.connector_id]
 
-        tx_fsm.context.connector.connector_status = conn_status.connector_status
-        tx_fsm.context.connector.evse_id = conn_status.evse_id
+            tx_fsm.context.connector.connector_status = conn_status.connector_status
+            tx_fsm.context.connector.evse_id = conn_status.evse_id
+            tx_fsm.context.connector.connector_id = conn_status.connector_id
 
-        logger.warning(" tx_fsm.loop")
-        await tx_fsm.loop()
-        
-        #if conn_status.connector_status == "Occupied":
-        #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+            logger.warning(" tx_fsm.loop")
+            await tx_fsm.loop()
 
-        if conn_status.connector_id not in self.fsm.context.connectors:
-            self.fsm.context.connectors[conn_status.connector_id] = conn_status
-            self.fsm.context.transaction_fsms[conn_status.connector_id].context.cp_interface = self
-            await broadcast_to(lambda x: x.on_new_connector(conn_status.connector_id), "/", kind=CPCard, marker=self.fsm.context.id)
-        else:
-            self.fsm.context.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
+            #if conn_status.connector_status == "Occupied":
+            #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+
+            if conn_status.connector_id not in self.fsm.context.connectors:
+                self.fsm.context.connectors[conn_status.connector_id] = conn_status
+                self.fsm.context.transaction_fsms[conn_status.connector_id].context.cp_interface = self
+                await broadcast_to(lambda x: x.on_new_connector(conn_status.connector_id), "/", kind=CPCard, marker=self.fsm.context.id)
+            else:
+                self.fsm.context.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
         return call_result.StatusNotification(
         )
 
@@ -208,38 +221,47 @@ class OCPPServerHandler(ChargePoint):
     async def on_authorize(self, **data):
         self.log_event(("authorize", (data)))
         logger.warning(f"id={self.fsm.context.id} on_authorize {data=}")
-        return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted))
+        return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.invalid))
 
     @on(Action.transaction_event)
     async def on_transaction_event(self, **data):
         self.log_event(("transaction_event", (data)))
         logger.warning(f"id={self.fsm.context.id} on_transaction_event {data=}")
 
-        if self.fsm.current_state not in [ChargePointFSMState.booted, ChargePointFSMState.running_transaction]:
+        if any_of(lambda: self.fsm.current_state not in [ChargePointFSMState.booted, ChargePointFSMState.running_transaction],
+                  lambda: "event_type" not in data,
+                  lambda: "transaction_info" not in data,
+                  lambda: "transaction_id" not in data["transaction_info"],
+                  lambda: "evse" not in data,
+                  lambda: "id" not in data["evse"]):
             return call_result.TransactionEvent()
 
-        if "transaction_info" not in data:
-            return call_result.TransactionEvent()
+        evse_id = data["evse"]["id"]
 
-        if "transaction_id" not in data["transaction_info"]:
-            return call_result.TransactionEvent()
+        tx_fsm = self.fsm.context.transaction_fsms[evse_id]
 
-        if "evse" not in data["transaction_info"]:
-            return call_result.TransactionEvent()
+        event_type = data["event_type"]
 
-        if "connector_id" not in data["transaction_info"]["evse"]:
-            return call_result.TransactionEvent()
+        reported_tx_id = data["transaction_info"]["transaction_id"]
 
-        connector_id = data["transaction_info"]["evse"]["connector_id"]
+        logger.warning(f"{event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 
-        tx_fsm = self.fsm.context.transaction_fsms[connector_id]
-
-        if data["transaction_info"]["transaction_id"] != tx_fsm.context.tx_id:
-            tx_fsm.context.tx_id = data["transaction_info"]["transaction_id"]
-            self.fsm.context.current_tx[connector_id] = data["transaction_info"]["transaction_id"]
-
+        tx_fsm.context : TxManagerContext
+        if reported_tx_id != tx_fsm.context.tx_id:
+            await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
+            tx_fsm.context.tx_id = reported_tx_id
+            self.fsm.context.current_tx[evse_id] = reported_tx_id
+            await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+            
+        if event_type == "Started":
             await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
+        if event_type == "Updated" and tx_fsm.current_state in [TxManagerFSMState.occupied]:
+            await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+
+        if event_type == "Ended" and tx_fsm.context.tx_id is not None:
+            await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
+            tx_fsm.context.tx_id = None
 
         response = dict()
         if "id_token_info" in data:
@@ -264,6 +286,9 @@ class OCPPServerHandler(ChargePoint):
         await self._connection.close()
         await self.onl_task
 
+    
+    async def do_clear_fault(self, evse_id):
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
     
     async def do_remote_stop(self, evse_id):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_deauthorized)
@@ -291,7 +316,11 @@ async def on_connect(websocket):
     while cp.fsm.context.connection_task is None or not cp.fsm.context.connection_task.done():
         await asyncio.sleep(1)
     await cp.close_connection()
-    cp.log_event(f"start_task.result {cp.fsm.context.connection_task.result()}")
+    try:
+        result = cp.fsm.context.connection_task.result()
+    except Exception as e:
+        result = f"Exception {e}"
+    cp.log_event(f"start_task.result {result}")
 
 
 async def get_remote_ip(cp, websocket):
@@ -452,6 +481,7 @@ class CPCard(Element):
                     logger.warning(f"remote start result {await charge_points[self.cp_context.id].do_remote_start(connector_id)}")
                 ui.button("Remote Start", on_click=rsb)
                 ui.button("Remote Stop", on_click=lambda : charge_points[self.cp_context.id].do_remote_stop(connector_id))
+                ui.button("Clear Fault", on_click=lambda : charge_points[self.cp_context.id].do_clear_fault(connector_id))
 
 
 @ui.page("/")

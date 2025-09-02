@@ -63,8 +63,16 @@ def setup_logging(name):
     lr: logging.Handler | None = logging.lastResort
     assert lr is not None
     lr.setFormatter(formatter)
+    lr.setLevel(logging.DEBUG)
     return logger
 
 
 def time_based_id():
     return int((datetime.now() - datetime(2025, 1, 1)).total_seconds() * 10)
+
+
+def any_of(*vargs):
+    for v in vargs:
+        if v():
+            return True
+    return False
