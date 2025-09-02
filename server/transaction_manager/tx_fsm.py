@@ -22,11 +22,25 @@ class TxFSMS(TxManagerFSMType):
                          context=TxManagerContext())
         self.apply_to_all_conditions(TxManagerFSMCondition.if_available, self.if_available)
         self.apply_to_all_conditions(TxManagerFSMCondition.if_occupied, self.if_occupied)
+        self.apply_to_all_conditions(TxManagerFSMCondition.if_charge_setpoint, self.if_charge_setpoint)
+        self.apply_to_all_conditions(TxManagerFSMCondition.if_idle_setpoint, self.if_idle_setpoint)
+        self.apply_to_all_conditions(TxManagerFSMCondition.if_discharge_setpoint, self.if_discharge_setpoint)
 
         self.on(TxManagerFSMState.authorizing.on_enter, self.send_auth_to_cp)
         self.on(TxManagerFSMState.occupied.on_loop, self.send_auth_to_cp)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
-        
+
+    @staticmethod
+    def if_charge_setpoint(self, context : TxManagerContext, other):
+        return context.connector.setpoint > 0
+
+    @staticmethod
+    def if_idle_setpoint(self, context : TxManagerContext, other):
+        return context.connector.setpoint == 0.0
+
+    @staticmethod
+    def if_discharge_setpoint(self, context : TxManagerContext, other):
+        return context.connector.setpoint < 0
 
     async def send_deauth_to_cp(self, *vargs):
         if self.context.cp_interface is not None:
@@ -35,8 +49,8 @@ class TxFSMS(TxManagerFSMType):
             logger.warning(f"send_deauth_to_cp {result=}")
             if result.status == "Accepted":
                 await self.handle(TxManagerFSMEvent.on_end_tx_event)
-                return 
-        
+                return
+
         await self.handle(TxManagerFSMEvent.on_termination_fault)
 
     async def send_auth_to_cp(self, *vargs):
@@ -49,7 +63,7 @@ class TxFSMS(TxManagerFSMType):
             if result.status == "Accepted":
                 await self.handle(TxManagerFSMEvent.on_authorize_accept)
                 return
-        
+
         await self.handle(TxManagerFSMEvent.on_authorize_reject)
 
     @staticmethod

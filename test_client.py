@@ -298,7 +298,7 @@ cp : OCPPClient | None = None
 
 async def main():
     global cp
-    uri = "ws://localhost:9000"
+    #uri = "ws://localhost:9000"
     if len(sys.argv) > 1:
         uri = sys.argv[1]
     if len(sys.argv) > 2:
@@ -308,7 +308,7 @@ async def main():
         serial_number = "CP_ACME_BAT_0000"
         
     #"wss://emotion-test.eu/ocpp/1"
-    #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+    uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
     ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],

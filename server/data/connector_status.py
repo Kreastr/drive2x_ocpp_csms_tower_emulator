@@ -10,3 +10,4 @@ class ConnectorStatus:
     evse_id : int = -1
     tx_id = str
     cp_interface : ChargePoint | None = None
+    setpoint : float = 0.0
