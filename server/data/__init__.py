@@ -17,7 +17,7 @@ class ChargePointContext:
     remote_ip = None
     online = False
     shutdown = False
-    connectors : dict[int, Any] = field(default_factory=dict)
+    evses : dict[int, Any] = field(default_factory=dict)
     tx_status = ""
     timeout : datetime = field(default_factory=datetime.now)
     id : str = "provisional"

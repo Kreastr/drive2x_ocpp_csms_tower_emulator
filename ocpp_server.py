@@ -22,7 +22,7 @@ from websockets import Subprotocol
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
 from server.charge_point_model import get_charge_point_fsm, ChargePointFSMType
 from server.data import ChargePointContext
-from server.data.connector_status import ConnectorStatus
+from server.data.evse_status import EvseStatus
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
@@ -172,7 +172,7 @@ class OCPPServerHandler(ChargePoint):
     async def on_status_notification(self, **data):
         self.log_event(("status_notification", (data)))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {data=}")
-        conn_status = ConnectorStatus(**data)
+        conn_status = EvseStatus(**data)
 
         if self.fsm.current_state in [ChargePointFSMState.identified,
                                       ChargePointFSMState.booted,
@@ -180,7 +180,7 @@ class OCPPServerHandler(ChargePoint):
                                       ChargePointFSMState.closing]:
         
 
-            tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.connector_id]
+            tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.evse_id]
 
             tx_fsm.context.evse.connector_status = conn_status.connector_status
             tx_fsm.context.evse.evse_id = conn_status.evse_id
@@ -192,12 +192,12 @@ class OCPPServerHandler(ChargePoint):
             #if conn_status.connector_status == "Occupied":
             #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
-            if conn_status.connector_id not in self.fsm.context.connectors:
-                self.fsm.context.connectors[conn_status.connector_id] = conn_status
-                self.fsm.context.transaction_fsms[conn_status.connector_id].context.cp_interface = self
-                await broadcast_to(lambda x: x.on_new_connector(conn_status.connector_id), "/", kind=CPCard, marker=self.fsm.context.id)
+            if conn_status.evse_id not in self.fsm.context.evses:
+                self.fsm.context.evses[conn_status.evse_id] = conn_status
+                self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
+                await broadcast_to(lambda x: x.on_new_evse(conn_status.evse_id), "/", kind=CPCard, marker=self.fsm.context.id)
             else:
-                self.fsm.context.connectors[conn_status.connector_id].connector_status = conn_status.connector_status
+                self.fsm.context.evses[conn_status.evse_id].connector_status = conn_status.connector_status
         return call_result.StatusNotification(
         )
 
@@ -398,13 +398,12 @@ async def remote_start(cp_id : str, evse_id : int):
         return {"result": await charge_points[cp_id].do_remote_start(evse_id)}
 
 
-@app.get("/cp/{cp_id}/remote_stop/{transaction_id}")
-async def remote_stop(cp_id : str, transaction_id : str):
+@app.get("/cp/{cp_id}/remote_stop/{evse_id}")
+async def remote_stop(cp_id : str, evse_id : int):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await charge_points[cp_id].call(
-            call.RequestStopTransaction(transaction_id=transaction_id))}
+        return {"result": await charge_points[cp_id].do_remote_stop(evse_id)}
 
 @app.get("/cp/{cp_id}/report_full")
 async def report_full(cp_id : str):
@@ -455,8 +454,8 @@ class CPCard(Element):
             self.connector_container = ui.column()
             ui.separator()
 
-        for connid in self.cp_context.connectors:
-            self.on_new_connector(connid)
+        for connid in self.cp_context.evses:
+            self.on_new_evse(connid)
 
     def bind_online_from(self, var, name):
         bind_from(self_obj=self, self_name="online",
@@ -468,20 +467,20 @@ class CPCard(Element):
         self.card.classes(add="bg-green" if card_online_status else "bg-red")
         self.card.update()
 
-    def on_new_connector(self, connector_id):
-        logger.warning(f"on new connector {connector_id}")
+    def on_new_evse(self, evse_id):
+        logger.warning(f"on new connector {evse_id}")
         with self.connector_container:
             with ui.row(align_items='center'):
-                new_label = ui.label(text=f"{connector_id}: {self.cp_context.connectors[connector_id].connector_status}")
-                new_label.bind_text_from(self.cp_context.connectors[connector_id], "connector_status", backward=lambda x, cid=connector_id: f"{cid}: {x}")
-                tx_fsm = self.cp_context.transaction_fsms[connector_id]
+                new_label = ui.label(text=f"{evse_id}: {self.cp_context.evses[evse_id].connector_status}")
+                new_label.bind_text_from(self.cp_context.evses[evse_id], "connector_status", backward=lambda x, cid=evse_id: f"{cid}: {x}")
+                tx_fsm = self.cp_context.transaction_fsms[evse_id]
                 tx_label = ui.label(text=f"{str(tx_fsm.current_state)}")
                 tx_label.bind_text_from(tx_fsm, "current_state")
-                async def rsb():
-                    logger.warning(f"remote start result {await charge_points[self.cp_context.id].do_remote_start(connector_id)}")
+                async def rsb(_evse_id=evse_id):
+                    logger.warning(f"remote start result {await charge_points[self.cp_context.id].do_remote_start(_evse_id)}")
                 ui.button("Remote Start", on_click=rsb)
-                ui.button("Remote Stop", on_click=lambda : charge_points[self.cp_context.id].do_remote_stop(connector_id))
-                ui.button("Clear Fault", on_click=lambda : charge_points[self.cp_context.id].do_clear_fault(connector_id))
+                ui.button("Remote Stop", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_remote_stop(_evse_id))
+                ui.button("Clear Fault", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_clear_fault(_evse_id))
 
 
 @ui.page("/")

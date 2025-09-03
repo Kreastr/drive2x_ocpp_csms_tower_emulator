@@ -32,25 +32,27 @@ class TxFSMS(TxManagerFSMType):
 
     @staticmethod
     def if_charge_setpoint(self, context : TxManagerContext, other):
-        return context.connector.setpoint > 0
+        return context.evse.setpoint > 0
 
     @staticmethod
     def if_idle_setpoint(self, context : TxManagerContext, other):
-        return context.connector.setpoint == 0.0
+        return context.evse.setpoint == 0.0
 
     @staticmethod
     def if_discharge_setpoint(self, context : TxManagerContext, other):
-        return context.connector.setpoint < 0
+        return context.evse.setpoint < 0
 
     async def send_deauth_to_cp(self, *vargs):
         if self.context.cp_interface is not None:
             if self.context.tx_id is None:
                 await self.handle(TxManagerFSMEvent.on_end_tx_event)
                 return
+
+            stop_request = call.RequestStopTransaction(transaction_id=self.context.tx_id)
             
             result = await self.context.cp_interface.call(
-                call.RequestStopTransaction(transaction_id=self.context.tx_id))
-            logger.warning(f"send_deauth_to_cp {result=}")
+                stop_request)
+            logger.warning(f"send_deauth_to_cp {stop_request=} {result=}")
             if result.status == "Accepted":
                 await self.handle(TxManagerFSMEvent.on_end_tx_event)
                 return
@@ -72,8 +74,8 @@ class TxFSMS(TxManagerFSMType):
 
     @staticmethod
     def if_available(ctxt: TxManagerContext, optional: Any):
-        return ctxt.connector.connector_status == "Available"
+        return ctxt.evse.connector_status == "Available"
 
     @staticmethod
     def if_occupied(ctxt: TxManagerContext, optional: Any):
-        return ctxt.connector.connector_status == "Occupied"
+        return ctxt.evse.connector_status == "Occupied"

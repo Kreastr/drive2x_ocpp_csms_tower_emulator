@@ -3,7 +3,7 @@ from ocpp.v201 import ChargePoint
 
 
 @binding.bindable_dataclass
-class ConnectorStatus:
+class EvseStatus:
     connector_id : int = 0
     connector_status : str = "Unknown"
     timestamp : str = "1970.01.01"

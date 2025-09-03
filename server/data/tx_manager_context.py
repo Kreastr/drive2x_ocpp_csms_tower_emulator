@@ -1,9 +1,9 @@
 from dataclasses import field, dataclass
 
-from server.data.connector_status import ConnectorStatus
+from server.data.evse_status import EvseStatus
 
 
 @dataclass 
 class TxManagerContext:
-    connector : ConnectorStatus = field(default_factory=ConnectorStatus)
+    evse : EvseStatus = field(default_factory=EvseStatus)
     tx_id : str | None = None

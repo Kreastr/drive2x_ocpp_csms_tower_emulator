@@ -75,6 +75,7 @@ class TxFSM(TxFSMType):
         self.tx_id.reset()
 
     async def call(self, *vargs, **kwargs):
+        logger.warning(f"Calling {vargs} {kwargs}")
         assert self.context.cp_interface is not None
         await self.context.cp_interface.call(*vargs, **kwargs)
 
@@ -85,7 +86,7 @@ class TxFSM(TxFSMType):
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value
                                                                                ),
-                                              evse=EVSEType(id=self.context.evse.evse_id)
+                                              evse=EVSEType(id=self.context.evse.id)
                                               ))
 
     async def inform_on_end_transaction_disconnected(self, *vargs):
@@ -94,7 +95,7 @@ class TxFSM(TxFSMType):
                                               trigger_reason=TriggerReasonEnumType.ev_communication_lost,
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,),
-                                              evse=EVSEType(id=self.context.evse.evse_id)
+                                              evse=EVSEType(id=self.context.evse.id)
                                               ))
 
     async def inform_on_remote_start(self, *vargs):
@@ -106,7 +107,7 @@ class TxFSM(TxFSMType):
                                                                                remote_start_id=self.context.remote_id,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.evse.evse_id)
+                                              evse=EVSEType(id=self.context.evse.id)
                                               ))
 
     async def inform_on_first_plugged_in(self, *vargs):
@@ -117,7 +118,7 @@ class TxFSM(TxFSMType):
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.evse.evse_id)
+                                              evse=EVSEType(id=self.context.evse.id)
                                               ))
 
     async def inform_on_authorized_when_plugged(self, *vargs):
@@ -129,7 +130,7 @@ class TxFSM(TxFSMType):
                                                                                remote_start_id=self.context.remote_id,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.evse.evse_id)
+                                              evse=EVSEType(id=self.context.evse.id)
                                               ))
 
 def log_async_call(log_sink):
@@ -228,7 +229,7 @@ class OCPPClient(ChargePoint):
 
     async def post_status_notification(self, evse : EvseModel):
         status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
-                                                 evse_status=ConnectorStatusEnumType.occupied if evse.cable_connected else EvseStatusEnumType.available,
+                                                 connector_status=ConnectorStatusEnumType.occupied if evse.cable_connected else ConnectorStatusEnumType.available,
                                                  evse_id=evse.id,
                                                  connector_id=evse.connector_id)
         result = await self.call(status_notification)
@@ -332,13 +333,12 @@ cp : OCPPClient | None = None
 async def main():
     global cp
 
+    serial_number = "CP_ACME_BAT_0000"
 
     #uri = "ws://localhost:9000"
     if len(sys.argv) > 1:
         uri = sys.argv[1]
-        serial_number = "CP_ACME_BAT_0000"
     if len(sys.argv) > 2:
-        uri = sys.argv[1]
         serial_number = "CP_ACME_BAT_" + sys.argv[2]
         
     #"wss://emotion-test.eu/ocpp/1"
