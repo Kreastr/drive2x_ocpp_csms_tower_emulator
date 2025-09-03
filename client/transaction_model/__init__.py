@@ -1,5 +1,5 @@
 from atfsm.atfsm import AFSM
-from client.data import TxFSMContext, ConnectorModel
+from client.data import TxFSMContext, EvseModel
 
 transaction_uml = """@startuml
 [*] -> Idle
@@ -18,7 +18,7 @@ StopTransactionDeauthorized --> Idle
 Authorized --> Idle : on deauthorized
 @enduml
 """
-_fsm = AFSM(uml=transaction_uml, context=TxFSMContext(ConnectorModel(1)), se_factory=lambda x: str(x))
+_fsm = AFSM(uml=transaction_uml, context=TxFSMContext(EvseModel.model_validate(dict(id=1))), se_factory=lambda x: str(x))
 
 _fsm.write_enums("TxFSM")
 

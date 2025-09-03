@@ -44,6 +44,10 @@ class TxFSMS(TxManagerFSMType):
 
     async def send_deauth_to_cp(self, *vargs):
         if self.context.cp_interface is not None:
+            if self.context.tx_id is None:
+                await self.handle(TxManagerFSMEvent.on_end_tx_event)
+                return
+            
             result = await self.context.cp_interface.call(
                 call.RequestStopTransaction(transaction_id=self.context.tx_id))
             logger.warning(f"send_deauth_to_cp {result=}")
@@ -56,7 +60,7 @@ class TxFSMS(TxManagerFSMType):
     async def send_auth_to_cp(self, *vargs):
         if self.context.cp_interface is not None:
             result = await self.context.cp_interface.call(
-                call.RequestStartTransaction(evse_id=self.context.connector.evse_id,
+                call.RequestStartTransaction(evse_id=self.context.evse.evse_id,
                                              remote_start_id=time_based_id(),
                                              id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
             logger.warning(f"send_auth_to_cp {result=}")

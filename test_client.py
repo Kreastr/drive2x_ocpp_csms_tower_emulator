@@ -28,10 +28,15 @@ from pyee.asyncio import AsyncIOEventEmitter
 
 from typing import Any
 
-from client.data import ConnectorModel, TxFSMContext
+from redis import Redis
+
+from client.data import EvseModel, TxFSMContext
 from client.transaction_model import TxFSMType, transaction_uml
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
 from util import ResettableValue, ResettableIterator, get_time_str, setup_logging
+
+from redis_dict import RedisDict
+
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -58,11 +63,11 @@ class TxFSM(TxFSMType):
 
     @staticmethod
     def if_cable_connected(ctxt : TxFSMContext, optional : Any):
-        return ctxt.connector.cable_connected
+        return ctxt.evse.cable_connected
 
     @staticmethod
     def if_cable_disconnected(ctxt : TxFSMContext, optional : Any):
-        return not ctxt.connector.cable_connected
+        return not ctxt.evse.cable_connected
 
 
     async def setup_transaction(self, *vargs):
@@ -80,7 +85,7 @@ class TxFSM(TxFSMType):
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value
                                                                                ),
-                                              evse=EVSEType(id=self.context.connector.evse_id)
+                                              evse=EVSEType(id=self.context.evse.evse_id)
                                               ))
 
     async def inform_on_end_transaction_disconnected(self, *vargs):
@@ -89,7 +94,7 @@ class TxFSM(TxFSMType):
                                               trigger_reason=TriggerReasonEnumType.ev_communication_lost,
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,),
-                                              evse=EVSEType(id=self.context.connector.evse_id)
+                                              evse=EVSEType(id=self.context.evse.evse_id)
                                               ))
 
     async def inform_on_remote_start(self, *vargs):
@@ -101,7 +106,7 @@ class TxFSM(TxFSMType):
                                                                                remote_start_id=self.context.remote_id,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.connector.evse_id)
+                                              evse=EVSEType(id=self.context.evse.evse_id)
                                               ))
 
     async def inform_on_first_plugged_in(self, *vargs):
@@ -112,7 +117,7 @@ class TxFSM(TxFSMType):
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.connector.evse_id)
+                                              evse=EVSEType(id=self.context.evse.evse_id)
                                               ))
 
     async def inform_on_authorized_when_plugged(self, *vargs):
@@ -124,7 +129,7 @@ class TxFSM(TxFSMType):
                                                                                remote_start_id=self.context.remote_id,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.connector.evse_id)
+                                              evse=EVSEType(id=self.context.evse.evse_id)
                                               ))
 
 def log_async_call(log_sink):
@@ -144,13 +149,14 @@ def log_async_call(log_sink):
 
 class OCPPClient(ChargePoint):
 
-    def __init__(self, *vargs, **kwargs):
+    def __init__(self, redis_data, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
+        self.redis_data = redis_data
         self.settings: dict[str, dict[str, str]] = deepcopy({"ChargingStation": {}})
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
-        self.task_contexts  = dict((i + 1, TxFSMContext(ConnectorModel(i + 1))) for i in range(3))
+        self.task_contexts  = dict((i + 1, TxFSMContext(self.get_evse_data(i+1))) for i in range(3))
         self.exit_flag = False
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
@@ -163,9 +169,29 @@ class OCPPClient(ChargePoint):
                                                             self.tx_fsms[x[0]]))), 
                                       self.task_contexts.items()))
         self.st_tasks = dict(map(lambda x: (
-            x[0], asyncio.create_task(self.status_task(x[1].connector))),
+            x[0], asyncio.create_task(self.status_task(x[1].evse))),
                                       self.task_contexts.items()))
+    
+    async def data_saver_task(self):
+        while True:
+            await asyncio.sleep(10)
+            map(self.save_evse_data, self.task_contexts.items())
 
+    def save_evse_data(self, i, v : EvseModel):
+        record_hash = self.get_evse_hash(i)
+        self.redis_data[record_hash] = v.to_json()
+    
+    @staticmethod
+    def get_evse_hash(i):
+        return f"evse-data-{i}"
+        
+    def get_evse_data(self, i) -> EvseModel:
+        record_hash = self.get_evse_hash(i)
+        if record_hash in self.redis_data:
+            data = self.redis_data[record_hash]
+        else:
+            data = dict(id=i)
+        return EvseModel.model_validate(data)
 
     async def transaction_task(self, context : TxFSMContext, fsm : TxFSMType):
         fsm.context.cp_interface = self
@@ -181,23 +207,30 @@ class OCPPClient(ChargePoint):
             heartbeat = Heartbeat()
             await self.call(heartbeat)
 
-    async def status_task(self, connector : ConnectorModel):
+    async def status_task(self, evse : EvseModel):
 
-        prev_status = connector.cable_connected
-        await self.post_status_notification(connector)
+        prev_status = evse.cable_connected
+        await self.post_status_notification(evse)
         while True:
             await asyncio.sleep(1)
 
-            if prev_status != connector.cable_connected:
-                await self.post_status_notification(connector)
-                prev_status = connector.cable_connected
+            if prev_status != evse.cable_connected:
+                await self.post_status_notification(evse)
+                prev_status = evse.cable_connected
+            
+            if evse.cable_connected:
+                pass
+            else:
+                if evse.soc_wh > 2:
+                    evse.soc_wh -= 5000/3600
+                    evse.km_driven += 25/3600
 
 
-    async def post_status_notification(self, connector : ConnectorModel):
+    async def post_status_notification(self, evse : EvseModel):
         status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
-                                                 connector_status=ConnectorStatusEnumType.occupied if connector.cable_connected else ConnectorStatusEnumType.available,
-                                                 evse_id=connector.evse_id,
-                                                 connector_id=connector.id)
+                                                 evse_status=ConnectorStatusEnumType.occupied if evse.cable_connected else EvseStatusEnumType.available,
+                                                 evse_id=evse.id,
+                                                 connector_id=evse.connector_id)
         result = await self.call(status_notification)
         logger.warning(f"{status_notification=} {result=}")
 
@@ -298,17 +331,18 @@ cp : OCPPClient | None = None
 
 async def main():
     global cp
+
+
     #uri = "ws://localhost:9000"
     if len(sys.argv) > 1:
         uri = sys.argv[1]
-    if len(sys.argv) > 2:
-        uri = sys.argv[2]
-        serial_number = "CP_ACME_BAT_" + sys.argv[2]
-    else:
         serial_number = "CP_ACME_BAT_0000"
+    if len(sys.argv) > 2:
+        uri = sys.argv[1]
+        serial_number = "CP_ACME_BAT_" + sys.argv[2]
         
     #"wss://emotion-test.eu/ocpp/1"
-    uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+    #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
     ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],
@@ -316,16 +350,15 @@ async def main():
     if uri.startswith("wss://"):
         ws_args["ssl"] = ctx
     async with websockets.connect(uri, **ws_args) as ws:
-        cp = OCPPClient(serial_number, ws)
+        redis_data = RedisDict(redis=Redis(host="localhost", port=6379, db=1), namespace=f"ocpp-client-{serial_number}-")
+        cp = OCPPClient(redis_data, serial_number, ws)
 
         for client in app.clients('/'):
             with client:
                 for cont in  ElementFilter(kind=ui.column, marker="power_plug_container"):
                     with cont:
                         for cid in cp.task_contexts:
-                            tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
-                            tgl.bind_value(cp.task_contexts[cid].connector, "cable_connected")
-                            ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
+                            await evse_row(cid, cp)
 
         cp_task = asyncio.create_task(cp.start())
 
@@ -354,13 +387,22 @@ async def index():
     with ui.column().mark("power_plug_container"):
         if cp is not None:
             for cid in cp.task_contexts:
-                tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
-                tgl.bind_value(cp.task_contexts[cid].connector, "cable_connected")
-                ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
+                await evse_row(cid, cp)
     ui.label("SoC")
     ui.button("Reset SoC", on_click=lambda: None)
 
+
+async def evse_row(cid, cp):
+    with ui.row(align_items="center"):
+        tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
+        tgl.bind_value(cp.task_contexts[cid].evse, "cable_connected")
+        ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
+        ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "soc_wh", 
+                                        backward=lambda x,c=cp.task_contexts[cid].evse: f"Charge: {(x/c.usable_capacity*100):0.2f}%")
+        ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "km_driven", backward=lambda x: f"Driven {x:0.1f} km")
+
+
 # Dummy call to generate enum modules on every run
-TxFSM(ConnectorModel(id=0))
+TxFSM(EvseModel(id=0))
 
 ui.run(host="0.0.0.0", port=7500)

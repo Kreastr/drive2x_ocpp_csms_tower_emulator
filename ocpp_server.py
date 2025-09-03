@@ -182,9 +182,9 @@ class OCPPServerHandler(ChargePoint):
 
             tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.connector_id]
 
-            tx_fsm.context.connector.connector_status = conn_status.connector_status
-            tx_fsm.context.connector.evse_id = conn_status.evse_id
-            tx_fsm.context.connector.connector_id = conn_status.connector_id
+            tx_fsm.context.evse.connector_status = conn_status.connector_status
+            tx_fsm.context.evse.evse_id = conn_status.evse_id
+            tx_fsm.context.evse.connector_id = conn_status.connector_id
 
             logger.warning(" tx_fsm.loop")
             await tx_fsm.loop()
