@@ -6,11 +6,12 @@ from docutils.nodes import field
 from ocpp.v201 import ChargePoint
 from pydantic import BaseModel
 
+from util.types import TransactionId, ConnectorId, EVSEId
 
 
 class EvseModel(BaseModel):
-    id : int
-    connector_id : int = 1
+    id : EVSEId
+    connector_id : ConnectorId = 1
     auth : bool = False
     cable_connected : bool = False
     soc_wh : float = 50000.0
@@ -19,6 +20,7 @@ class EvseModel(BaseModel):
     metered_power : float = 0.0
     setpoint : float = 0.0
     last_meter_update : datetime.datetime = field(default_constructor=datetime.datetime.now)
+    tx_id : TransactionId | None = None
     
 
 
@@ -26,5 +28,5 @@ class EvseModel(BaseModel):
 class TxFSMContext:
     evse : EvseModel
     auth_status : Any = None
-    remote_id : int = -1
+    remote_start_id : int = -1
     cp_interface : ChargePoint | None = None

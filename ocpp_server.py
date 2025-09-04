@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import cast, Self
 
 import websockets
+from beartype import beartype
 from nicegui.binding import BindableProperty, bind_from
 from nicegui.element import Element
 from ocpp.routing import on
@@ -27,6 +28,7 @@ from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
 from util import get_time_str, setup_logging, time_based_id, any_of
+from util.types import *
 
 
 async def broadcast_to(op, page, **filters):
@@ -42,7 +44,7 @@ logger.setLevel(logging.DEBUG)
 
 boot_notification_cache = dict()
 
-
+@beartype
 class OCPPServerHandler(ChargePoint):
 
     def __init__(self, *vargs, **kwargs):
@@ -236,13 +238,13 @@ class OCPPServerHandler(ChargePoint):
                   lambda: "id" not in data["evse"]):
             return call_result.TransactionEvent()
 
-        evse_id = data["evse"]["id"]
+        evse_id = EVSEId(data["evse"]["id"])
 
         tx_fsm = self.fsm.context.transaction_fsms[evse_id]
 
         event_type = data["event_type"]
 
-        reported_tx_id = data["transaction_info"]["transaction_id"]
+        reported_tx_id = TransactionId(data["transaction_info"]["transaction_id"])
 
         logger.warning(f"{event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 
@@ -287,13 +289,13 @@ class OCPPServerHandler(ChargePoint):
         await self.onl_task
 
     
-    async def do_clear_fault(self, evse_id):
+    async def do_clear_fault(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
     
-    async def do_remote_stop(self, evse_id):
+    async def do_remote_stop(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_deauthorized)
     
-    async def do_remote_start(self, evse_id):
+    async def do_remote_start(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized)
 
 cp_card_container : ui.grid | None = None

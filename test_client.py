@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import random
 import ssl
 import sys
 from copy import deepcopy
@@ -10,14 +9,15 @@ from uuid import uuid4
 
 import certifi
 import websockets
+from beartype import beartype
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
 
 from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification
 from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType, GetVariableDataType, \
-    GetVariableResultType, VariableType, SetVariableResultType, TransactionType, IdTokenInfoType, IdTokenType, EVSEType
+    GetVariableResultType, VariableType, SetVariableResultType, TransactionType, EVSEType
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
-    RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType, AuthorizationStatusEnumType
+    RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
 from nicegui import ui, app, background_tasks, ElementFilter
 from ocpp.v201 import enums
@@ -37,10 +37,13 @@ from util import ResettableValue, ResettableIterator, get_time_str, setup_loggin
 
 from redis_dict import RedisDict
 
+from util.types import EVSEId, TransactionId
+
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+@beartype
 class TxFSM(TxFSMType):
     def __init__(self, context : TxFSMContext):
         super().__init__(uml=transaction_uml,
@@ -73,6 +76,7 @@ class TxFSM(TxFSMType):
     async def setup_transaction(self, *vargs):
         self._seq_no.reset()
         self.tx_id.reset()
+        self.context.evse.tx_id = self.tx_id.value
 
     async def call(self, *vargs, **kwargs):
         logger.warning(f"Calling {vargs} {kwargs}")
@@ -104,7 +108,7 @@ class TxFSM(TxFSMType):
                                               trigger_reason=TriggerReasonEnumType.remote_start,
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,
-                                                                               remote_start_id=self.context.remote_id,
+                                                                               remote_start_id=self.context.remote_start_id,
                                                                                ),
                                               id_token=self.context.auth_status,
                                               evse=EVSEType(id=self.context.evse.id)
@@ -127,7 +131,7 @@ class TxFSM(TxFSMType):
                                               trigger_reason=TriggerReasonEnumType.authorized,
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,
-                                                                               remote_start_id=self.context.remote_id,
+                                                                               remote_start_id=self.context.remote_start_id,
                                                                                ),
                                               id_token=self.context.auth_status,
                                               evse=EVSEType(id=self.context.evse.id)
@@ -148,6 +152,7 @@ def log_async_call(log_sink):
     return log_call_inner
 
 
+@beartype
 class OCPPClient(ChargePoint):
 
     def __init__(self, redis_data, *vargs, **kwargs):
@@ -238,15 +243,28 @@ class OCPPClient(ChargePoint):
     @on(Action.request_stop_transaction)
     @log_async_call(logger.warning)
     async def request_stop_transaction(self, **data):
-        if "evse_id" in data:
-            evse_id = int(data["evse_id"])
-        else:
-            evse_id = 1
+        
+        tx_found = False
+        
+        request_tx_id : TransactionId = data["transaction_id"]
+        
+        context : TxFSMContext
+        for i_evse_id, context in self.task_contexts.items():
+            if context.evse.tx_id == request_tx_id:
+                tx_found = True
+                evse_id = i_evse_id
+                logger.warning(f"Fonud {request_tx_id=} in {i_evse_id=}")
+                break
+        
+        if not tx_found:
+            return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected)
+            
         ctxt = self.task_contexts[evse_id]
         fsm = self.tx_fsms[evse_id]
 
         if ctxt.auth_status is None:
             return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected)
+        
         ctxt.auth_status = None
         
         await fsm.handle(TxFSMEvent.on_deauthorized)
@@ -261,8 +279,12 @@ class OCPPClient(ChargePoint):
         if "evse_id" in data:
             evse_id = int(data["evse_id"])
         else:
-            evse_id = 1
+            return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected,
+                                                       transaction_id=None,
+                                                       )
+            
         ctxt = self.task_contexts[evse_id]
+        ctxt.remote_start_id = remote_start_id
         fsm = self.tx_fsms[evse_id]
         if ctxt.auth_status is not None:
             return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected,
@@ -335,7 +357,7 @@ async def main():
 
     serial_number = "CP_ACME_BAT_0000"
 
-    #uri = "ws://localhost:9000"
+    uri = "ws://localhost:9000"
     if len(sys.argv) > 1:
         uri = sys.argv[1]
     if len(sys.argv) > 2:
@@ -392,7 +414,7 @@ async def index():
     ui.button("Reset SoC", on_click=lambda: None)
 
 
-async def evse_row(cid, cp):
+async def evse_row(cid : EVSEId, cp : OCPPClient):
     with ui.row(align_items="center"):
         tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
         tgl.bind_value(cp.task_contexts[cid].evse, "cable_connected")
@@ -403,6 +425,6 @@ async def evse_row(cid, cp):
 
 
 # Dummy call to generate enum modules on every run
-TxFSM(EvseModel(id=0))
+TxFSM(TxFSMContext(EvseModel(id=0)))
 
 ui.run(host="0.0.0.0", port=7500)
