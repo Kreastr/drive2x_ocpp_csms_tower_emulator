@@ -1,7 +1,12 @@
 import asyncio
+import json
+import traceback
+from itertools import starmap
 import logging
 import ssl
 import sys
+from cgi import maxlen
+from collections import deque
 from copy import deepcopy
 from datetime import datetime
 from functools import wraps
@@ -163,7 +168,8 @@ class OCPPClient(ChargePoint):
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
         self.task_contexts  = dict((i + 1, TxFSMContext(self.get_evse_data(i+1))) for i in range(3))
-        self.exit_flag = False
+
+        self.running = True
 
         self.hb_task = asyncio.create_task(self.heartbeat_task())
         self._events = AsyncIOEventEmitter()
@@ -177,15 +183,25 @@ class OCPPClient(ChargePoint):
         self.st_tasks = dict(map(lambda x: (
             x[0], asyncio.create_task(self.status_task(x[1].evse))),
                                       self.task_contexts.items()))
+        self.datasaver_task = asyncio.create_task(self.data_saver_task())
     
     async def data_saver_task(self):
-        while True:
-            await asyncio.sleep(10)
-            map(self.save_evse_data, self.task_contexts.items())
+        try:
+            while self.running:
+                logger.warning(f"data_saver_task")
+                await asyncio.sleep(10)
+                for i, v in self.task_contexts.items():
+                    self.save_evse_data(i, v.evse)
+        except asyncio.exceptions.CancelledError:
+            raise
+        except:
+            logger.error(traceback.format_exc())
 
     def save_evse_data(self, i, v : EvseModel):
         record_hash = self.get_evse_hash(i)
-        self.redis_data[record_hash] = v.to_json()
+        data=v.model_dump_json()
+        logger.warning(f"Saving to Redis {i=} {record_hash=} {data=}")
+        self.redis_data[record_hash] = data
     
     @staticmethod
     def get_evse_hash(i):
@@ -194,42 +210,57 @@ class OCPPClient(ChargePoint):
     def get_evse_data(self, i) -> EvseModel:
         record_hash = self.get_evse_hash(i)
         if record_hash in self.redis_data:
-            data = self.redis_data[record_hash]
+            data = json.loads(self.redis_data[record_hash])
         else:
             data = dict(id=i)
+        logger.warning(f"Loading from Redis {i=} {record_hash=} {data=}")
         return EvseModel.model_validate(data)
 
     async def transaction_task(self, context : TxFSMContext, fsm : TxFSMType):
-        fsm.context.cp_interface = self
+        try:
+            fsm.context.cp_interface = self
 
-        while True:
-            await asyncio.sleep(1)
-            await fsm.loop()
+            while self.running:
+                await asyncio.sleep(1)
+                await fsm.loop()
+        except asyncio.exceptions.CancelledError:
+            raise
+        except:
+            logger.error(traceback.format_exc())
 
 
     async def heartbeat_task(self):
-        while True:
-            await asyncio.sleep(10)
-            heartbeat = Heartbeat()
-            await self.call(heartbeat)
+        try:
+            while self.running:
+                await asyncio.sleep(10)
+                heartbeat = Heartbeat()
+                await self.call(heartbeat)
+        except asyncio.exceptions.CancelledError:
+            raise
+        except:
+            logger.error(traceback.format_exc())
 
     async def status_task(self, evse : EvseModel):
+        try:
+            prev_status = evse.cable_connected
+            await self.post_status_notification(evse)
+            while self.running:
+                await asyncio.sleep(1)
 
-        prev_status = evse.cable_connected
-        await self.post_status_notification(evse)
-        while True:
-            await asyncio.sleep(1)
+                if prev_status != evse.cable_connected:
+                    await self.post_status_notification(evse)
+                    prev_status = evse.cable_connected
 
-            if prev_status != evse.cable_connected:
-                await self.post_status_notification(evse)
-                prev_status = evse.cable_connected
-            
-            if evse.cable_connected:
-                pass
-            else:
-                if evse.soc_wh > 2:
-                    evse.soc_wh -= 5000/3600
-                    evse.km_driven += 25/3600
+                if evse.cable_connected:
+                    pass
+                else:
+                    if evse.soc_wh > 2:
+                        evse.soc_wh -= 5000/3600
+                        evse.km_driven += 25/3600
+        except asyncio.exceptions.CancelledError:
+            raise
+        except:
+            logger.error(traceback.format_exc())
 
 
     async def post_status_notification(self, evse : EvseModel):
@@ -350,18 +381,17 @@ class OCPPClient(ChargePoint):
         return call_result.SetVariables(results)
 
 
-cp : OCPPClient | None = None
+charge_point_objects : dict[str, OCPPClient] = dict()
 
-async def main():
-    global cp
+async def main(serial_number = None):
+    #global cp
 
-    serial_number = "CP_ACME_BAT_0000"
+    if serial_number is None:
+        serial_number = "CP_ACME_BAT_0000"
 
     uri = "ws://localhost:9000"
     if len(sys.argv) > 1:
         uri = sys.argv[1]
-    if len(sys.argv) > 2:
-        serial_number = "CP_ACME_BAT_" + sys.argv[2]
         
     #"wss://emotion-test.eu/ocpp/1"
     #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
@@ -371,47 +401,57 @@ async def main():
                open_timeout=5)
     if uri.startswith("wss://"):
         ws_args["ssl"] = ctx
-    async with websockets.connect(uri, **ws_args) as ws:
-        redis_data = RedisDict(redis=Redis(host="localhost", port=6379, db=1), namespace=f"ocpp-client-{serial_number}-")
-        cp = OCPPClient(redis_data, serial_number, ws)
+    fallback = 5
+    while True:
+        try:
+            async with websockets.connect(uri, **ws_args) as ws:
+                redis_data = RedisDict(redis=Redis(host="localhost", port=6379, db=1), namespace=f"ocpp-client-{serial_number}-")
+                cp = OCPPClient(redis_data, serial_number, ws)
+                charge_point_objects[serial_number] = cp
 
-        for client in app.clients('/'):
-            with client:
-                for cont in  ElementFilter(kind=ui.column, marker="power_plug_container"):
-                    with cont:
-                        for cid in cp.task_contexts:
-                            await evse_row(cid, cp)
+                for client in app.clients(f'/{serial_number}'):
+                    with client:
+                        for cont in  ElementFilter(kind=ui.column, marker=f"power_plug_container"):
+                            with cont:
+                                for cid in cp.task_contexts:
+                                    await evse_row(cid, cp)
 
-        cp_task = asyncio.create_task(cp.start())
+                cp_task = asyncio.create_task(cp.start())
 
-        boot_notification = BootNotification(
-            charging_station=ChargingStationType(vendor_name="ACME Inc",
-                                                 model="ACME Battery 1",
-                                                 serial_number=serial_number,
-                                                 firmware_version="0.0.1"),
-            reason=BootReasonEnumType.power_up,
-            custom_data={"vendorId": "ACME labs", "sn": 234}
-        )
-        result : call_result.BootNotification = await cp.call(boot_notification)
-        logger.warning(result)
-        if result.status != enums.RegistrationStatusEnumType.accepted:
-            raise Exception("Boot notification rejected")
+                boot_notification = BootNotification(
+                    charging_station=ChargingStationType(vendor_name="ACME Inc",
+                                                         model="ACME Battery 1",
+                                                         serial_number=serial_number,
+                                                         firmware_version="0.0.1"),
+                    reason=BootReasonEnumType.power_up,
+                    custom_data={"vendorId": "ACME labs", "sn": 234}
+                )
+                result : call_result.BootNotification = await cp.call(boot_notification)
+                logger.warning(result)
+                if result.status != enums.RegistrationStatusEnumType.accepted:
+                    raise Exception("Boot notification rejected")
 
-        await cp_task
-        await cp.hb_task
-        for k, t in cp.st_tasks.items():
-            await t
+                await cp_task
+                await cp.hb_task
+                for k, t in cp.st_tasks.items():
+                    await t
+                break
+        except asyncio.exceptions.CancelledError:
+            raise
+        except:
+            logger.error(traceback.format_exc())
+            await asyncio.sleep(fallback)
+            fallback *= 1.5
 
-@ui.page("/")
-async def index():
-    background_tasks.create_lazy(main(),name="main")
+@ui.page("/{serial}")
+async def index(serial : str):
     ui.label("Power plug status")
-    with ui.column().mark("power_plug_container"):
-        if cp is not None:
-            for cid in cp.task_contexts:
-                await evse_row(cid, cp)
-    ui.label("SoC")
-    ui.button("Reset SoC", on_click=lambda: None)
+    ui.column().mark(f"power_plug_container")
+    if serial in charge_point_objects:
+        cp = charge_point_objects[serial]
+        for cid in cp.task_contexts:
+            await evse_row(cid, cp)
+    background_tasks.create_lazy(main(serial),name=f"main_{serial}")
 
 
 async def evse_row(cid : EVSEId, cp : OCPPClient):
