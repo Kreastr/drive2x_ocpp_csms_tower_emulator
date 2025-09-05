@@ -409,13 +409,6 @@ async def main(serial_number = None):
                 cp = OCPPClient(redis_data, serial_number, ws)
                 charge_point_objects[serial_number] = cp
 
-                for client in app.clients(f'/{serial_number}'):
-                    with client:
-                        for cont in  ElementFilter(kind=ui.column, marker=f"power_plug_container"):
-                            with cont:
-                                for cid in cp.task_contexts:
-                                    await evse_row(cid, cp)
-
                 cp_task = asyncio.create_task(cp.start())
 
                 boot_notification = BootNotification(
@@ -445,13 +438,16 @@ async def main(serial_number = None):
 
 @ui.page("/{serial}")
 async def index(serial : str):
+    background_tasks.create_lazy(main(serial), name=f"main_{serial}")
+    ui.label(f"Charge point {serial}")
     ui.label("Power plug status")
-    ui.column().mark(f"power_plug_container")
-    if serial in charge_point_objects:
-        cp = charge_point_objects[serial]
+    clmn = ui.column().mark(f"power_plug_container")
+    while serial not in charge_point_objects:
+        await asyncio.sleep(1)
+    cp = charge_point_objects[serial]
+    with clmn:
         for cid in cp.task_contexts:
             await evse_row(cid, cp)
-    background_tasks.create_lazy(main(serial),name=f"main_{serial}")
 
 
 async def evse_row(cid : EVSEId, cp : OCPPClient):
