@@ -19,6 +19,8 @@ Discharging --> Charging : if charge setpoint
 Ready --> Discharging : if discharge setpoint
 Charging --> Discharging : if discharge setpoint
 Charging --> Ready : if idle setpoint
+Charging --> Charging : on setpoint update
+Discharging --> Discharging : on setpoint update
 Discharging --> Ready : if idle setpoint
 Charging --> Terminating : on deauthorized
 Discharging --> Terminating : on deauthorized

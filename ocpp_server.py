@@ -297,7 +297,14 @@ class OCPPServerHandler(ChargePoint):
     
     async def do_remote_start(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized)
+        
+    async def do_increase_setpoint(self, evse_id : EVSEId):
+        self.fsm.context.transaction_fsms[evse_id].context
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_update)
 
+    async def do_decrease_setpoint(self, evse_id : EVSEId):
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_update)
+        
 cp_card_container : ui.grid | None = None
 charge_points : dict[str, OCPPServerHandler] = dict()
 charge_point_cards : dict[str, Any] = dict()
@@ -480,9 +487,9 @@ class CPCard(Element):
                 tx_label.bind_text_from(tx_fsm, "current_state")
                 async def rsb(_evse_id=evse_id):
                     logger.warning(f"remote start result {await charge_points[self.cp_context.id].do_remote_start(_evse_id)}")
-                ui.button("Remote Start", on_click=rsb)
-                ui.button("Remote Stop", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_remote_stop(_evse_id))
-                ui.button("Clear Fault", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_clear_fault(_evse_id))
+                ui.button("Start", on_click=rsb)
+                ui.button("Stop", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_remote_stop(_evse_id))
+                ui.button("Clear", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_clear_fault(_evse_id))
 
 
 @ui.page("/")

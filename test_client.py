@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import traceback
 from itertools import starmap
@@ -15,6 +16,7 @@ from uuid import uuid4
 import certifi
 import websockets
 from beartype import beartype
+from nicegui.functions.navigate import navigate
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
 
@@ -390,8 +392,17 @@ async def main(serial_number = None):
         serial_number = "CP_ACME_BAT_0000"
 
     uri = "ws://localhost:9000"
+    redis_host="localhost"
+    redis_port=6379
+    redis_db=1
     if len(sys.argv) > 1:
         uri = sys.argv[1]
+    if len(sys.argv) > 2:
+        redis_host = sys.argv[2]
+    if len(sys.argv) > 3:
+        redis_port = int(sys.argv[3])
+    if len(sys.argv) > 4:
+        redis_db = int(sys.argv[4])
         
     #"wss://emotion-test.eu/ocpp/1"
     #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
@@ -405,7 +416,7 @@ async def main(serial_number = None):
     while True:
         try:
             async with websockets.connect(uri, **ws_args) as ws:
-                redis_data = RedisDict(redis=Redis(host="localhost", port=6379, db=1), namespace=f"ocpp-client-{serial_number}-")
+                redis_data = RedisDict(redis=Redis(host=redis_host, port=redis_port, db=redis_db), namespace=f"ocpp-client-{serial_number}-")
                 cp = OCPPClient(redis_data, serial_number, ws)
                 charge_point_objects[serial_number] = cp
 
@@ -417,7 +428,6 @@ async def main(serial_number = None):
                                                          serial_number=serial_number,
                                                          firmware_version="0.0.1"),
                     reason=BootReasonEnumType.power_up,
-                    custom_data={"vendorId": "ACME labs", "sn": 234}
                 )
                 result : call_result.BootNotification = await cp.call(boot_notification)
                 logger.warning(result)
@@ -436,31 +446,43 @@ async def main(serial_number = None):
             await asyncio.sleep(fallback)
             fallback *= 1.5
 
-@ui.page("/{serial}")
-async def index(serial : str):
+@ui.page("/charge_point_panel/{serial}")
+async def charge_point(serial : str):
     background_tasks.create_lazy(main(serial), name=f"main_{serial}")
-    ui.label(f"Charge point {serial}")
-    ui.label("Power plug status")
-    clmn = ui.column().mark(f"power_plug_container")
-    while serial not in charge_point_objects:
-        await asyncio.sleep(1)
-    cp = charge_point_objects[serial]
-    with clmn:
-        for cid in cp.task_contexts:
-            await evse_row(cid, cp)
+
+    with ui.card(align_items="center").classes('fixed-center background'):
+        ui.label(f"Charge point {serial}").classes('text-h5')
+        ui.label("Power plug status")
+        clmn = ui.column().mark(f"power_plug_container")
+        while serial not in charge_point_objects:
+            await asyncio.sleep(1)
+        cp = charge_point_objects[serial]
+        with clmn:
+            for cid in cp.task_contexts:
+                await evse_row(cid, cp, debug=serial.startswith("CP_"))
 
 
-async def evse_row(cid : EVSEId, cp : OCPPClient):
+async def evse_row(cid : EVSEId, cp : OCPPClient, debug=False):
     with ui.row(align_items="center"):
-        tgl = ui.toggle({True: "CONNECTED", False: "DISCONNECTED"}).mark(f"plug_tgl_{cid}")
+        tgl = ui.toggle({True: "CONNECT", False: "DISCONNECT"}).mark(f"plug_tgl_{cid}")
         tgl.bind_value(cp.task_contexts[cid].evse, "cable_connected")
-        ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
+        if debug:
+            ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
         ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "soc_wh", 
                                         backward=lambda x,c=cp.task_contexts[cid].evse: f"Charge: {(x/c.usable_capacity*100):0.2f}%")
         ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "km_driven", backward=lambda x: f"Driven {x:0.1f} km")
 
 
+def sha256(val : str):
+    return hashlib.sha256(val.encode('utf-8')).hexdigest()
+
 # Dummy call to generate enum modules on every run
 TxFSM(TxFSMContext(EvseModel(id=0)))
 
 ui.run(host="0.0.0.0", port=7500)
+@ui.page("/")
+async def login():
+    with ui.card().classes('fixed-center background'):
+        with ui.column(align_items="center"):
+            lgn = ui.input(label="Username", placeholder="Type your username here")
+            ui.button(text="Login", on_click=lambda : navigate.to(f"/charge_point_panel/D2X_DEMO_{sha256(lgn.value)[:16].upper()}"))
