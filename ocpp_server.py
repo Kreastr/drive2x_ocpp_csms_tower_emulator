@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import traceback
 from datetime import datetime, timedelta
 from typing import cast, Self
 
@@ -183,6 +184,9 @@ class OCPPServerHandler(ChargePoint):
         
 
             tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.evse_id]
+            
+            if tx_fsm.context.cp_interface is None:
+                tx_fsm.context.cp_interface = self
 
             tx_fsm.context.evse.connector_status = conn_status.connector_status
             tx_fsm.context.evse.evse_id = conn_status.evse_id
@@ -194,12 +198,12 @@ class OCPPServerHandler(ChargePoint):
             #if conn_status.connector_status == "Occupied":
             #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
-            if conn_status.evse_id not in self.fsm.context.evses:
-                self.fsm.context.evses[conn_status.evse_id] = conn_status
+            if conn_status.evse_id not in self.fsm.context.transaction_fsms:
+                self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse = conn_status
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
                 await broadcast_to(lambda x: x.on_new_evse(conn_status.evse_id), "/", kind=CPCard, marker=self.fsm.context.id)
             else:
-                self.fsm.context.evses[conn_status.evse_id].connector_status = conn_status.connector_status
+                self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse.connector_status = conn_status.connector_status
         return call_result.StatusNotification(
         )
 
@@ -249,10 +253,11 @@ class OCPPServerHandler(ChargePoint):
         logger.warning(f"{event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 
         tx_fsm.context : TxManagerContext
+        
         if reported_tx_id != tx_fsm.context.tx_id:
             await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
             tx_fsm.context.tx_id = reported_tx_id
-            self.fsm.context.current_tx[evse_id] = reported_tx_id
+            self.fsm.context.transaction_fsms[evse_id].context.tx_id = reported_tx_id
             await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
             
         if event_type == "Started":
@@ -297,14 +302,30 @@ class OCPPServerHandler(ChargePoint):
     
     async def do_remote_start(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized)
-        
+    
+    def get_evse(self, evse_id : EVSEId):
+        return self.fsm.context.transaction_fsms[evse_id].context.evse
+
+    def clamp_setpoint(self, evse: EvseStatus):
+        if evse.setpoint > 11000:
+            evse.setpoint = 11000
+        if evse.setpoint < -11000:
+            evse.setpoint = -11000
+
     async def do_increase_setpoint(self, evse_id : EVSEId):
-        self.fsm.context.transaction_fsms[evse_id].context
+        logger.warning(f"Increased setpoint")
+        self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint += 1000
+        self.clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
+        logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_update)
 
     async def do_decrease_setpoint(self, evse_id : EVSEId):
+        logger.warning(f"Decreased setpoint")
+        self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint -= 1000
+        self.clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
+        logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_update)
-        
+
 cp_card_container : ui.grid | None = None
 charge_points : dict[str, OCPPServerHandler] = dict()
 charge_point_cards : dict[str, Any] = dict()
@@ -448,22 +469,25 @@ class CPCard(Element):
     def __init__(self, fsm : ChargePointFSMType, **kwargs):
         super().__init__(tag="div")
         self.fsm = fsm
-        self.cp_context = fsm.context
+        self.cp_context : ChargePointContext = fsm.context
         self.card = ui.card()
         self.bind_online_from(self.cp_context, "online")
         self._handle_online_change(self.cp_context.online)
         with self.card:
-            ui.label("ID")
-            ui.label().bind_text(self.cp_context, "id")
-            ui.label("Remote IP")
-            ui.label().bind_text(self.cp_context, "remote_ip")
-            ui.label("Status")
-            ui.label().bind_text(self.fsm, "current_state")
+            with ui.row():
+                ui.label("ID")
+                ui.label().bind_text(self.cp_context, "id")
+            with ui.row():
+                ui.label("Remote IP")
+                ui.label().bind_text(self.cp_context, "remote_ip")
+            with ui.row():
+                ui.label("Status")
+                ui.label().bind_text(self.fsm, "current_state")
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
 
-        for connid in self.cp_context.evses:
+        for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
 
     def bind_online_from(self, var, name):
@@ -480,16 +504,26 @@ class CPCard(Element):
         logger.warning(f"on new connector {evse_id}")
         with self.connector_container:
             with ui.row(align_items='center'):
-                new_label = ui.label(text=f"{evse_id}: {self.cp_context.evses[evse_id].connector_status}")
-                new_label.bind_text_from(self.cp_context.evses[evse_id], "connector_status", backward=lambda x, cid=evse_id: f"{cid}: {x}")
+                cp = charge_points[self.cp_context.id]
+                evse = cp.get_evse(evse_id)
+                new_label = ui.label(text=f"{evse_id}: {evse.connector_status}")
+                new_label.bind_text_from(evse, "connector_status", backward=lambda x, cid=evse_id: f"{cid}: {x}")
                 tx_fsm = self.cp_context.transaction_fsms[evse_id]
                 tx_label = ui.label(text=f"{str(tx_fsm.current_state)}")
                 tx_label.bind_text_from(tx_fsm, "current_state")
-                async def rsb(_evse_id=evse_id):
-                    logger.warning(f"remote start result {await charge_points[self.cp_context.id].do_remote_start(_evse_id)}")
-                ui.button("Start", on_click=rsb)
-                ui.button("Stop", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_remote_stop(_evse_id))
-                ui.button("Clear", on_click=lambda _evse_id=evse_id: charge_points[self.cp_context.id].do_clear_fault(_evse_id))
+                def exec_async(_evse_id, operation):
+                    async def executable():
+                        try:
+                            logger.warning(f"operation result {await operation(_evse_id)}")
+                        except:
+                            logger.error(traceback.format_exc())
+                    return executable
+                ui.button("Start", on_click=exec_async(evse_id, cp.do_remote_start))
+                ui.button("Stop", on_click=exec_async(evse_id, cp.do_remote_stop))
+                ui.button("Clear", on_click=exec_async(evse_id, cp.do_clear_fault))
+                ui.button("+", on_click=exec_async(evse_id, cp.do_increase_setpoint))
+                ui.label("0").bind_text_from(self.fsm.context.transaction_fsms[evse_id].context.evse, "setpoint", backward=str)
+                ui.button("-", on_click=exec_async(evse_id, cp.do_decrease_setpoint))
 
 
 @ui.page("/")
@@ -498,6 +532,6 @@ async def index():
     ui.label(text="Charge Point status")
     with ui.row().mark("cp_card_container"):
         for cpid in charge_points:
-            assert cpid != "provisional"
-            CPCard(charge_points[cpid].fsm).mark(cpid)
+            if cpid != "provisional":
+                CPCard(charge_points[cpid].fsm).mark(cpid)
 ui.run(host="0.0.0.0", port=8000)
