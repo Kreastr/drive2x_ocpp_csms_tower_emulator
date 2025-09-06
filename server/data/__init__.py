@@ -24,3 +24,7 @@ class ChargePointContext:
     transaction_fsms: defaultdict[EVSEId, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMS))
 
     connection_task : Any = None
+
+@dataclass()
+class UIManagerContext:
+    pass

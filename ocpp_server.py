@@ -3,6 +3,7 @@ import logging
 import traceback
 from datetime import datetime, timedelta
 from typing import cast, Self
+from uuid import uuid4
 
 import websockets
 from beartype import beartype
@@ -19,6 +20,7 @@ from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationSta
 from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
 
+from redis import Redis
 from websockets import Subprotocol
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
@@ -31,6 +33,9 @@ from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
 from util import get_time_str, setup_logging, time_based_id, any_of
 from util.types import *
 
+from server.ui_manager import UIManagerFSMType, UIManagerContext
+
+from redis import Redis
 
 async def broadcast_to(op, page, **filters):
     for client in app.clients(page):
@@ -44,6 +49,11 @@ logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
 
 boot_notification_cache = dict()
+
+redis_host = "localhost"
+redis_port = 6379
+redis_db = 2
+redis = Redis(host=redis_host, port=redis_port, db=redis_db)
 
 @beartype
 class OCPPServerHandler(ChargePoint):
@@ -184,7 +194,7 @@ class OCPPServerHandler(ChargePoint):
         
 
             tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.evse_id]
-            
+
             if tx_fsm.context.cp_interface is None:
                 tx_fsm.context.cp_interface = self
 
@@ -253,7 +263,7 @@ class OCPPServerHandler(ChargePoint):
         logger.warning(f"{event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 
         tx_fsm.context : TxManagerContext
-        
+
         if reported_tx_id != tx_fsm.context.tx_id:
             await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
             tx_fsm.context.tx_id = reported_tx_id
@@ -302,7 +312,7 @@ class OCPPServerHandler(ChargePoint):
     
     async def do_remote_start(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized)
-    
+
     def get_evse(self, evse_id : EVSEId):
         return self.fsm.context.transaction_fsms[evse_id].context.evse
 
@@ -327,8 +337,9 @@ class OCPPServerHandler(ChargePoint):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_update)
 
 cp_card_container : ui.grid | None = None
-charge_points : dict[str, OCPPServerHandler] = dict()
-charge_point_cards : dict[str, Any] = dict()
+charge_points : dict[ChargePointId, OCPPServerHandler] = dict()
+ui_pages : dict[ChargePointId, UIManagerFSMType] = dict()
+charge_point_cards : dict[ChargePointId, Any] = dict()
 
 
 
@@ -461,7 +472,7 @@ async def setpoint(cp_id : str, value : int):
 
 
 
-
+@beartype
 class CPCard(Element):
     online = BindableProperty(
         on_change=lambda sender, value: cast(Self, sender)._handle_online_change(value))
@@ -500,7 +511,7 @@ class CPCard(Element):
         self.card.classes(add="bg-green" if card_online_status else "bg-red")
         self.card.update()
 
-    def on_new_evse(self, evse_id):
+    def on_new_evse(self, evse_id : EVSEId):
         logger.warning(f"on new connector {evse_id}")
         with self.connector_container:
             with ui.row(align_items='center'):
@@ -534,4 +545,63 @@ async def index():
         for cpid in charge_points:
             if cpid != "provisional":
                 CPCard(charge_points[cpid].fsm).mark(cpid)
+
+
+class FairSemaphoreRedis:
+
+    def __init__(self, name : str, n_users : int, redis : Redis):
+        self.my_id = str(uuid4())
+        self.redis = redis
+        self.name = name
+        self.name_zset = name + ":queue"
+        self.name_ctr = name + ":cntr"
+        self.n_users = n_users
+
+    def __enter__(self, timeout):
+        result, rank = self.acquire(timeout)
+        assert result
+        return self
+
+    def acquire(self, timeout):
+        t_now = datetime.now().timestamp()
+        pipeline = self.redis.pipeline(True)
+        # Delete stale requests and get them out of the queue
+        pipeline.zremrangebyscore(self.name, '-inf', t_now - timeout)
+        pipeline.zinterstore(self.name_zset, {self.name_zset: 1, self.name: 0})
+        pipeline.incr(self.name_ctr)
+        nonce = pipeline.execute()[-1]
+        # Add myself to semaphore set and queue
+        pipeline.zadd(self.name, self.my_id, t_now)
+        pipeline.zadd(self.name_zset, self.my_id, nonce)
+        pipeline.zrank(self.name_zset, self.my_id)
+        rank = pipeline.execute()[-1]
+        if rank < self.n_users:
+            return True, rank
+        #
+        pipeline.zrem(self.name, self.my_id)
+        pipeline.zrem(self.name_zset, self.my_id)
+        pipeline.execute()
+        return False, rank
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.free()
+
+    def free(self):
+        pipeline = self.redis.pipeline(True)
+        pipeline.zrem(self.name, self.my_id)
+        pipeline.zrem(self.name_zset, self.my_id)
+        assert pipeline.execute()[0]
+
+
+@ui.page("/d2x_ui/{cp_id}")
+async def d2x_ui(cp_id : ChargePointId):
+    semaphore = FairSemaphoreRedis(name="page-access-"+cp_id, n_users=1, redis=redis)
+    result, rank = semaphore.acquire(5)
+    with ui.card().classes('fixed-center'):
+        if cp_id not in charge_points:
+            ui.label(f"Charge Point with this ID is not active. Please try later.")
+        else:
+            cp = charge_points[cp_id]
+            ui.label(cp_id)
+
 ui.run(host="0.0.0.0", port=8000)
