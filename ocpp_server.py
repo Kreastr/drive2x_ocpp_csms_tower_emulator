@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import traceback
+from collections import defaultdict
 from datetime import datetime, timedelta
 from math import ceil
 from typing import cast, Self
@@ -56,6 +57,7 @@ redis_host = "localhost"
 redis_port = 6379
 redis_db = 2
 redis = Redis(host=redis_host, port=redis_port, db=redis_db)
+ui_manager_fsms = defaultdict(default_factory=lambda : UIManagerFSMType(UIManagerContext()))
 
 @beartype
 class OCPPServerHandler(ChargePoint):
@@ -619,6 +621,7 @@ class FairSemaphoreRedis:
 
 @ui.page("/d2x_ui/{cp_id}")
 async def d2x_ui(cp_id : ChargePointId):
+    fsm = ui_manager_fsms[cp_id]
     semaphore = FairSemaphoreRedis(name="page-access-"+cp_id, n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
 
