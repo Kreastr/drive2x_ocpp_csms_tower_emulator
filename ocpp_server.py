@@ -610,6 +610,7 @@ class FairSemaphoreRedis:
         self.free()
 
     def free(self):
+        self.redis.expire(self.name_lock, 1)
         pipeline = self.redis.pipeline(True)
         pipeline.zrem(self.name, self.my_id)
         pipeline.zrem(self.name_zset, self.my_id)
