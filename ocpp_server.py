@@ -2,6 +2,7 @@ import asyncio
 import logging
 import traceback
 from datetime import datetime, timedelta
+from math import ceil
 from typing import cast, Self
 from uuid import uuid4
 
@@ -21,6 +22,7 @@ from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
 
 from redis import Redis
+from snoop import snoop
 from websockets import Subprotocol
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
@@ -549,39 +551,60 @@ async def index():
 
 class FairSemaphoreRedis:
 
-    def __init__(self, name : str, n_users : int, redis : Redis):
-        self.my_id = str(uuid4())
+    def __init__(self, name : str, n_users : int, redis : Redis, session_timeout : int = 10):
+        self.session_timeout = session_timeout
+        self.my_id = str(uuid4()).encode("utf-8")
         self.redis = redis
         self.name = name
+        self.name_lock = name + ":lock"
         self.name_zset = name + ":queue"
         self.name_ctr = name + ":cntr"
         self.n_users = n_users
+        self.acquired = False
+        self.rank = None
 
-    def __enter__(self, timeout):
-        result, rank = self.acquire(timeout)
-        assert result
+    def __enter__(self):
+        self.acquire()
+        assert self.acquired
         return self
 
-    def acquire(self, timeout):
+    def acquire(self):
+        session_timeout = self.session_timeout
         t_now = datetime.now().timestamp()
         pipeline = self.redis.pipeline(True)
+        lock_current = self.redis.get(self.name_lock)
+        mid =self.my_id
+        if lock_current == mid:
+            self.redis.expire(self.name_lock, int(ceil(session_timeout)))
+            pipeline.zadd(self.name, {self.my_id: t_now})
+            self.acquired = True
+            self.rank = -1
+            return
         # Delete stale requests and get them out of the queue
-        pipeline.zremrangebyscore(self.name, '-inf', t_now - timeout)
+        pipeline.zremrangebyscore(self.name, '-inf', t_now - session_timeout)
         pipeline.zinterstore(self.name_zset, {self.name_zset: 1, self.name: 0})
         pipeline.incr(self.name_ctr)
         nonce = pipeline.execute()[-1]
         # Add myself to semaphore set and queue
-        pipeline.zadd(self.name, self.my_id, t_now)
-        pipeline.zadd(self.name_zset, self.my_id, nonce)
+        pipeline.zadd(self.name, {self.my_id: t_now})
+        pipeline.zadd(self.name_zset, {self.my_id: nonce}, nx=True)
         pipeline.zrank(self.name_zset, self.my_id)
         rank = pipeline.execute()[-1]
         if rank < self.n_users:
-            return True, rank
-        #
-        pipeline.zrem(self.name, self.my_id)
-        pipeline.zrem(self.name_zset, self.my_id)
-        pipeline.execute()
-        return False, rank
+            if self.redis.get(self.name_lock) == self.my_id or self.redis.setnx(self.name_lock, self.my_id):
+                self.redis.expire(self.name_lock, int(ceil(session_timeout)))
+                self.acquired = True
+                self.rank = -1
+                return
+            elif not self.redis.ttl(self.name_lock):
+                self.redis.expire(self.name_lock, int(ceil(session_timeout)))
+                self.acquired = False
+                self.rank = rank
+                return
+
+        self.acquired = False
+        self.rank = rank
+        return
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.free()
@@ -595,13 +618,27 @@ class FairSemaphoreRedis:
 
 @ui.page("/d2x_ui/{cp_id}")
 async def d2x_ui(cp_id : ChargePointId):
-    semaphore = FairSemaphoreRedis(name="page-access-"+cp_id, n_users=1, redis=redis)
-    result, rank = semaphore.acquire(5)
-    with ui.card().classes('fixed-center'):
+    semaphore = FairSemaphoreRedis(name="page-access-"+cp_id, n_users=1, redis=redis, session_timeout=5)
+    semaphore.acquire()
+
+    with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired"):
         if cp_id not in charge_points:
             ui.label(f"Charge Point with this ID is not active. Please try later.")
         else:
             cp = charge_points[cp_id]
             ui.label(cp_id)
+
+    (ui.label(format_queue_position(semaphore.rank)).bind_visibility_from(semaphore, "acquired", backward=lambda x: not x)
+                                                    .bind_text_from(semaphore,
+                                                                    "rank",
+                                                                          backward=format_queue_position))
+    ui.timer(1, lambda : semaphore.acquire())
+
+
+def format_queue_position(rank):
+    return (f"This resource is busy. "
+            f"You are in queue. "
+            f"Your place in queue is {rank}")
+
 
 ui.run(host="0.0.0.0", port=8000)
