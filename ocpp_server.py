@@ -501,9 +501,11 @@ class CPCard(Element):
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
+            ui.button("UI", on_click=lambda: ui.navigate.to(f"/d2x_ui/{self.cp_context.id}"))
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
+
 
     def bind_online_from(self, var, name):
         bind_from(self_obj=self, self_name="online",
