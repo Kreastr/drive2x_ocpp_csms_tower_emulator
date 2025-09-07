@@ -60,7 +60,7 @@ class TxFSMS(TxManagerFSMType):
                                                                              evse=EVSEType(id=self.context.evse.evse_id)),
                                                                          variable=VariableType(name="Setpoint"))]))
             logger.warning(f"send_new_setpoint {setpoint=} {result=}")
-            for v in result["set_variable_result"]:
+            for v in result.set_variable_result:
                 status = v["attribute_status"]
                 logger.warning(status)
                 #if status == AttributeStatusType()
