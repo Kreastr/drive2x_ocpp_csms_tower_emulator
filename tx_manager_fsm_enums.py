@@ -22,6 +22,7 @@ class TxManagerFSMCondition(str, Enum):
 
 
 class TxManagerFSMEvent(str, Enum):
+    on_state_changed = 'on_state_changed'
     on_authorized='on_authorized'
     on_start_tx_event='on_start_tx_event'
     on_authorize_accept='on_authorize_accept'

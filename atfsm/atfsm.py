@@ -396,8 +396,8 @@ class AFSM(Generic[SE, CE, EE, FSM_ST]):
 
         for k, v in self.sm_states.items():
             if v.default_transition:
-                v.default_transition = self.se_factory(v.default_transition) 
-            
+                v.default_transition = self.se_factory(v.default_transition)
+
         self.current_state : SE | None = None
 
         for k, st in self.sm_states.items():
@@ -451,8 +451,8 @@ class {module_name}Condition(str, Enum):
             f.write(f"""
 
 class {module_name}Event(str, Enum):
+    on_state_changed = 'on_state_changed'
 """)
-            stub = True
             uniques = set()
             for st, stv in self.sm_states.items():
                 for tr in stv.transition_events:
@@ -460,14 +460,13 @@ class {module_name}Event(str, Enum):
                         uniques |= {tr.name}
                         f.write(f"    {tr.name}='{tr.name}'\n")
                         stub = False
-            if stub:
-                f.write(f"    pass'\n")
         if not Path(actual_name).exists() or not filecmp.cmp(shadow_name, actual_name, shallow=False):
             shutil.move(shadow_name, actual_name)
         else:
             unlink(shadow_name)
 
     def on(self, event, callback):
+        logger.warning(f"New subscription to {event}")
         self._events.on(event, callback)
 
     def apply_context_to_all_states(self, context):
@@ -488,9 +487,9 @@ class {module_name}Event(str, Enum):
             return
         if self.current_state is None:
             raise Exception("Trying to loop before current_state is set is not allowed.")
-        
+
         await self.handle_deferred_signals()
-        
+
         st = self.sm_states[self.current_state]
         transition : TransitionCondition[SE, CE]
         for transition in st.transition_conditions:
@@ -580,6 +579,7 @@ class {module_name}Event(str, Enum):
             else:
                 self._events.emit(self_current_state.on_enter, self_current_state.on_enter,
                                   self_current_state)
+            self._events.emit("on_state_changed", "on_state_changed")
         self.in_transit = False
         await self.handle_deferred_signals()
 

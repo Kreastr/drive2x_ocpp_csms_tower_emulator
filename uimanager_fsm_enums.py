@@ -30,6 +30,7 @@ class UIManagerFSMCondition(str, Enum):
 
 
 class UIManagerFSMEvent(str, Enum):
+    on_state_changed = 'on_state_changed'
     on_session_pin_correct='on_session_pin_correct'
     on_exit='on_exit'
     on_gdpr_accept='on_gdpr_accept'

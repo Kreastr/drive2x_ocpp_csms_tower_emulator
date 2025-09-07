@@ -47,4 +47,41 @@ _fsm.write_enums("UIManagerFSM")
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMCondition, UIManagerFSMEvent
 
 
-UIManagerFSMType = AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerFSMEvent, UIManagerContext]
+class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerFSMEvent, UIManagerContext]):
+
+    def __init__(self, *vargs, **kwargs):
+        super().__init__(*vargs, **kwargs)
+
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_active, self.if_session_is_active)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_not_active, self.if_session_is_not_active)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_car_present, self.if_car_present)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_car_not_present, self.if_car_not_present)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_has_locking, self.if_has_locking)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
+
+    @staticmethod
+    def if_session_is_active(*vargs):
+        return False
+
+    def if_session_is_not_active(self, *vargs):
+        return not self.if_session_is_active(*vargs)
+
+    @staticmethod
+    def if_car_present(*vargs):
+        return False
+
+    def if_car_not_present(self, *vargs):
+        return not self.if_car_present(*vargs)
+
+    @staticmethod
+    def if_has_locking(*vargs):
+        return False
+
+    def if_has_no_locking(self, *vargs):
+        return not self.if_has_locking(*vargs)
+
+    @staticmethod
+    def if_session_fault(*vargs):
+        return False
+

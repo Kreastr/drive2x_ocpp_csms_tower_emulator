@@ -33,7 +33,7 @@ from server.data.evse_status import EvseStatus
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
-from uimanager_fsm_enums import UIManagerFSMState
+from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
 from util import get_time_str, setup_logging, time_based_id, any_of
 from util.types import *
 
@@ -641,6 +641,12 @@ async def d2x_ui_landing(cp_id : ChargePointId):
                         with ui.card():
                             ui.label(evse_id)
 
+@ui.refreshable
+def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    ui.label(fsm.current_state)
+    ui.label(cp_id)
+    ui.label(evse_id)
+    
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
@@ -657,10 +663,14 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
             ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
 
         else:
-            fsm = UIManagerFSMType(uml=ui_manager_uml, context=UIManagerContext(charge_points[cp_id]), se_factory=UIManagerFSMState)
+            fsm = UIManagerFSMType(uml=ui_manager_uml, 
+                                   context=UIManagerContext(charge_point=charge_points[cp_id],
+                                                            tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[evse_id],
+                                                            evse=charge_points[cp_id].fsm.context.transaction_fsms[evse_id].context.evse), se_factory=UIManagerFSMState)
             cp = charge_points[cp_id]
-            ui.label(cp_id)
-            ui.label(evse_id)
+            state_dependent_frame(cp_id, evse_id, fsm, cp)
+            fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh)
+            ui.timer(1, fsm.loop)
             ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
