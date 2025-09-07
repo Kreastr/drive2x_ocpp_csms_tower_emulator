@@ -33,10 +33,11 @@ from server.data.evse_status import EvseStatus
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
+from uimanager_fsm_enums import UIManagerFSMState
 from util import get_time_str, setup_logging, time_based_id, any_of
 from util.types import *
 
-from server.ui_manager import UIManagerFSMType, UIManagerContext
+from server.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
 
 from redis import Redis
 
@@ -57,7 +58,6 @@ redis_host = "localhost"
 redis_port = 6379
 redis_db = 2
 redis = Redis(host=redis_host, port=redis_port, db=redis_db)
-ui_manager_fsms = defaultdict(default_factory=lambda : UIManagerFSMType(UIManagerContext()))
 
 @beartype
 class OCPPServerHandler(ChargePoint):
@@ -543,6 +543,7 @@ class CPCard(Element):
 
 @ui.page("/")
 async def index():
+    ui.page_title(f'Drive2X OCPP Server Control Panel')
     background_tasks.create_lazy(main(),name="main")
     ui.label(text="Charge Point status")
     with ui.row().mark("cp_card_container"):
@@ -620,29 +621,59 @@ class FairSemaphoreRedis:
 
 
 @ui.page("/d2x_ui/{cp_id}")
-async def d2x_ui(cp_id : ChargePointId):
-    fsm = ui_manager_fsms[cp_id]
-    semaphore = FairSemaphoreRedis(name="page-access-"+cp_id, n_users=1, redis=redis, session_timeout=5)
+async def d2x_ui_landing(cp_id : ChargePointId):
+    ui.page_title(f'Drive2X UI - {cp_id}')
+
+    with ui.card().classes('fixed-center'):
+        if cp_id not in charge_points:
+            ui.label(f"Charge Point with this ID is not active. Please try later.")
+            ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"))
+
+        else:
+            fsm = UIManagerFSMType(uml=ui_manager_uml, context=UIManagerContext(charge_points[cp_id]), se_factory=UIManagerFSMState)
+            cp = charge_points[cp_id]
+            evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
+
+            ui.label(cp_id)
+            with ui.grid():
+                for evse_id in evse_ids:
+                    with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}"):
+                        with ui.card():
+                            ui.label(evse_id)
+
+
+@ui.page("/d2x_ui/{cp_id}/{evse_id}")
+async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
+    ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
+    semaphore = FairSemaphoreRedis(name="page-access-"+cp_id+"-"+str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
 
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired"):
         if cp_id not in charge_points:
             ui.label(f"Charge Point with this ID is not active. Please try later.")
+            ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
+        elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
+            ui.label(f"EV charging equipment with this ID is not active. Please try later.")
+            ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
+
         else:
+            fsm = UIManagerFSMType(uml=ui_manager_uml, context=UIManagerContext(charge_points[cp_id]), se_factory=UIManagerFSMState)
             cp = charge_points[cp_id]
             ui.label(cp_id)
+            ui.label(evse_id)
+            ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
-    (ui.label(format_queue_position(semaphore.rank)).bind_visibility_from(semaphore, "acquired", backward=lambda x: not x)
-                                                    .bind_text_from(semaphore,
-                                                                    "rank",
-                                                                          backward=format_queue_position))
+    with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
+        (ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
+                                                                        "rank",
+                                                                              backward=format_queue_position))
+        ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
     ui.timer(1, lambda : semaphore.acquire())
-
 
 def format_queue_position(rank):
     return (f"This resource is busy. "
-            f"You are in queue. "
-            f"Your place in queue is {rank}")
+            f"You are in the queue to access the resource. "
+            f"Your place in the queue is {rank+1}")
 
 
-ui.run(host="0.0.0.0", port=8000)
+ui.run(host="0.0.0.0", port=8000, favicon="🚘")

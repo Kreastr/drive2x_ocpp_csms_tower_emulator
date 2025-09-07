@@ -448,6 +448,7 @@ async def main(serial_number = None):
 
 @ui.page("/charge_point_panel/{serial}")
 async def charge_point(serial : str):
+    ui.page_title(f'Drive2X Charge Point Emulator ID {serial}')
     background_tasks.create_lazy(main(serial), name=f"main_{serial}")
 
     with ui.card(align_items="center").classes('fixed-center background'):
@@ -479,9 +480,10 @@ def sha256(val : str):
 # Dummy call to generate enum modules on every run
 TxFSM(TxFSMContext(EvseModel(id=0)))
 
-ui.run(host="0.0.0.0", port=7500)
+ui.run(host="0.0.0.0", port=7500, favicon="🚘")
 @ui.page("/")
 async def login():
+    ui.page_title(f'Drive2X Charge Point Emulator Login')
     with ui.card().classes('fixed-center background'):
         with ui.column(align_items="center"):
             lgn = ui.input(label="Username", placeholder="Type your username here")

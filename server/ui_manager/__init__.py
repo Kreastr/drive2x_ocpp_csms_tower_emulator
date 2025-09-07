@@ -2,8 +2,7 @@ from atfsm.atfsm import AFSM
 from server.data import UIManagerContext
 
 ui_manager_uml="""@startuml
-[*] --> EVSESelectPage
-EVSESelectPage --> EVSEPage : on evse selected
+[*] --> EVSEPage
 EVSEPage --> SessionUnlock : if session is active
 EVSEPage --> NewSession : if session is not active
 SeesionUnlock --> EVSESelectPage : on exit

@@ -2,11 +2,11 @@ from enum import Enum
 from atfsm.state_base import StateBase
 
 class UIManagerFSMState(StateBase, str, Enum):
-    evseselect_page='evseselect_page'
     evsepage='evsepage'
     session_unlock='session_unlock'
     new_session='new_session'
     seesion_unlock='seesion_unlock'
+    evseselect_page='evseselect_page'
     gdpraccepted='gdpraccepted'
     user_has_booking='user_has_booking'
     session_confirmed='session_confirmed'
@@ -30,7 +30,6 @@ class UIManagerFSMCondition(str, Enum):
 
 
 class UIManagerFSMEvent(str, Enum):
-    on_evse_selected='on_evse_selected'
     on_session_pin_correct='on_session_pin_correct'
     on_exit='on_exit'
     on_gdpr_accept='on_gdpr_accept'

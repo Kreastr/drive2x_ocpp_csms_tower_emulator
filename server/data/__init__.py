@@ -3,6 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
+from ocpp.v201 import ChargePoint
 from server.data.evse_status import EvseStatus
 from server.transaction_manager.tx_fsm import TxFSMS
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
@@ -27,4 +28,6 @@ class ChargePointContext:
 
 @dataclass()
 class UIManagerContext:
-    pass
+    charge_point : ChargePoint | None = None
+    evse : EvseStatus | None = None
+    tx_fsm : TxManagerFSMType | None = None
