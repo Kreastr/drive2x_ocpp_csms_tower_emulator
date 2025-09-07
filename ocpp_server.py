@@ -40,6 +40,8 @@ from util.types import *
 from server.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
 
 from redis import Redis
+from redis_dict import RedisDict
+from lorem_text import lorem
 
 async def broadcast_to(op, page, **filters):
     for client in app.clients(page):
@@ -54,10 +56,17 @@ logger.setLevel(logging.DEBUG)
 
 boot_notification_cache = dict()
 
-redis_host = "localhost"
-redis_port = 6379
-redis_db = 2
-redis = Redis(host=redis_host, port=redis_port, db=redis_db)
+
+def get_default_redis():
+    redis_host = "localhost"
+    redis_port = 6379
+    redis_db = 2
+    return Redis(host=redis_host, port=redis_port, db=redis_db)
+
+
+redis = get_default_redis()
+session_pins = RedisDict("ocpp_server-session-pins-", expire=3600*24, redis=redis)
+
 
 @beartype
 class OCPPServerHandler(ChargePoint):
@@ -76,6 +85,7 @@ class OCPPServerHandler(ChargePoint):
         self.fsm.on(ChargePointFSMState.closing.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
+        
 
     async def set_online(self, *vargs):
         self.fsm.context.timeout = datetime.now() + timedelta(seconds=30)
@@ -632,8 +642,6 @@ async def d2x_ui_landing(cp_id : ChargePointId):
             ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
         else:
-            fsm = UIManagerFSMType(uml=ui_manager_uml, context=UIManagerContext(charge_points[cp_id]), se_factory=UIManagerFSMState)
-            cp = charge_points[cp_id]
             evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
 
             ui.label(cp_id)
@@ -643,11 +651,132 @@ async def d2x_ui_landing(cp_id : ChargePointId):
                         with ui.card():
                             ui.label(evse_id)
 
+def async_l(f):
+    async def wrapped_async():
+        return await f()
+    return wrapped_async
+
+def dispatch(fsm : UIManagerFSMType, target : UIManagerFSMEvent, condition=None):
+    if condition is None or condition():
+        return async_l(lambda: fsm.handle(target))
+    else:
+        return None
+
+def gdpraccepted_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    with ui.card():
+        ui.label("Do you have a pre-booked session?")
+        with ui.row():
+            ui.button("Yes, I have a booking", on_click=async_l(lambda : fsm.handle(UIManagerFSMEvent.on_have_booking)))
+            ui.button("No, I'll fill the session info now", on_click=async_l(lambda : fsm.handle(UIManagerFSMEvent.on_continue_without_booking)))
+
+
+
+
+def new_session_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    with ui.card():
+        ui.label("Welcome to the Drive2X Project demo. ")
+        ui.label("Here is how we process your data. ")
+        with ui.scroll_area().classes('w-800 h-400 border'):
+            ui.label(lorem.paragraphs(5).split("\n"))
+        with ui.row():
+            ui.button("Yes, I have read the policies and consent to handling of my data",
+                      on_click=dispatch(fsm, UIManagerFSMEvent.on_gdpr_accept))
+            ui.button("No, do not consent and cannot use this service.",
+                      on_click=dispatch(fsm, UIManagerFSMEvent.on_exit))
+
+def edit_booking_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    with ui.card():
+        ui.label("Please enter all of the following details related to your charging session").classes("w-60")
+        with ui.column():
+            moment = datetime.now()
+            fsm.context.session_info.update({"car_make": "D2X Cars",
+                                             "car_model": "D2X Virtual EV (2025-)",
+                                             "departure_date": moment.isoformat()[:10],
+                                             "departure_time": "23:59"})
+            checked_inputs = []
+            checked_inputs.append(ui.select(["D2X Cars"], value="D2X Cars", label="Car make",
+                      on_change=lambda x: fsm.context.session_info.update({"car_make": x.value})).classes("w-60"))
+            checked_inputs.append(ui.select(["D2X Virtual EV (2025-)"], value="D2X Virtual EV (2025-)", label="Car model",
+                      on_change=lambda x: fsm.context.session_info.update({"car_model": x.value})).classes("w-60"))
+            with ui.input('Departure Date', value=moment.isoformat()[:10],
+                          validation={"Departure date should not be empty": lambda x: len(x)}).classes("w-60") as date:
+                checked_inputs.append(date)
+                with ui.menu().props('no-parent-event') as menu:
+                    with ui.date(on_change=lambda x: fsm.context.session_info.update({"departure_date": x.value})).bind_value(date):
+                        with ui.row().classes('justify-end'):
+                            ui.button('Close', on_click=menu.close).props('flat')
+                with date.add_slot('append'):
+                    ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
+
+            with ui.input('Departure Time', value="23:59",
+                          validation={"Departure time should not be empty": lambda x: len(x)}
+                          ).classes("w-60") as time:
+                checked_inputs.append(time)
+                with ui.menu().props('no-parent-event') as menu:
+                    with ui.time(on_change=lambda x: fsm.context.session_info.update({"departure_time": x.value})).bind_value(time):
+                        with ui.row().classes('justify-end'):
+                            ui.button('Close', on_click=menu.close).props('flat')
+                with time.add_slot('append'):
+                    ui.icon('access_time').on('click', menu.open).classes('cursor-pointer')
+
+            def if_valid(checked_inputs):
+                valid = True
+                for inp in checked_inputs:
+                    valid = valid and inp.validate()
+                return valid
+            ui.button("CONFIRM SESSION DETAILS", on_click=dispatch(fsm, UIManagerFSMEvent.on_confirm_session,
+                                                                        condition=lambda : if_valid(checked_inputs))).classes("w-60")
+
+def session_confirmed_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    with ui.card():
+        ui.label("Here are your session details").classes("w-60")
+        with ui.column():
+            ui.select(["D2X Cars"], value=fsm.context.session_info["car_make"], label="Car make").classes("w-60").disable()
+            ui.select(["D2X Virtual EV (2025-)"], value=fsm.context.session_info["car_model"], label="Car model").classes("w-60").disable()
+            ui.label('Departure Date').classes("w-60")
+            ui.input(fsm.context.session_info["departure_date"]).classes("w-60").disable()
+            ui.label('Departure Time').classes("w-60")
+            ui.input(fsm.context.session_info["departure_time"]).classes("w-60").disable()
+
+            ui.button("GO BACK", on_click=dispatch(fsm, UIManagerFSMEvent.on_back)).classes("w-60")
+            ui.button("START SESSION", on_click=dispatch(fsm, UIManagerFSMEvent.on_start_session)).classes("w-60")
+
+def car_not_connected_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    with ui.card():
+        ui.label("Waiting for car to be connected to charging port. If you have done so already please wait.").classes("w-60")
+
+
+def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+    with ui.card():
+        ui.label("Car connection detected.").classes(
+            "w-60")
+        ui.button("AUTHORISE CHARGING/DISCHARGING", on_click=dispatch(fsm, UIManagerFSMEvent.on_start)).classes("w-60")
+
+def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+    ui.label("Thank you. Charging/dischargning of your EV will now occur according to the command from the Smart Charging Algorithm.")
+    ui.label().bind_text_from(fsm.context, "session_pin", lambda x: f"Your session PIN is {x}")
+    ui.label(f"Please record your PIN and use it to unlock charging progress information.")
+    ui.button(f"Stop session early", on_click=dispatch(fsm, UIManagerFSMEvent.on_early_stop))
+
+
+STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
+                    UIManagerFSMState.gdpraccepted: gdpraccepted_screen,
+                    UIManagerFSMState.edit_booking: edit_booking_screen,
+                    UIManagerFSMState.evseselect_page: lambda cp_id, *vargs: ui.navigate.to(f"/d2x_ui/{cp_id}"),
+                    UIManagerFSMState.session_confirmed: session_confirmed_screen,
+                    UIManagerFSMState.car_not_connected: car_not_connected_screen,
+                    UIManagerFSMState.car_connected: car_connected_screen,
+                    UIManagerFSMState.normal_session: normal_session_screen
+                    }
+
 @ui.refreshable
 def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
     ui.label(fsm.current_state)
     ui.label(cp_id)
     ui.label(evse_id)
+    if fsm.current_state in STATE_SCREEN_MAP:
+        STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp)
+
     
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
@@ -669,9 +798,13 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
                                    context=UIManagerContext(charge_point=charge_points[cp_id],
                                                             tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[evse_id],
                                                             evse=charge_points[cp_id].fsm.context.transaction_fsms[evse_id].context.evse), se_factory=UIManagerFSMState)
+
+            fsm.context.session_pins = session_pins
+            fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
+            fsm.load_from_redis()
             cp = charge_points[cp_id]
             state_dependent_frame(cp_id, evse_id, fsm, cp)
-            fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh)
+            fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
             ui.timer(1, fsm.loop)
             ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
@@ -688,4 +821,4 @@ def format_queue_position(rank):
             f"Your place in the queue is {rank+1}")
 
 
-ui.run(host="0.0.0.0", port=8000, favicon="🚘")
+ui.run(host="0.0.0.0", port=8000, favicon="🚘", language="en-GB")

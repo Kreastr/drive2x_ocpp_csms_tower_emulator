@@ -9,6 +9,8 @@ from server.transaction_manager.tx_fsm import TxFSMS
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from util.types import EVSEId, TransactionId, ChargePointId
 
+from redis_dict import RedisDict
+
 
 @dataclass
 class ChargePointContext:
@@ -28,6 +30,11 @@ class ChargePointContext:
 
 @dataclass()
 class UIManagerContext:
+    cp_evse_id : str = ""
     charge_point : ChargePoint | None = None
     evse : EvseStatus | None = None
     tx_fsm : TxManagerFSMType | None = None
+    session_pin : int = -1
+    session_pins : RedisDict | None = None
+    session_info : dict[str, Any] = field(default_factory=dict)
+    

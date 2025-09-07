@@ -1,3 +1,5 @@
+import random
+
 from atfsm.atfsm import AFSM
 from server.data import UIManagerContext
 
@@ -47,6 +49,7 @@ _fsm.write_enums("UIManagerFSM")
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMCondition, UIManagerFSMEvent
 
 
+
 class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerFSMEvent, UIManagerContext]):
 
     def __init__(self, *vargs, **kwargs):
@@ -60,16 +63,30 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
 
-    @staticmethod
-    def if_session_is_active(*vargs):
-        return False
+        self.on(UIManagerFSMState.normal_session.on_enter, self.set_new_pin)
+
+    def load_from_redis(self):
+        ctxt : UIManagerContext = self.context
+        if ctxt.cp_evse_id in ctxt.session_pins:
+            stored_val = ctxt.session_pins[ctxt.cp_evse_id]
+            if stored_val != ctxt.session_pin:
+                ctxt.session_pin = stored_val
+
+    async def set_new_pin(self, *vargs, **kwargs):
+        ctxt : UIManagerContext = self.context
+        ctxt.session_pin = random.randint(100000,999999)
+        ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
+
+    def if_session_is_active(self, *vargs):
+        ctxt : UIManagerContext = self.context
+        return ctxt.evse.connector_status == "Occupied" and ctxt.session_pin > 0
 
     def if_session_is_not_active(self, *vargs):
         return not self.if_session_is_active(*vargs)
 
-    @staticmethod
-    def if_car_present(*vargs):
-        return False
+    def if_car_present(self, *vargs):
+        ctxt : UIManagerContext = self.context
+        return ctxt.evse.connector_status == "Occupied"
 
     def if_car_not_present(self, *vargs):
         return not self.if_car_present(*vargs)
