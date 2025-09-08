@@ -159,6 +159,10 @@ class OCPPServerHandler(ChargePoint):
                 await v.loop()
             await self.fsm.loop()
 
+    @on(Action.notify_event)
+    async def on_notify_event(self, **data):
+        self.log_event(("notify_event", (data)))
+        return call_result.NotifyEvent()
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
