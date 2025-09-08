@@ -314,6 +314,7 @@ class OCPPServerHandler(ChargePoint):
         self.events.append(event_data)
 
     async def reboot_peer_and_close_connection(self, *vargs):
+        if self.fsm.context.id in boot_notification_cache:                    del boot_notification_cache[self.fsm.context.id]
         await self.call(call.Reset(type=ResetEnumType.immediate))
         await self.close_connection(*vargs)
 
