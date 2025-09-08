@@ -315,7 +315,7 @@ class OCPPServerHandler(ChargePoint):
     def log_event(self, event_data):
         self.events.append(event_data)
 
-    async def close_connection(self):
+    async def close_connection(self, *vargs):
         self.fsm.context.shutdown = True
         self.fsm.context.online = False
         await self._connection.close()
