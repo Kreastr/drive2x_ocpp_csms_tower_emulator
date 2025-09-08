@@ -100,8 +100,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
             cp.do_remote_stop(evse_id=ctxt.evse.evse_id)
             
     async def trigger_remote_start(self, *vargs, **kwargs):
-        if TYPE_CHECKING:
-            from ocpp_server import OCPPServerHandler
+        from ocpp_server import OCPPServerHandler
         ctxt : UIManagerContext = self.context
         cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
         if isinstance(cp, OCPPServerHandler):
