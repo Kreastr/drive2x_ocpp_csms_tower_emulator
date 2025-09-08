@@ -54,7 +54,6 @@ async def broadcast_to(op, page, **filters):
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
 
-boot_notification_cache = dict()
 
 
 def get_default_redis():
@@ -66,8 +65,7 @@ def get_default_redis():
 
 redis = get_default_redis()
 session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
-
-
+boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redis=redis)
 @beartype
 class OCPPServerHandler(ChargePoint):
 
