@@ -1,11 +1,8 @@
 import asyncio
 import logging
 import traceback
-from collections import defaultdict
 from datetime import datetime, timedelta
-from math import ceil
 from typing import cast, Self
-from uuid import uuid4
 
 import websockets
 from beartype import beartype
@@ -22,7 +19,6 @@ from ocpp.v201.enums import Action, RegistrationStatusEnumType, AuthorizationSta
 from nicegui import ui, app, background_tasks, ElementFilter
 from typing import Any
 
-from redis import Redis
 from snoop import snoop
 from websockets import Subprotocol
 
@@ -34,7 +30,8 @@ from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
-from util import get_time_str, setup_logging, time_based_id, any_of
+from util import get_time_str, setup_logging, time_based_id, any_of, async_l, dispatch
+from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
 
 from server.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
@@ -81,6 +78,7 @@ class OCPPServerHandler(ChargePoint):
         self.events = []
         self.onl_task = asyncio.create_task(self.online_status_task())
         self.fsm = get_charge_point_fsm(ChargePointContext())
+        self.fsm.context : ChargePointContext
         
 
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
@@ -312,16 +310,31 @@ class OCPPServerHandler(ChargePoint):
         #return call_result.TransactionEvent()
 
     @on(Action.notify_report)
-    async def on_notify_report(self, **data):
-        self.log_event(("notify_report", (data)))
-        logger.warning(f"id={self.fsm.context.id} on_notify_report {data=}")
-        return call_result.NotifyReport()
+    async def on_notify_report(self, **report_data):
+        self.log_event(("notify_report", (report_data)))
+        logger.warning(f"id={self.fsm.context.id} on_notify_report {report_data=}")
+        try:
+            for record in report_data["report_data"]:
+                cmp = record["component"]["name"]
+                var = record["variable"]["name"]
+                self.fsm.context.components[cmp][var] = record
+            self.fsm.context.report_datetime = report_data["generated_at"]
+        finally:   
+            return call_result.NotifyReport()
 
     def log_event(self, event_data):
         self.events.append(event_data)
+        
+        
+    async def request_full_report(self, *vargs):
+        result = await self.call(
+            call.GetBaseReport(request_id=time_based_id(),
+                               report_base=ReportBaseEnumType.full_inventory))
+        logging.warning(f"request_full_report {result=}")
 
     async def reboot_peer_and_close_connection(self, *vargs):
-        if self.fsm.context.id in boot_notification_cache:                    del boot_notification_cache[self.fsm.context.id]
+        if self.fsm.context.id in boot_notification_cache:
+            del boot_notification_cache[self.fsm.context.id]
         await self.call(call.Reset(type=ResetEnumType.immediate))
         await self.close_connection(*vargs)
 
@@ -450,7 +463,7 @@ async def reboot(cp_id : str):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await charge_points[cp_id].call(call.Reset(type=ResetEnumType.immediate))}
+        return {"result": await charge_points[cp_id].reboot_peer_and_close_connection()}
 
 @app.get("/cp/{cp_id}/transactions")
 async def transactions(cp_id : str):
@@ -480,9 +493,7 @@ async def report_full(cp_id : str):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await charge_points[cp_id].call(
-            call.GetBaseReport(request_id=time_based_id(),
-                               report_base=ReportBaseEnumType.full_inventory))}
+        return {"result": await charge_points[cp_id].request_full_report()}
 
 
 @app.get("/cp/{cp_id}/setpoint/{value}")
@@ -529,6 +540,7 @@ class CPCard(Element):
             self.connector_container = ui.column()
             ui.separator()
             ui.button("UI", on_click=lambda: ui.navigate.to(f"/d2x_ui/{self.cp_context.id}"))
+            ui.button("REPORT", on_click=cp.reboot_peer_and_close_connection)
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
@@ -581,79 +593,6 @@ async def index():
                 CPCard(charge_points[cpid].fsm).mark(cpid)
 
 
-class FairSemaphoreRedis:
-
-    def __init__(self, name : str, n_users : int, redis : Redis, session_timeout : int = 10):
-        self.session_timeout = session_timeout
-        self.my_id = str(uuid4()).encode("utf-8")
-        self.redis = redis
-        self.name = name
-        self.name_lock = name + ":lock"
-        self.name_zset = name + ":queue"
-        self.name_ctr = name + ":cntr"
-        self.n_users = n_users
-        self.acquired = False
-        self.rank = None
-
-    def __enter__(self):
-        self.acquire()
-        assert self.acquired
-        return self
-
-    def acquire(self):
-        session_timeout = self.session_timeout
-        t_now = datetime.now().timestamp()
-        pipeline = self.redis.pipeline(True)
-        lock_current = self.redis.get(self.name_lock)
-        if lock_current is not None:
-            lock_current = lock_current.encode("utf-8")
-        mid = self.my_id
-        if lock_current == mid:
-            self.redis.expire(self.name_lock, int(ceil(session_timeout)))
-            pipeline.zadd(self.name, {self.my_id: t_now})
-            self.acquired = True
-            self.rank = -1
-            return
-        else:
-            if self.redis.ttl(self.name_lock) > session_timeout:
-                self.redis.expire(self.name_lock, int(ceil(session_timeout)))
-        # Delete stale requests and get them out of the queue
-        pipeline.zremrangebyscore(self.name, '-inf', t_now - session_timeout)
-        pipeline.zinterstore(self.name_zset, {self.name_zset: 1, self.name: 0})
-        pipeline.incr(self.name_ctr)
-        nonce = pipeline.execute()[-1]
-        # Add myself to semaphore set and queue
-        pipeline.zadd(self.name, {self.my_id: t_now})
-        pipeline.zadd(self.name_zset, {self.my_id: nonce}, nx=True)
-        pipeline.zrank(self.name_zset, self.my_id)
-        rank = pipeline.execute()[-1]
-        if rank < self.n_users:
-            if self.redis.get(self.name_lock) == self.my_id or self.redis.setnx(self.name_lock, self.my_id):
-                self.redis.expire(self.name_lock, int(ceil(session_timeout)))
-                self.acquired = True
-                self.rank = -1
-                return
-            elif not self.redis.ttl(self.name_lock):
-                self.redis.expire(self.name_lock, int(ceil(session_timeout)))
-                self.acquired = False
-                self.rank = rank
-                return
-
-        self.acquired = False
-        self.rank = rank
-        return
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.free()
-
-    def free(self):
-        self.redis.expire(self.name_lock, 1)
-        pipeline = self.redis.pipeline(True)
-        pipeline.zrem(self.name, self.my_id)
-        pipeline.zrem(self.name_zset, self.my_id)
-        assert pipeline.execute()[0]
-
-
 @ui.page("/d2x_ui/{cp_id}")
 async def d2x_ui_landing(cp_id : ChargePointId):
     ui.page_title(f'Drive2X UI - {cp_id}')
@@ -673,16 +612,6 @@ async def d2x_ui_landing(cp_id : ChargePointId):
                         with ui.card():
                             ui.label(evse_id)
 
-def async_l(f):
-    async def wrapped_async():
-        return await f()
-    return wrapped_async
-
-def dispatch(fsm : UIManagerFSMType, target : UIManagerFSMEvent, condition=None):
-    if condition is None or condition():
-        return async_l(lambda: fsm.handle(target))
-    else:
-        return None
 
 def gdpraccepted_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
     with ui.card():
@@ -749,7 +678,7 @@ def edit_booking_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManager
 
 
             ui.button("CONFIRM SESSION DETAILS", on_click=dispatch(fsm, UIManagerFSMEvent.on_confirm_session,
-                                                                        condition=lambda : if_valid(checked_inputs))).classes("w-60")
+                                                                   condition=lambda : if_valid(checked_inputs))).classes("w-60")
 
 def session_confirmed_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
     with ui.card():
@@ -821,7 +750,7 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
-    semaphore = FairSemaphoreRedis(name="page-access-"+cp_id+"-"+str(evse_id), n_users=1, redis=redis, session_timeout=5)
+    semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
 
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired"):

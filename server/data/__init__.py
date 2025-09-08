@@ -11,6 +11,9 @@ from util.types import EVSEId, TransactionId, ChargePointId
 
 from redis_dict import RedisDict
 
+@dataclass
+class ComponentData:
+    variables : dict[str, dict[str, Any]] = field(default_factory=dict)
 
 @dataclass
 class ChargePointContext:
@@ -27,6 +30,9 @@ class ChargePointContext:
     transaction_fsms: defaultdict[EVSEId, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMS))
 
     connection_task : Any = None
+    
+    components : [str, ComponentData] = field(default_factory=dict)
+    report_datetime : str = ""
 
 @dataclass()
 class UIManagerContext:
