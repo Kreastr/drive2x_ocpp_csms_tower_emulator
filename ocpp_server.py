@@ -706,6 +706,12 @@ def new_session_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerF
             ui.button("No, do not consent and cannot use this service.",
                       on_click=dispatch(fsm, UIManagerFSMEvent.on_exit))
 
+def if_valid(checked_inputs):
+    valid = True
+    for inp in checked_inputs:
+        valid = valid and inp.validate()
+    return valid
+
 def edit_booking_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
     with ui.card():
         ui.label("Please enter all of the following details related to your charging session").classes("w-60")
@@ -741,11 +747,7 @@ def edit_booking_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManager
                 with time.add_slot('append'):
                     ui.icon('access_time').on('click', menu.open).classes('cursor-pointer')
 
-            def if_valid(checked_inputs):
-                valid = True
-                for inp in checked_inputs:
-                    valid = valid and inp.validate()
-                return valid
+
             ui.button("CONFIRM SESSION DETAILS", on_click=dispatch(fsm, UIManagerFSMEvent.on_confirm_session,
                                                                         condition=lambda : if_valid(checked_inputs))).classes("w-60")
 
@@ -793,7 +795,7 @@ def session_unlock_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
         return int(val if lvl else "0") == fsm.context.session_pin
 
     ui.button(f"Unlock session", on_click=dispatch(fsm, UIManagerFSMEvent.on_session_pin_correct,
-                                                   condition=pin_code_test_call))
+                                                   condition=if_valid([pininp])))
 
 
 STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
