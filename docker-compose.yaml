@@ -5,3 +5,14 @@ services:
         - 9000:9000
         - 8000:8000
       restart: unless-stopped
+      depends_on:
+        - redis
+   redis:
+      image: redis:7.4-alpine
+      restart: always
+      command: redis-server --save 20 1 --loglevel warning
+      volumes:
+        - redisdb:/data
+volumes:
+  redisdb:
+    driver: local

@@ -58,7 +58,7 @@ boot_notification_cache = dict()
 
 
 def get_default_redis():
-    redis_host = "localhost"
+    redis_host = "redis"
     redis_port = 6379
     redis_db = 2
     return Redis(host=redis_host, port=redis_port, db=redis_db)
@@ -81,7 +81,7 @@ class OCPPServerHandler(ChargePoint):
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.try_cached_boot_notification)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.start_boot_timeout)
-        self.fsm.on(ChargePointFSMState.failed.on_enter, self.close_connection)
+        self.fsm.on(ChargePointFSMState.failed.on_enter, self.reboot_peer_and_close_connection)
         self.fsm.on(ChargePointFSMState.closing.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
@@ -314,6 +314,11 @@ class OCPPServerHandler(ChargePoint):
 
     def log_event(self, event_data):
         self.events.append(event_data)
+
+    async def reboot_peer_and_close_connection(self, *vargs):
+        await self.call(call.Reset(type=ResetEnumType.immediate))
+        await self.close_connection(*vargs)
+
 
     async def close_connection(self, *vargs):
         self.fsm.context.shutdown = True
