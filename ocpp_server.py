@@ -65,7 +65,7 @@ def get_default_redis():
 
 
 redis = get_default_redis()
-session_pins = RedisDict("ocpp_server-session-pins-", expire=3600*24, redis=redis)
+session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
 
 
 @beartype
@@ -85,7 +85,7 @@ class OCPPServerHandler(ChargePoint):
         self.fsm.on(ChargePointFSMState.closing.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
-        
+
 
     async def set_online(self, *vargs):
         self.fsm.context.timeout = datetime.now() + timedelta(seconds=30)
@@ -588,13 +588,18 @@ class FairSemaphoreRedis:
         t_now = datetime.now().timestamp()
         pipeline = self.redis.pipeline(True)
         lock_current = self.redis.get(self.name_lock)
-        mid =self.my_id
+        if lock_current is not None:
+            lock_current = lock_current.encode("utf-8")
+        mid = self.my_id
         if lock_current == mid:
             self.redis.expire(self.name_lock, int(ceil(session_timeout)))
             pipeline.zadd(self.name, {self.my_id: t_now})
             self.acquired = True
             self.rank = -1
             return
+        else:
+            if self.redis.ttl(self.name_lock) > session_timeout:
+                self.redis.expire(self.name_lock, int(ceil(session_timeout)))
         # Delete stale requests and get them out of the queue
         pipeline.zremrangebyscore(self.name, '-inf', t_now - session_timeout)
         pipeline.zinterstore(self.name_zset, {self.name_zset: 1, self.name: 0})
@@ -666,7 +671,7 @@ def gdpraccepted_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManager
     with ui.card():
         ui.label("Do you have a pre-booked session?")
         with ui.row():
-            ui.button("Yes, I have a booking", on_click=async_l(lambda : fsm.handle(UIManagerFSMEvent.on_have_booking)))
+            ui.button("Yes, I have a booking", on_click=async_l(lambda : fsm.handle(UIManagerFSMEvent.on_have_booking))).disable()
             ui.button("No, I'll fill the session info now", on_click=async_l(lambda : fsm.handle(UIManagerFSMEvent.on_continue_without_booking)))
 
 
@@ -758,6 +763,11 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
     ui.label(f"Please record your PIN and use it to unlock charging progress information.")
     ui.button(f"Stop session early", on_click=dispatch(fsm, UIManagerFSMEvent.on_early_stop))
 
+def session_unlock_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+    pininp = ui.input(label="Session PIN", validation={"PIN is incorrect": lambda *vargs: int(pininp.value if len(pininp.value) else "0") == fsm.context.session_pin}).classes("w-40")
+    ui.button(f"Unlock session", on_click=dispatch(fsm, UIManagerFSMEvent.on_session_pin_correct,
+                                                    condition=lambda *vargs: int(pininp.value if len(pininp.value) else "0") == fsm.context.session_pin))
+
 
 STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.gdpraccepted: gdpraccepted_screen,
@@ -766,7 +776,8 @@ STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.session_confirmed: session_confirmed_screen,
                     UIManagerFSMState.car_not_connected: car_not_connected_screen,
                     UIManagerFSMState.car_connected: car_connected_screen,
-                    UIManagerFSMState.normal_session: normal_session_screen
+                    UIManagerFSMState.normal_session: normal_session_screen,
+                    UIManagerFSMState.session_unlock: session_unlock_screen
                     }
 
 @ui.refreshable
@@ -777,7 +788,6 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
     if fsm.current_state in STATE_SCREEN_MAP:
         STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp)
 
-    
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):

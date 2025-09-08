@@ -3,6 +3,11 @@ import random
 from atfsm.atfsm import AFSM
 from server.data import UIManagerContext
 
+import snoop
+from dateutil.parser import parse as dtparse
+from datetime import datetime
+import math
+
 ui_manager_uml="""@startuml
 [*] --> EVSEPage
 EVSEPage --> SessionUnlock : if session is active
@@ -63,8 +68,10 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
 
-        self.on(UIManagerFSMState.normal_session.on_enter, self.set_new_pin)
+        self.on(UIManagerFSMState.normal_session.session_confirmed.on_exit, self.set_new_pin)
+        self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
 
+    @snoop
     def load_from_redis(self):
         ctxt : UIManagerContext = self.context
         if ctxt.cp_evse_id in ctxt.session_pins:
@@ -72,10 +79,22 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
             if stored_val != ctxt.session_pin:
                 ctxt.session_pin = stored_val
 
+    @snoop
+    def get_session_remaining_duration(self):
+        ts =  dtparse(self.context.session_info["departure_date"] + "T" + self.context.session_info["departure_time"])
+        return int(math.ceil((ts-datetime.now()).total_seconds()))
+
+
     async def set_new_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = random.randint(100000,999999)
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
+        ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
+
+    async def clear_pin(self, *vargs, **kwargs):
+        ctxt : UIManagerContext = self.context
+        ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
+        ctxt.session_pin = -1
 
     def if_session_is_active(self, *vargs):
         ctxt : UIManagerContext = self.context
