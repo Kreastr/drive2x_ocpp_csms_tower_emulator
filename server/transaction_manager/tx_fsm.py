@@ -51,7 +51,7 @@ class TxFSMS(TxManagerFSMType):
 
     async def send_new_setpoint(self, *vargs):
         self.context: TxManagerContext
-        setpoint = self.context.evse.setpoint
+        setpoint = int(self.context.evse.setpoint)
         if self.context.cp_interface is not None:
             result = await self.context.cp_interface.call(
                 call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(setpoint),
