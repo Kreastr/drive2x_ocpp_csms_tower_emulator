@@ -502,6 +502,7 @@ class CPCard(Element):
         super().__init__(tag="div")
         self.fsm = fsm
         self.cp_context : ChargePointContext = fsm.context
+        cp = charge_points[self.cp_context.id]
         self.card = ui.card()
         self.bind_online_from(self.cp_context, "online")
         self._handle_online_change(self.cp_context.online)
@@ -515,6 +516,7 @@ class CPCard(Element):
             with ui.row():
                 ui.label("Status")
                 ui.label().bind_text(self.fsm, "current_state")
+            ui.button("REBOOT", on_click=cp.reboot_peer_and_close_connection))
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
