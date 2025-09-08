@@ -1,4 +1,7 @@
 import random
+from typing import TYPE_CHECKING
+
+from ocpp.v201 import ChargePoint
 
 from atfsm.atfsm import AFSM
 from server.data import UIManagerContext
@@ -40,7 +43,8 @@ Unlocking --> CarLockedSession : if has locking
 Unlocking --> NormalSession : if has no locking
 CarLockedSession --> SessionEndSummary : on early stop and unlock
 CarLockedSession --> SessionEndSummary : if session fault
-CarConnected --> NormalSession : on start
+CarConnected --> SessionFirstStart : on start
+SessionFirstStart --> NormalSession
 NormalSession --> EVSESelectPage : on exit
 NormalSession --> SessionEndSummary : on early stop
 NormalSession --> SessionEndSummary : if session fault
@@ -68,8 +72,10 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
 
-        self.on(UIManagerFSMState.normal_session.session_confirmed.on_exit, self.set_new_pin)
+        self.on(UIManagerFSMState.session_first_start.on_exit, self.set_new_pin)
+        self.on(UIManagerFSMState.session_first_start.on_exit, self.trigger_remote_start)
         self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
+        self.on(UIManagerFSMState.normal_session.on_exit, self.trigger_remote_stop)
 
     @snoop
     def load_from_redis(self):
@@ -85,6 +91,25 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         return int(math.ceil((ts-datetime.now()).total_seconds()))
 
 
+    async def trigger_remote_stop(self, *vargs, **kwargs):
+        if TYPE_CHECKING:
+            from ocpp_server import OCPPServerHandler
+        ctxt : UIManagerContext = self.context
+        cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
+        if isinstance(cp, OCPPServerHandler):
+            cp.do_remote_stop(evse_id=ctxt.evse.evse_id)
+            
+    async def trigger_remote_start(self, *vargs, **kwargs):
+        if TYPE_CHECKING:
+            from ocpp_server import OCPPServerHandler
+        ctxt : UIManagerContext = self.context
+        cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
+        if isinstance(cp, OCPPServerHandler):
+            cp.do_remote_start(evse_id=ctxt.evse.evse_id)
+        #ctxt.session_pin = random.randint(100000,999999)
+        #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
+        #ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
+        
     async def set_new_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = random.randint(100000,999999)

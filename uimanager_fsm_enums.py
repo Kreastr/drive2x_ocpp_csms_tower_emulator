@@ -18,6 +18,7 @@ class UIManagerFSMState(StateBase, str, Enum):
     unlocking='unlocking'
     session_end_summary='session_end_summary'
     normal_session='normal_session'
+    session_first_start='session_first_start'
 
 class UIManagerFSMCondition(str, Enum):
     if_session_is_active='if_session_is_active'
