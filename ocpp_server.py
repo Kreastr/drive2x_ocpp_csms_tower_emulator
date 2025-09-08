@@ -763,10 +763,20 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
     ui.label(f"Please record your PIN and use it to unlock charging progress information.")
     ui.button(f"Stop session early", on_click=dispatch(fsm, UIManagerFSMEvent.on_early_stop))
 
+
 def session_unlock_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    pininp = ui.input(label="Session PIN", validation={"PIN is incorrect": lambda *vargs: int(pininp.value if len(pininp.value) else "0") == fsm.context.session_pin}).classes("w-40")
+    pin_code_test = snoop(lambda x: int(x if len(x) else "0") == fsm.context.session_pin)
+
+    pininp = ui.input(label="Session PIN", validation={"PIN is incorrect": pin_code_test}).classes("w-40")
+
+    @snoop
+    def pin_code_test_call(*vargs,pininp=pininp):
+        val = pininp.value
+        lvl = len(pininp.value)
+        return int(val if lvl else "0") == fsm.context.session_pin
+
     ui.button(f"Unlock session", on_click=dispatch(fsm, UIManagerFSMEvent.on_session_pin_correct,
-                                                    condition=lambda *vargs: int(pininp.value if len(pininp.value) else "0") == fsm.context.session_pin))
+                                                   condition=pin_code_test_call))
 
 
 STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
