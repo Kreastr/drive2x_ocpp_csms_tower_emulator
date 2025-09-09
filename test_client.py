@@ -147,7 +147,7 @@ class OCPPClient(ChargePoint):
     def __init__(self, redis_data, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
         self.redis_data = redis_data
-        self.settings: dict[str, dict[str, str]] = deepcopy({"ChargingStation": {}})
+        self.settings: dict[str, dict[str, str]] = deepcopy({"ChargingStation": {}, "V2XChargingCtrlr": {"Setpoint": {}}})
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
@@ -165,14 +165,17 @@ class OCPPClient(ChargePoint):
                                                             self.tx_fsms[x[0]]))), 
                                       self.task_contexts.items()))
         self.st_tasks = dict(map(lambda x: (
-            x[0], asyncio.create_task(self.status_task(x[1].evse))),
+            x[0], asyncio.create_task(self.status_task(x[1].evse,
+                                      self.tx_fsms[x[0]]))),
                                       self.task_contexts.items()))
+        for i in self.st_tasks:
+            self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{i}"] = 0.0
         self.datasaver_task = asyncio.create_task(self.data_saver_task())
     
     async def data_saver_task(self):
         try:
             while self.running:
-                logger.warning(f"data_saver_task")
+                #logger.warning(f"data_saver_task")
                 await asyncio.sleep(10)
                 for i, v in self.task_contexts.items():
                     self.save_evse_data(i, v.evse)
@@ -184,7 +187,7 @@ class OCPPClient(ChargePoint):
     def save_evse_data(self, i, v : EvseModel):
         record_hash = self.get_evse_hash(i)
         data=v.model_dump_json()
-        logger.warning(f"Saving to Redis {i=} {record_hash=} {data=}")
+        #logger.warning(f"Saving to Redis {i=} {record_hash=} {data=}")
         self.redis_data[record_hash] = data
     
     @staticmethod
@@ -224,7 +227,7 @@ class OCPPClient(ChargePoint):
         except:
             logger.error(traceback.format_exc())
 
-    async def status_task(self, evse : EvseModel):
+    async def status_task(self, evse : EvseModel, fsm : TxFSMType):
         try:
             prev_status = evse.cable_connected
             await self.post_status_notification(evse)
@@ -234,9 +237,23 @@ class OCPPClient(ChargePoint):
                 if prev_status != evse.cable_connected:
                     await self.post_status_notification(evse)
                     prev_status = evse.cable_connected
+                logger.warning(f"{evse}")
+                logger.warning(f'{self.settings["V2XChargingCtrlr"]["Setpoint"]} {fsm.current_state} {evse.cable_connected}')
 
-                if evse.cable_connected:
-                    pass
+                if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
+                    prev_wh = evse.soc_wh
+                    evse.soc_wh += float(self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{evse.id}"]) / 3600.0
+                    if evse.soc_wh > evse.usable_capacity:
+                        evse.soc_wh = evse.usable_capacity
+                    if evse.soc_wh < 0:
+                        evse.soc_wh = 0
+                    change = evse.soc_wh - prev_wh
+                    evse.metered_power += change
+                    if change > 0:
+                        evse.metered_power_charge += change
+                    elif change < 0:
+                        evse.metered_power_discharge -= change
+
                 else:
                     if evse.soc_wh > 2:
                         evse.soc_wh -= 5000/3600
@@ -343,6 +360,7 @@ class OCPPClient(ChargePoint):
     async def set_variables(self, set_variable_data):
         results = list()
         for dv in map(lambda x: SetVariableDataType(**x), set_variable_data):
+            logger.warning(f"{dv=}")
             v: SetVariableDataType = SetVariableDataType(
                 variable=VariableType(**dv.variable),
                 component=ComponentType(**dv.component),
@@ -356,7 +374,12 @@ class OCPPClient(ChargePoint):
                                                      component=v.component,
                                                      attribute_status=SetVariableStatusEnumType.unknown_variable))
             else:
-                self.settings[v.component.name][v.variable.name] = v.attribute_value
+                tag = []
+                if v.component.instance:
+                    tag.append(f"instance-{v.component.instance}")
+                if v.component.evse:
+                    tag.append(f"evse-{v.component.evse['id']}")
+                self.settings[v.component.name][v.variable.name][""+"-".join(tag)] = v.attribute_value
 
                 results.append(SetVariableResultType(variable=v.variable,
                                                      component=v.component,
@@ -433,7 +456,15 @@ async def charge_point(serial : str):
     ui.page_title(f'Drive2X Charge Point Emulator ID {serial}')
     background_tasks.create_lazy(main(serial), name=f"main_{serial}")
 
-    with ui.card(align_items="center").classes('fixed-center background'):
+    with ui.grid(columns=1).classes('fixed-center background'):
+        await cp_control_panel(serial)
+        await leaderboard()
+
+    ui.timer(15, leaderboard.refresh)
+
+
+async def cp_control_panel(serial):
+    with (ui.card(align_items="center")):
         ui.label(f"Charge point {serial}").classes('text-h5')
         ui.label("Power plug status")
         clmn = ui.column().mark(f"power_plug_container")
@@ -443,6 +474,28 @@ async def charge_point(serial : str):
         with clmn:
             for cid in cp.task_contexts:
                 await evse_row(cid, cp, debug=serial.startswith("CP_"))
+        with ui.link(target=f"https://drive2x.lut.fi/d2x_ui/{serial}", new_tab=True):
+            ui.icon("qr_code").classes('text-h5')
+
+def get_score(cp : OCPPClient):
+    score = 0
+    for i, fsm in cp.tx_fsms.items():
+        score += fsm.context.evse.km_driven
+    return score
+
+@ui.refreshable
+async def leaderboard():
+    with ui.card(align_items="center"):
+        ui.label(f"Leaderboard").classes('text-h5')
+        stat = []
+        for serial in charge_point_objects:
+            cp = charge_point_objects[serial]
+            score = get_score(cp)
+            stat.append((serial, score))
+        stat.sort(key=lambda x: -x[1])
+        with ui.column():
+            for i, (serial, score) in enumerate(stat[:5]):
+                ui.label(f"{i+1}. Charge Point ending with {serial[-6:]} ({score:0.1f} km driven)")
 
 
 async def evse_row(cid : EVSEId, cp : OCPPClient, debug=False):
@@ -454,6 +507,7 @@ async def evse_row(cid : EVSEId, cp : OCPPClient, debug=False):
         ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "soc_wh", 
                                         backward=lambda x,c=cp.task_contexts[cid].evse: f"Charge: {(x/c.usable_capacity*100):0.2f}%")
         ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "km_driven", backward=lambda x: f"Driven {x:0.1f} km")
+
 
 
 def sha256(val : str):

@@ -110,7 +110,9 @@ def log_async_call(log_sink):
         @wraps(f)
         async def wrapped_function(*vargs, **kwargs):
             log_sink(f"Called {f.__name__} with {vargs} {kwargs}")
-            return await f(*vargs, **kwargs)
+            result = await f(*vargs, **kwargs)
+            log_sink(f"Returned from {f.__name__} with {result=}")
+            return result
 
         wrapped_function.__name__ = f.__name__
         return wrapped_function

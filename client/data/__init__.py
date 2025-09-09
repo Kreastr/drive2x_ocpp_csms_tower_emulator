@@ -17,6 +17,8 @@ class EvseModel(BaseModel):
     usable_capacity : float = 70000.0
     km_driven : float = 0.0
     metered_power : float = 0.0
+    metered_power_charge : float = 0.0
+    metered_power_discharge : float = 0.0
     setpoint : float = 0.0
     last_meter_update : datetime.datetime = Field(default_factory=datetime.datetime.now)
     tx_id : TransactionId | None = None
