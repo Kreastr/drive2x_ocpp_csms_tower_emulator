@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ocpp.v201 import ChargePoint
+from pydantic import BaseModel, Field
+
 from server.data.evse_status import EvseStatus
 from server.transaction_manager.tx_fsm import TxFSMS
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
@@ -12,8 +14,8 @@ from util.types import EVSEId, TransactionId, ChargePointId
 from redis_dict import RedisDict
 
 @dataclass
-class ComponentData:
-    variables : dict[str, dict[str, Any]] = field(default_factory=dict)
+class ComponentData(BaseModel):
+    variables : dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 @dataclass
 class ChargePointContext:
@@ -30,8 +32,9 @@ class ChargePointContext:
     transaction_fsms: defaultdict[EVSEId, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMS))
 
     connection_task : Any = None
-    
-    components : [str, ComponentData] = field(default_factory=dict)
+
+    components : dict[str, ComponentData] = field(default_factory=lambda *vargs, **kwargs:
+                                                        defaultdict(lambda : ComponentData.model_validate(dict(variables=dict()))))
     report_datetime : str = ""
 
 @dataclass()
@@ -43,4 +46,3 @@ class UIManagerContext:
     session_pin : int = -1
     session_pins : RedisDict | None = None
     session_info : dict[str, Any] = field(default_factory=dict)
-    

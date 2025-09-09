@@ -55,6 +55,7 @@ class OCPPServerHandler(ChargePoint):
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
 
 
+
     async def set_online(self, *vargs):
         self.fsm.context.timeout = datetime.now() + timedelta(seconds=30)
         self.fsm.context.online = True
