@@ -22,7 +22,7 @@ from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
 from util import get_time_str, any_of, time_based_id, broadcast_to
 
-from nicegui import ui, app
+from server.ui.nicegui import ui, app
 from util.types import *
 from server.ui.ui_manager import UIManagerFSMType
 

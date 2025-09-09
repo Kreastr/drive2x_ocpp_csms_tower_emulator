@@ -7,7 +7,7 @@ from ocpp.v201 import call_result
 from ocpp.v201.datatypes import ComponentType, VariableType, \
     SetVariableDataType, EVSEType
 
-from nicegui import ui, app, background_tasks
+from server.ui.nicegui import ui, app, background_tasks
 
 from websockets import Subprotocol
 
