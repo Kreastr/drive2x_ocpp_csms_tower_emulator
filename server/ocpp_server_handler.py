@@ -80,7 +80,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             await self.fsm.handle(ChargePointFSMEvent.on_cached_boot_notification)
             if self.fsm.context.id in status_notification_cache:
                 for _, notification in status_notification_cache[self.fsm.context.id].items():
-                    self.handle_status_notification_inner(EvseStatus.model_validate(json.loads(notification)))
+                    await self.handle_status_notification_inner(EvseStatus.model_validate(json.loads(notification)))
 
     async def add_to_ui(self, *vargs):
         assert  self.fsm.context.id != "provisional"
