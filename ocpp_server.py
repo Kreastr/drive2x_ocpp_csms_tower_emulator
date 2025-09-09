@@ -178,10 +178,10 @@ async def setpoint(cp_id : str, value : int):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        if value > 4000:
-            value = 4000
-        if value < -2000:
-            value = -2000
+        if value > 8000:
+            value = 8000
+        if value < -8000:
+            value = -8000
         return {"result": await charge_points[cp_id].call_payload(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
                                                                      component=ComponentType(name="V2XChargingCtrlr", instance="1", evse=EVSEType(id=1)),

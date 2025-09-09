@@ -357,10 +357,10 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         return self.fsm.context.transaction_fsms[evse_id].context.evse
 
     def clamp_setpoint(self, evse: EvseStatus):
-        if evse.setpoint > 11000:
-            evse.setpoint = 11000
-        if evse.setpoint < -11000:
-            evse.setpoint = -11000
+        if evse.setpoint > 8000:
+            evse.setpoint = 8000
+        if evse.setpoint < -8000:
+            evse.setpoint = -8000
 
     async def do_increase_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Increased setpoint")
