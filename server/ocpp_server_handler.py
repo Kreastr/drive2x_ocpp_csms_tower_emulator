@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from _pydatetime import datetime, timedelta
 from logging import getLogger
@@ -35,6 +36,7 @@ logger.setLevel(logging.DEBUG)
 redis = get_default_redis()
 session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
 boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redis=redis)
+status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
 
 
 @beartype
@@ -74,6 +76,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         if self.fsm.context.id in boot_notification_cache:
             self.fsm.context.boot_notifications.append( boot_notification_cache[self.fsm.context.id] )
             await self.fsm.handle(ChargePointFSMEvent.on_cached_boot_notification)
+            if self.fsm.context.id in status_notification_cache[self.fsm.context.id]:
+                for _, notification in status_notification_cache[self.fsm.context.id].items():
+                    self.handle_status_notification_inner(EvseStatus.model_validate(json.loads(notification)))
 
     async def add_to_ui(self, *vargs):
         assert  self.fsm.context.id != "provisional"
@@ -178,19 +183,29 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         )
 
     @on(Action.status_notification)
-    async def on_status_notification(self, **data):
+    async def on_status_notification(self, **status_data):
         from server.ui import CPCard
-        self.log_event(("status_notification", (data)))
-        logger.warning(f"id={self.fsm.context.id} on_status_notification {data=}")
-        conn_status = EvseStatus(**data)
+        self.log_event(("status_notification", (status_data)))
+        logger.warning(f"id={self.fsm.context.id} on_status_notification {status_data=}")
+        conn_status = EvseStatus(**status_data)
+        
+        if self.fsm.context.id not in status_notification_cache:
+            status_data = dict()
+        else:
+            status_data = status_notification_cache[self.fsm.context.id]
+        status_data.update({conn_status.evse_id: conn_status.model_dump_json()})
 
+        await self.handle_status_notification_inner(conn_status)
+        return call_result.StatusNotification(
+        )
+
+    async def handle_status_notification_inner(self, conn_status):
         if self.fsm.current_state in [ChargePointFSMState.identified,
                                       ChargePointFSMState.booted,
                                       ChargePointFSMState.running_transaction,
                                       ChargePointFSMState.closing]:
-        
 
-            tx_fsm : TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.evse_id]
+            tx_fsm: TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.evse_id]
 
             if tx_fsm.context.cp_interface is None:
                 tx_fsm.context.cp_interface = self
@@ -202,7 +217,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             logger.warning(" tx_fsm.loop")
             await tx_fsm.loop()
 
-            #if conn_status.connector_status == "Occupied":
+            # if conn_status.connector_status == "Occupied":
             #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
             if conn_status.evse_id not in self.fsm.context.transaction_fsms:
@@ -213,9 +228,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                                    page="/",
                                    kind=CPCard, marker=self.fsm.context.id)
             else:
-                self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse.connector_status = conn_status.connector_status
-        return call_result.StatusNotification(
-        )
+                self.fsm.context.transaction_fsms[
+                    conn_status.evse_id].context.evse.connector_status = conn_status.connector_status
 
     @on(Action.heartbeat)
     async def on_heartbeat(self, **data):
@@ -314,6 +328,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     async def reboot_peer_and_close_connection(self, *vargs):
         if self.fsm.context.id in boot_notification_cache:
             del boot_notification_cache[self.fsm.context.id]
+        if self.fsm.context.id in status_notification_cache:
+            del status_notification_cache[self.fsm.context.id]
         await self.call_payload(call.Reset(type=ResetEnumType.immediate))
         await self.close_connection(*vargs)
 
