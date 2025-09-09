@@ -4,6 +4,8 @@ from _typing import TypeVar, Generic
 from logging import getLogger
 from typing import Callable, Iterator
 
+from nicegui import ElementFilter
+
 ET = TypeVar("ET")
 
 
@@ -89,3 +91,10 @@ def if_valid(checked_inputs):
     for inp in checked_inputs:
         valid = valid and inp.validate()
     return valid
+
+
+async def broadcast_to(app, op, page, **filters):
+    for client in app.clients(page):
+        with client:
+            for old in ElementFilter(**filters):
+                op(old)

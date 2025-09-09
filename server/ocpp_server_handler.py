@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from _pydatetime import datetime, timedelta
+from logging import getLogger
 
 from beartype import beartype
 from nicegui import ui
@@ -12,15 +13,24 @@ from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatu
 from redis_dict import RedisDict
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
-from ocpp_server import charge_points, broadcast_to, CPCard, logger
+
 from util.db import get_default_redis
 from server.charge_point_model import get_charge_point_fsm
 from server.data import ChargePointContext, EvseStatus
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
-from util import get_time_str, any_of, time_based_id
+from util import get_time_str, any_of, time_based_id, broadcast_to
 from util.types import EVSEId, TransactionId
+
+from nicegui import ui, app, background_tasks
+from util.types import *
+from server.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
+
+from typing import Any
+
+logger = getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 redis = get_default_redis()
 session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
@@ -93,7 +103,9 @@ class OCPPServerHandler(ChargePoint):
 
 
     async def ui_effects_on_connected(self):
-        await broadcast_to(kind=CPCard,
+        from server.ui import CPCard
+        await broadcast_to(app=app,
+                           kind=CPCard,
                            marker=self.fsm.context.id,
                            op=lambda x: x.delete(),
                            page="/")
@@ -102,7 +114,8 @@ class OCPPServerHandler(ChargePoint):
             with grid:
                 CPCard(self.fsm).mark(self.fsm.context.id)
 
-        await broadcast_to(kind=ui.row,
+        await broadcast_to(app=app,
+                           kind=ui.row,
                            marker="cp_card_container",
                            op=add_card,
                            page="/")
@@ -161,6 +174,7 @@ class OCPPServerHandler(ChargePoint):
 
     @on(Action.status_notification)
     async def on_status_notification(self, **data):
+        from server.ui import CPCard
         self.log_event(("status_notification", (data)))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {data=}")
         conn_status = EvseStatus(**data)
@@ -189,7 +203,10 @@ class OCPPServerHandler(ChargePoint):
             if conn_status.evse_id not in self.fsm.context.transaction_fsms:
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse = conn_status
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
-                await broadcast_to(lambda x: x.on_new_evse(conn_status.evse_id), "/", kind=CPCard, marker=self.fsm.context.id)
+                await broadcast_to(app=app,
+                                   op=lambda x: x.on_new_evse(conn_status.evse_id),
+                                   page="/",
+                                   kind=CPCard, marker=self.fsm.context.id)
             else:
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse.connector_status = conn_status.connector_status
         return call_result.StatusNotification(
@@ -334,3 +351,8 @@ class OCPPServerHandler(ChargePoint):
         self.clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_update)
+
+
+charge_points : dict[ChargePointId, OCPPServerHandler] = dict()
+ui_pages : dict[ChargePointId, UIManagerFSMType] = dict()
+charge_point_cards : dict[ChargePointId, Any] = dict()
