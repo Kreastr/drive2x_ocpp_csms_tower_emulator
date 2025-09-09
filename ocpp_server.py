@@ -105,6 +105,23 @@ async def main():
 async def cp_list():
     return {"charge_points": list(charge_points)}
 
+
+@app.get("/cp/{cp_id}/set/{component}/{variable}/{value}")
+async def events(cp_id : str, component: str, variable: str, value: str):
+    if cp_id not in charge_points:
+        return {"status": "error"}
+    
+    cp : OCPPServerHandler = charge_points[cp_id]
+
+    result: call_result.SetVariables = await cp.call_payload(
+        call.SetVariables(set_variable_data=[SetVariableDataType(
+            attribute_value=value,
+            component=ComponentType(name=component),
+            variable=VariableType(name=variable))
+        ]))
+    
+    return {"result": result, "status": "ok"}
+
 @app.get("/cp/{cp_id}/events/")
 async def events(cp_id : str):
     if cp_id not in charge_points:
