@@ -142,6 +142,12 @@ async def report_full(cp_id : str):
     else:
         return {"result": await charge_points[cp_id].request_full_report()}
 
+@app.get("/cp/{cp_id}/read_reported_variables")
+async def report_full(cp_id : str):
+    if cp_id not in charge_points:
+        return {"status": "error"}
+    else:
+        return {"result": charge_points[cp_id].fsm.context.components}
 
 @app.get("/cp/{cp_id}/setpoint/{value}")
 async def setpoint(cp_id : str, value : int):

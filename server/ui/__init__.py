@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from typing import cast, Self
 
@@ -45,7 +46,11 @@ class CPCard(Element):
             self.connector_container = ui.column()
             ui.separator()
             ui.button("UI", on_click=lambda: ui.navigate.to(f"/d2x_ui/{self.cp_context.id}"))
-            ui.button("REPORT", on_click=cp.request_full_report)
+            async def request_and_open_report():
+                await cp.request_full_report()
+                await asyncio.sleep(5)
+                ui.navigate.to(f"/cp/{self.cp_context.id}/read_reported_variables")
+            ui.button("REPORT", on_click=request_and_open_report)
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
