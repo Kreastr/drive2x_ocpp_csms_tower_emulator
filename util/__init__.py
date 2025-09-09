@@ -4,9 +4,6 @@ from _typing import TypeVar, Generic
 from logging import getLogger
 from typing import Callable, Iterator
 
-from server.ui_manager import UIManagerFSMType
-from uimanager_fsm_enums import UIManagerFSMEvent
-
 ET = TypeVar("ET")
 
 
@@ -87,8 +84,8 @@ def async_l(f):
     return wrapped_async
 
 
-def dispatch(fsm : UIManagerFSMType, target : UIManagerFSMEvent, condition=None):
-    if condition is None or condition():
-        return async_l(lambda: fsm.handle(target))
-    else:
-        return None
+def if_valid(checked_inputs):
+    valid = True
+    for inp in checked_inputs:
+        valid = valid and inp.validate()
+    return valid
