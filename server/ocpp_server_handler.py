@@ -290,7 +290,7 @@ class OCPPServerHandler(ChargePoint):
             for record in report_data["report_data"]:
                 cmp = record["component"]["name"]
                 var = record["variable"]["name"]
-                self.fsm.context.components[cmp][var] = record
+                self.fsm.context.components[cmp].variables[var] = record
             self.fsm.context.report_datetime = report_data["generated_at"]
         finally:   
             return call_result.NotifyReport()
