@@ -45,7 +45,7 @@ class CPCard(Element):
             self.connector_container = ui.column()
             ui.separator()
             ui.button("UI", on_click=lambda: ui.navigate.to(f"/d2x_ui/{self.cp_context.id}"))
-            ui.button("REPORT", on_click=cp.reboot_peer_and_close_connection)
+            ui.button("REPORT", on_click=cp.request_full_report)
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
