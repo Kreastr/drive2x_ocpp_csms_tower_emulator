@@ -118,3 +118,9 @@ def session_unlock_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     ui.button(f"Unlock session", on_click=dispatch(fsm, UIManagerFSMEvent.on_session_pin_correct,
                                                    condition=pin_code_test_call))
+
+def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+    ui.label("Your session has ended. Thank you for using Drive2X!")
+    ui.label("Total energy consumed: 0.0 kWh")
+    ui.label("Total energy returned: 0.0 kWh")
+    ui.label("Total cost: 0.0 ¢ ")
