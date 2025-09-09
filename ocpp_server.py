@@ -8,7 +8,6 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
     SetVariableDataType, EVSEType
 
 from nicegui import ui, app, background_tasks
-from typing import Any
 
 from websockets import Subprotocol
 
@@ -16,14 +15,14 @@ import server.ocpp_server_handler
 from charge_point_fsm_enums import ChargePointFSMEvent
 from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points
 from server.ui import CPCard
-from server.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
+from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
     car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
 from util import setup_logging
 from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
 
-from server.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
+from server.ui.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)

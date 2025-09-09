@@ -1,4 +1,4 @@
-from server.ui_manager import UIManagerFSMType
+from server.ui.ui_manager import UIManagerFSMType
 from uimanager_fsm_enums import UIManagerFSMEvent
 from util import async_l
 

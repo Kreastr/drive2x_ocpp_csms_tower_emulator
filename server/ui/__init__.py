@@ -6,7 +6,6 @@ from nicegui import ui
 from nicegui.binding import BindableProperty, bind_from
 from nicegui.element import Element
 
-from server.ocpp_server_handler import charge_points
 from server.charge_point_model import ChargePointFSMType
 from server.data import ChargePointContext
 from util.types import EVSEId
@@ -23,6 +22,7 @@ class CPCard(Element):
         on_change=lambda sender, value: cast(Self, sender)._handle_online_change(value))
 
     def __init__(self, fsm : ChargePointFSMType, **kwargs):
+        from server.ocpp_server_handler import charge_points
         super().__init__(tag="div")
         self.fsm = fsm
         self.cp_context : ChargePointContext = fsm.context
@@ -62,6 +62,7 @@ class CPCard(Element):
         self.card.update()
 
     def on_new_evse(self, evse_id : EVSEId):
+        from server.ocpp_server_handler import charge_points
         logger.warning(f"on new connector {evse_id}")
         with self.connector_container:
             with ui.row(align_items='center'):

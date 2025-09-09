@@ -4,7 +4,6 @@ from _pydatetime import datetime, timedelta
 from logging import getLogger
 
 from beartype import beartype
-from nicegui import ui
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, IdTokenInfoType
@@ -21,11 +20,10 @@ from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
 from util import get_time_str, any_of, time_based_id, broadcast_to
-from util.types import EVSEId, TransactionId
 
-from nicegui import ui, app, background_tasks
+from nicegui import ui, app
 from util.types import *
-from server.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
+from server.ui.ui_manager import UIManagerFSMType
 
 from typing import Any
 
