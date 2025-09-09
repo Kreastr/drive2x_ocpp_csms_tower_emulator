@@ -22,7 +22,7 @@ from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
 from util import get_time_str, any_of, time_based_id, broadcast_to
 
-from server.ui.nicegui import ui, app
+from server.ui.nicegui import gui_info
 from util.types import *
 from server.ui.ui_manager import UIManagerFSMType
 
@@ -110,7 +110,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     async def ui_effects_on_connected(self):
         from server.ui import CPCard
-        await broadcast_to(app=app,
+        await broadcast_to(app=gui_info.app,
                            kind=CPCard,
                            marker=self.fsm.context.id,
                            op=lambda x: x.delete(),
@@ -120,8 +120,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             with grid:
                 CPCard(self.fsm).mark(self.fsm.context.id)
 
-        await broadcast_to(app=app,
-                           kind=ui.row,
+        await broadcast_to(app=gui_info.app,
+                           kind=gui_info.ui.row,
                            marker="cp_card_container",
                            op=add_card,
                            page="/")
@@ -209,7 +209,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             if conn_status.evse_id not in self.fsm.context.transaction_fsms:
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse = conn_status
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
-                await broadcast_to(app=app,
+                await broadcast_to(app=gui_info.app,
                                    op=lambda x: x.on_new_evse(conn_status.evse_id),
                                    page="/",
                                    kind=CPCard, marker=self.fsm.context.id)
