@@ -30,6 +30,8 @@ from typing import Any
 
 from server.callable_interface import CallableInterface
 
+from server.ui import CPCard
+
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
