@@ -60,7 +60,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     async def call_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
-        return self.call(payload, suppress, unique_id, skip_schema_validation)
+        return await self.call(payload, suppress, unique_id, skip_schema_validation)
 
     async def set_online(self, *vargs):
         self.fsm.context.timeout = datetime.now() + timedelta(seconds=30)
