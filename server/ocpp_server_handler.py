@@ -190,13 +190,14 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.log_event(("status_notification", (status_data)))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {status_data=}")
         conn_status = EvseStatus(**status_data)
-        
+
         if self.fsm.context.id not in status_notification_cache:
             status_data = dict()
         else:
             status_data = status_notification_cache[self.fsm.context.id]
         status_data.update({conn_status.evse_id: conn_status.model_dump_json()})
-
+        status_notification_cache[self.fsm.context.id] = status_data
+        
         await self.handle_status_notification_inner(conn_status)
         return call_result.StatusNotification(
         )
