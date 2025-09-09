@@ -209,14 +209,16 @@ async def d2x_ui_landing(cp_id : ChargePointId):
 
     with ui.card().classes('fixed-center'):
         if cp_id not in charge_points:
-            ui.label(f"Charge Point with this ID is not active. Please try later.")
-            ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"))
+            with ui.row(align_items="center"):
+                ui.icon("warning", color='red').classes('text-5xl')
+                ui.label(f"Charge Point with this ID is not active. Please try later.")
+                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
         else:
             evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
 
             ui.label("Please pick an EV charging outlet to proceed.")
-            with ui.grid():
+            with ui.grid().classes("justify-center"):
                 for evse_id in evse_ids:
                     with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
                         with ui.card():
@@ -272,11 +274,15 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
 
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired"):
         if cp_id not in charge_points:
-            ui.label(f"Charge Point with this ID is not active. Please try later.")
-            ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
+            with ui.row(align_items="center"):
+                ui.icon("warning", color='red').classes('text-5xl')
+                ui.label(f"Charge Point with this ID is not active. Please try later.")
+                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
         elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
-            ui.label(f"EV charging equipment with this ID is not active. Please try later.")
-            ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
+            with ui.row(align_items="center"):
+                ui.icon("warning", color='red').classes('text-5xl')
+                ui.label(f"EV charging equipment with this ID is not active. Please try later.")
+                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
 
         else:
             fsm = UIManagerFSMType(uml=ui_manager_uml, 
@@ -296,9 +302,11 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
                 ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-        (ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
-                                                                        "rank",
-                                                                              backward=format_queue_position))
+        with ui.row(align_items="center"):
+            ui.icon("clock", color='warning').classes('text-5xl')
+            (ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
+                                                                            "rank",
+                                                                                  backward=format_queue_position))
         ui.separator()
         with ui.row().classes('items-center justify-around'):
             ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
