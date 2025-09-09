@@ -4,7 +4,4 @@ from util import async_l
 
 
 def dispatch(fsm : UIManagerFSMType, target : UIManagerFSMEvent, condition=None):
-    if condition is None or condition():
-        return async_l(lambda: fsm.handle(target))
-    else:
-        return None
+    return async_l(lambda: fsm.handle(target), condition=condition)

@@ -81,9 +81,11 @@ def any_of(*vargs):
     return False
 
 
-def async_l(f):
+def async_l(f, condition=None):
     async def wrapped_async():
-        return await f()
+        if condition is None or condition():
+            return await f()
+        return None
     return wrapped_async
 
 

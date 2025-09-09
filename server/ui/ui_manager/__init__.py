@@ -111,11 +111,12 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         #ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
 
+    
     async def set_new_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = random.randint(100000,999999)
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
-        server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
+        server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), self.get_session_remaining_duration())
 
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context

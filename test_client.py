@@ -462,7 +462,7 @@ def sha256(val : str):
 # Dummy call to generate enum modules on every run
 TxFSM(TxFSMContext(EvseModel(id=0)))
 
-ui.run(host="0.0.0.0", port=7500, favicon="🚘")
+ui.run(host="0.0.0.0", port=7500, favicon="static/cropped-Favicon-1-192x192.png")
 @ui.page("/")
 async def login():
     ui.page_title(f'Drive2X Charge Point Emulator Login')

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 
 import websockets
@@ -9,6 +10,7 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
 
 from nicegui import ui, app, background_tasks
 from server.ui.nicegui import gui_info
+
 
 gui_info._app = app
 gui_info._ui = ui
@@ -110,7 +112,7 @@ async def cp_list():
 async def events(cp_id : str, component: str, variable: str, value: str):
     if cp_id not in charge_points:
         return {"status": "error"}
-    
+
     cp : OCPPServerHandler = charge_points[cp_id]
 
     result: call_result.SetVariables = await cp.call_payload(
@@ -119,7 +121,7 @@ async def events(cp_id : str, component: str, variable: str, value: str):
             component=ComponentType(name=component),
             variable=VariableType(name=variable))
         ]))
-    
+
     return {"result": result, "status": "ok"}
 
 @app.get("/cp/{cp_id}/events/")
@@ -203,6 +205,8 @@ async def index():
 async def d2x_ui_landing(cp_id : ChargePointId):
     ui.page_title(f'Drive2X UI - {cp_id}')
 
+    await standard_header_footer(cp_id)
+
     with ui.card().classes('fixed-center'):
         if cp_id not in charge_points:
             ui.label(f"Charge Point with this ID is not active. Please try later.")
@@ -211,12 +215,31 @@ async def d2x_ui_landing(cp_id : ChargePointId):
         else:
             evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
 
-            ui.label(cp_id)
+            ui.label("Please pick an EV charging outlet to proceed.")
             with ui.grid():
                 for evse_id in evse_ids:
-                    with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}"):
+                    with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
                         with ui.card():
-                            ui.label(evse_id)
+                            with ui.row(align_items="center"):
+                                ui.icon('outlet', color='primary').classes('text-5xl')
+                                ui.label(evse_id).classes('text-5xl')
+
+
+async def standard_header_footer(cp_id):
+    with ui.header(elevated=True).classes('items-center justify-between'):
+        ui.label()
+        timenow()
+        ui.timer(1, timenow.refresh)
+    with (ui.footer(elevated=True).classes('items-center justify-between')):
+        ui.label(f"Charging station serial number: {cp_id}.")
+        ui.label("Operator: Drive2X.")
+        ui.label("Contact details: support@drive2x.eu +358 XXX YYY ZZZ")
+
+
+@ui.refreshable
+def timenow():
+    tnow = datetime.datetime.now()
+    ui.label(f"Current time: {tnow.date()} {tnow.time().replace(microsecond=0)}")
 
 
 STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
@@ -232,9 +255,9 @@ STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
 
 @ui.refreshable
 def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
-    ui.label(fsm.current_state)
-    ui.label(cp_id)
-    ui.label(evse_id)
+    #ui.label(fsm.current_state)
+    #ui.label(cp_id)
+    #ui.label(evse_id)
     if fsm.current_state in STATE_SCREEN_MAP:
         STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp)
 
@@ -242,6 +265,7 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
+    await standard_header_footer(cp_id)
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
 
@@ -259,20 +283,24 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
                                                             tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[evse_id],
                                                             evse=charge_points[cp_id].fsm.context.transaction_fsms[evse_id].context.evse), se_factory=UIManagerFSMState)
 
-            server.ocpp_server_handler.session_pins = session_pins
+            fsm.context.session_pins = session_pins
             fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
             fsm.load_from_redis()
             cp = charge_points[cp_id]
             state_dependent_frame(cp_id, evse_id, fsm, cp)
             fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
             ui.timer(1, fsm.loop)
-            ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
+            ui.separator()
+            with ui.row().classes('items-center justify-around'):
+                ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
         (ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
                                                                         "rank",
                                                                               backward=format_queue_position))
-        ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
+        ui.separator()
+        with ui.row().classes('items-center justify-around'):
+            ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
     ui.timer(1, lambda : semaphore.acquire())
 
 def format_queue_position(rank):
@@ -281,4 +309,4 @@ def format_queue_position(rank):
             f"Your place in the queue is {rank+1}")
 
 
-ui.run(host="0.0.0.0", port=8000, favicon="🚘", language="en-GB")
+ui.run(host="0.0.0.0", port=8000, favicon="static/cropped-Favicon-1-192x192.png", language="en-GB")
