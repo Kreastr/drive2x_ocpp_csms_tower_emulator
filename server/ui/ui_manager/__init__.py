@@ -1,7 +1,6 @@
 import random
 from typing import TYPE_CHECKING
 
-from ocpp.v201 import ChargePoint
 
 import server.ocpp_server_handler
 from atfsm.atfsm import AFSM
@@ -11,6 +10,8 @@ import snoop
 from dateutil.parser import parse as dtparse
 from datetime import datetime
 import math
+
+from server.callable_interface import CallableInterface
 
 ui_manager_uml="""@startuml
 [*] --> EVSEPage
@@ -96,20 +97,20 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         if TYPE_CHECKING:
             from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
-        cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
+        cp : OCPPServerHandler | CallableInterface = ctxt.charge_point
         if isinstance(cp, OCPPServerHandler):
             cp.do_remote_stop(evse_id=ctxt.evse.evse_id)
-            
+
     async def trigger_remote_start(self, *vargs, **kwargs):
         from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
-        cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
+        cp : OCPPServerHandler | CallableInterface = ctxt.charge_point
         if isinstance(cp, OCPPServerHandler):
             cp.do_remote_start(evse_id=ctxt.evse.evse_id)
         #ctxt.session_pin = random.randint(100000,999999)
         #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         #ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
-        
+
     async def set_new_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = random.randint(100000,999999)

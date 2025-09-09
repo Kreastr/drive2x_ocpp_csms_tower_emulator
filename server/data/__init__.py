@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from ocpp.v201 import ChargePoint
+from server.callable_interface import CallableInterface
 from pydantic import BaseModel, Field
 
 from server.data.evse_status import EvseStatus
@@ -40,7 +40,7 @@ class ChargePointContext:
 @dataclass()
 class UIManagerContext:
     cp_evse_id : str = ""
-    charge_point : ChargePoint | None = None
+    charge_point : CallableInterface | None = None
     evse : EvseStatus | None = None
     tx_fsm : TxManagerFSMType | None = None
     session_pin : int = -1

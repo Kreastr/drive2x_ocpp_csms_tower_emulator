@@ -12,6 +12,7 @@ from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatu
 from redis_dict import RedisDict
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
+from test_client import log_async_call
 
 from util.db import get_default_redis
 from server.charge_point_model import get_charge_point_fsm
@@ -27,6 +28,8 @@ from server.ui.ui_manager import UIManagerFSMType
 
 from typing import Any
 
+from server.callable_interface import CallableInterface
+
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -36,7 +39,7 @@ boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redi
 
 
 @beartype
-class OCPPServerHandler(ChargePoint):
+class OCPPServerHandler(CallableInterface, ChargePoint):
 
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
@@ -54,7 +57,11 @@ class OCPPServerHandler(ChargePoint):
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
 
-
+    @log_async_call(logger.warning)
+    async def call_payload(
+        self, payload, suppress=True, unique_id=None, skip_schema_validation=False
+    ):
+        return self.call(payload, suppress, unique_id, skip_schema_validation)
 
     async def set_online(self, *vargs):
         self.fsm.context.timeout = datetime.now() + timedelta(seconds=30)
@@ -78,7 +85,7 @@ class OCPPServerHandler(ChargePoint):
 
         self.fsm.context.connection_task = asyncio.create_task(self.start())
 
-        result: call_result.GetVariables | None = await self.call(
+        result: call_result.GetVariables | None = await self.call_payload(
             call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                    variable=VariableType(name="SerialNumber"))]))
         if result is None:
@@ -300,7 +307,7 @@ class OCPPServerHandler(ChargePoint):
         
         
     async def request_full_report(self, *vargs):
-        result = await self.call(
+        result = await self.call_payload(
             call.GetBaseReport(request_id=time_based_id(),
                                report_base=ReportBaseEnumType.full_inventory))
         logging.warning(f"request_full_report {result=}")
@@ -308,7 +315,7 @@ class OCPPServerHandler(ChargePoint):
     async def reboot_peer_and_close_connection(self, *vargs):
         if self.fsm.context.id in boot_notification_cache:
             del boot_notification_cache[self.fsm.context.id]
-        await self.call(call.Reset(type=ResetEnumType.immediate))
+        await self.call_payload(call.Reset(type=ResetEnumType.immediate))
         await self.close_connection(*vargs)
 
 

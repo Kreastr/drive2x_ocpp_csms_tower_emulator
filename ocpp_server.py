@@ -23,6 +23,7 @@ from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
 
 from server.ui.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
+from server.callable_interface import CallableInterface
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
@@ -61,8 +62,8 @@ async def get_remote_ip(cp, websocket):
     cp.fsm.context.remote_ip = real_ip
 
 
-async def set_measurement_variables(cp):
-    result: call_result.SetVariables = await cp.call(
+async def set_measurement_variables(cp : CallableInterface):
+    result: call_result.SetVariables = await cp.call_payload(
         call.SetVariables(set_variable_data=[SetVariableDataType(
             attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
             component=ComponentType(name="AlignedDataCtrlr"),
@@ -158,7 +159,7 @@ async def setpoint(cp_id : str, value : int):
             value = 4000
         if value < -2000:
             value = -2000
-        return {"result": await charge_points[cp_id].call(
+        return {"result": await charge_points[cp_id].call_payload(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
                                                                      component=ComponentType(name="V2XChargingCtrlr", instance="1", evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}

@@ -53,7 +53,7 @@ class TxFSMS(TxManagerFSMType):
         self.context: TxManagerContext
         setpoint = int(self.context.evse.setpoint)
         if self.context.cp_interface is not None:
-            result = await self.context.cp_interface.call(
+            result = await self.context.cp_interface.call_payload(
                 call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(setpoint),
                                                                          component=ComponentType(
                                                                              name="V2XChargingCtrlr", instance="1",
@@ -76,7 +76,7 @@ class TxFSMS(TxManagerFSMType):
 
             stop_request = call.RequestStopTransaction(transaction_id=self.context.tx_id)
             
-            result = await self.context.cp_interface.call(
+            result = await self.context.cp_interface.call_payload(
                 stop_request)
             logger.warning(f"send_deauth_to_cp {stop_request=} {result=}")
             if result.status == "Accepted":
@@ -88,7 +88,7 @@ class TxFSMS(TxManagerFSMType):
     async def send_auth_to_cp(self, *vargs):
         self.context : TxManagerContext
         if self.context.cp_interface is not None:
-            result = await self.context.cp_interface.call(
+            result = await self.context.cp_interface.call_payload(
                 call.RequestStartTransaction(evse_id=self.context.evse.evse_id,
                                              remote_start_id=time_based_id(),
                                              id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
