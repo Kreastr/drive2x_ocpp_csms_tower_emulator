@@ -2,15 +2,11 @@ import asyncio
 import hashlib
 import json
 import traceback
-from itertools import starmap
 import logging
 import ssl
 import sys
-from cgi import maxlen
-from collections import deque
 from copy import deepcopy
 from datetime import datetime
-from functools import wraps
 from uuid import uuid4
 
 import certifi
@@ -26,7 +22,7 @@ from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, Compon
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
-from nicegui import ui, app, background_tasks, ElementFilter
+from nicegui import ui, background_tasks
 from ocpp.v201 import enums
 
 from itertools import count
@@ -40,7 +36,7 @@ from redis import Redis
 from client.data import EvseModel, TxFSMContext
 from client.transaction_model import TxFSMType, transaction_uml
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
-from util import ResettableValue, ResettableIterator, get_time_str, setup_logging
+from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call
 
 from redis_dict import RedisDict
 
@@ -143,20 +139,6 @@ class TxFSM(TxFSMType):
                                               id_token=self.context.auth_status,
                                               evse=EVSEType(id=self.context.evse.id)
                                               ))
-
-def log_async_call(log_sink):
-
-    def log_call_inner(f):
-
-        @wraps(f)
-        async def wrapped_function(*vargs, **kwargs):
-            log_sink(f"Called {f.__name__} with {vargs} {kwargs}")
-            return await f(*vargs, **kwargs)
-
-        wrapped_function.__name__ = f.__name__
-        return wrapped_function
-
-    return log_call_inner
 
 
 @beartype

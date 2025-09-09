@@ -12,7 +12,6 @@ from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatu
 from redis_dict import RedisDict
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
-from test_client import log_async_call
 
 from util.db import get_default_redis
 from server.charge_point_model import get_charge_point_fsm
@@ -20,7 +19,7 @@ from server.data import ChargePointContext, EvseStatus
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
-from util import get_time_str, any_of, time_based_id, broadcast_to
+from util import get_time_str, any_of, time_based_id, broadcast_to, log_async_call
 
 from server.ui.nicegui import gui_info
 from util.types import *

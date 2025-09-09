@@ -1,6 +1,7 @@
 import logging
 from _pydatetime import datetime
 from _typing import TypeVar, Generic
+from functools import wraps
 from logging import getLogger
 from typing import Callable, Iterator
 
@@ -98,3 +99,18 @@ async def broadcast_to(app, op, page, **filters):
         with client:
             for old in ElementFilter(**filters):
                 op(old)
+
+
+def log_async_call(log_sink):
+
+    def log_call_inner(f):
+
+        @wraps(f)
+        async def wrapped_function(*vargs, **kwargs):
+            log_sink(f"Called {f.__name__} with {vargs} {kwargs}")
+            return await f(*vargs, **kwargs)
+
+        wrapped_function.__name__ = f.__name__
+        return wrapped_function
+
+    return log_call_inner
