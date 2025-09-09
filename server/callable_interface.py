@@ -1,7 +1,7 @@
-from abc import abstractmethod, ABCMeta
+from abc import abstractmethod, ABC
 
 
-class CallableInterface(ABCMeta):
+class CallableInterface(ABC):
     
     @abstractmethod
     async def call_payload(
