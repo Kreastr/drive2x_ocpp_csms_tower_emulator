@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from ocpp.v201 import ChargePoint
 
+import server.ocpp_server_handler
 from atfsm.atfsm import AFSM
 from server.data import UIManagerContext
 
@@ -93,14 +94,14 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
 
     async def trigger_remote_stop(self, *vargs, **kwargs):
         if TYPE_CHECKING:
-            from ocpp_server import OCPPServerHandler
+            from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
         cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
         if isinstance(cp, OCPPServerHandler):
             cp.do_remote_stop(evse_id=ctxt.evse.evse_id)
             
     async def trigger_remote_start(self, *vargs, **kwargs):
-        from ocpp_server import OCPPServerHandler
+        from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
         cp : OCPPServerHandler | ChargePoint = ctxt.charge_point
         if isinstance(cp, OCPPServerHandler):
@@ -113,11 +114,11 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = random.randint(100000,999999)
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
-        ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
+        server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
 
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
-        ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
+        server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
         ctxt.session_pin = -1
 
     def if_session_is_active(self, *vargs):

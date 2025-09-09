@@ -4,7 +4,7 @@ from lorem_text import lorem
 from nicegui import ui
 from snoop import snoop
 
-from ocpp_server import OCPPServerHandler
+from server.ocpp_server_handler import OCPPServerHandler
 from server.ui_manager import UIManagerFSMType
 from uimanager_fsm_enums import UIManagerFSMEvent
 from util import async_l, if_valid
