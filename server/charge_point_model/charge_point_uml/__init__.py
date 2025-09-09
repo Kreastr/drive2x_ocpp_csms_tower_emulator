@@ -11,6 +11,7 @@ Identified --> Booted : on cached boot notification
 Identified --> Failed : on boot timeout
 Failed --> [*]
 Booted --> RunningTransaction : on transaction_manager request
+Booted --> Identified : on boot notification
 RunningTransaction --> RunningTransaction
 RunningTransaction --> Booted : if no active transactions
 Booted --> Closing : on reboot confirmed

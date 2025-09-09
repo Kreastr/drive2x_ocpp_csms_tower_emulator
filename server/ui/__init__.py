@@ -33,24 +33,25 @@ class CPCard(Element):
         self._handle_online_change(self.cp_context.online)
         with self.card:
             with ui.row():
-                ui.label("ID")
+                ui.label("ID").classes("w-40")
                 ui.label().bind_text(self.cp_context, "id")
             with ui.row():
-                ui.label("Remote IP")
+                ui.label("Remote IP").classes("w-40")
                 ui.label().bind_text(self.cp_context, "remote_ip")
             with ui.row():
-                ui.label("Status")
+                ui.label("Status").classes("w-40")
                 ui.label().bind_text(self.fsm, "current_state")
-            ui.button("REBOOT", on_click=cp.reboot_peer_and_close_connection)
+            ui.button("REBOOT", on_click=cp.reboot_peer_and_close_connection).classes("w-40")
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
-            ui.button("UI", on_click=lambda: ui.navigate.to(f"/d2x_ui/{self.cp_context.id}"))
-            async def request_and_open_report():
-                await cp.request_full_report()
-                await asyncio.sleep(5)
-                ui.navigate.to(f"/cp/{self.cp_context.id}/read_reported_variables")
-            ui.button("REPORT", on_click=request_and_open_report)
+            with ui.row():
+                ui.button("UI", on_click=lambda: ui.navigate.to(f"/d2x_ui/{self.cp_context.id}")).classes("w-40")
+                async def request_and_open_report():
+                    await cp.request_full_report()
+                    await asyncio.sleep(5)
+                    ui.navigate.to(f"/cp/{self.cp_context.id}/read_reported_variables")
+                ui.button("REPORT", on_click=request_and_open_report).classes("w-40")
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)

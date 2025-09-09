@@ -169,6 +169,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         if self.fsm.current_state not in [ChargePointFSMState.unknown,
                                           ChargePointFSMState.identified]:
             #await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
+            if self.fsm.context.id in boot_notification_cache:
+                del boot_notification_cache[self.fsm.context.id]
+            await self.fsm.handle(ChargePointFSMEvent.on_boot_notification)
             return call_result.BootNotification(
                 current_time=get_time_str(),
                 interval=60,
