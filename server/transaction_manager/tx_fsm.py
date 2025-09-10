@@ -32,11 +32,8 @@ class TxFSMS(TxManagerFSMType):
 
         self.on(TxManagerFSMState.charging.on_enter, self.send_new_setpoint)
         self.on(TxManagerFSMState.discharging.on_enter, self.send_new_setpoint)
-        self.on(TxManagerFSMState.charging.on_exit, self.send_new_setpoint)
-        self.on(TxManagerFSMState.discharging.on_exit, self.send_new_setpoint)
-        self.on(TxManagerFSMState.charging.on_loop, self.send_new_setpoint)
-        self.on(TxManagerFSMState.discharging.on_loop, self.send_new_setpoint)
-
+        self.on(TxManagerFSMState.ready.on_enter, self.send_new_setpoint)
+        
     @staticmethod
     def if_charge_setpoint(context : TxManagerContext, other):
         return context.evse.setpoint > 0

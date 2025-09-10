@@ -27,6 +27,7 @@ class UIManagerFSMCondition(str, Enum):
     if_car_present='if_car_present'
     if_car_not_present='if_car_not_present'
     if_has_locking='if_has_locking'
+    if_session_ready='if_session_ready'
     if_session_fault='if_session_fault'
     if_has_no_locking='if_has_no_locking'
     if_timeout='if_timeout'
