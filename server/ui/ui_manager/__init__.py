@@ -22,6 +22,7 @@ NewSession --> EVSESelectPage : on exit
 NewSession --> GDPRAccepted : on gdpr accept
 GDPRAccepted --> EVSESelectPage : on exit
 GDPRAccepted --> UserHasBooking : on have booking
+GDPRAccepted --> EditBooking : if booking not supported
 UserHasBooking --> GDPRAccepted : on back
 UserHasBooking --> SessionConfirmed : on confirm session
 SessionConfirmed --> GDPRAccepted : on back
@@ -73,6 +74,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_locking, self.if_has_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_booking_not_supported, self.if_booking_not_supported)
 
         self.on(UIManagerFSMState.session_first_start.on_exit, self.set_new_pin)
         self.on(UIManagerFSMState.session_first_start.on_exit, self.trigger_remote_start)
@@ -137,6 +139,10 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     def if_car_not_present(self, *vargs):
         return not self.if_car_present(*vargs)
 
+    @staticmethod
+    def if_booking_not_supported(*vargs):
+        return True
+    
     @staticmethod
     def if_has_locking(*vargs):
         return False

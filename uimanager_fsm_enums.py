@@ -9,8 +9,8 @@ class UIManagerFSMState(StateBase, str, Enum):
     evseselect_page='evseselect_page'
     gdpraccepted='gdpraccepted'
     user_has_booking='user_has_booking'
-    session_confirmed='session_confirmed'
     edit_booking='edit_booking'
+    session_confirmed='session_confirmed'
     car_not_connected='car_not_connected'
     car_connected='car_connected'
     can_lock='can_lock'
@@ -23,6 +23,7 @@ class UIManagerFSMState(StateBase, str, Enum):
 class UIManagerFSMCondition(str, Enum):
     if_session_is_active='if_session_is_active'
     if_session_is_not_active='if_session_is_not_active'
+    if_booking_not_supported='if_booking_not_supported'
     if_car_present='if_car_present'
     if_car_not_present='if_car_not_present'
     if_has_locking='if_has_locking'
