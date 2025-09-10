@@ -29,6 +29,7 @@ class UIManagerFSMCondition(str, Enum):
     if_has_locking='if_has_locking'
     if_session_fault='if_session_fault'
     if_has_no_locking='if_has_no_locking'
+    if_timeout='if_timeout'
 
 
 class UIManagerFSMEvent(str, Enum):
@@ -47,3 +48,4 @@ class UIManagerFSMEvent(str, Enum):
     on_lock_and_start='on_lock_and_start'
     on_early_stop_and_unlock='on_early_stop_and_unlock'
     on_early_stop='on_early_stop'
+    on_ready_status='on_ready_status'

@@ -24,7 +24,7 @@ from charge_point_fsm_enums import ChargePointFSMEvent
 from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
-    car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen
+    car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
 from util import setup_logging
 from util.fair_semaphore_redis import FairSemaphoreRedis
@@ -254,7 +254,8 @@ STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.car_connected: car_connected_screen,
                     UIManagerFSMState.normal_session: normal_session_screen,
                     UIManagerFSMState.session_unlock: session_unlock_screen,
-                    UIManagerFSMState.session_end_summary: session_end_summary_screen
+                    UIManagerFSMState.session_end_summary: session_end_summary_screen,
+                    UIManagerFSMState.session_first_start: session_first_start_screen
                     }
 
 @ui.refreshable

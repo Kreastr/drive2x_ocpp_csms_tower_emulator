@@ -46,3 +46,4 @@ class UIManagerContext:
     session_pin : int = -1
     session_pins : RedisDict | None = None
     session_info : dict[str, Any] = field(default_factory=dict)
+    timeout_time : datetime = field(default_factory=datetime.now)

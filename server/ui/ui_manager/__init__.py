@@ -8,10 +8,16 @@ from server.data import UIManagerContext
 
 import snoop
 from dateutil.parser import parse as dtparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 
 from server.callable_interface import CallableInterface
+if TYPE_CHECKING:
+    from server.ocpp_server_handler import OCPPServerHandler
+else:
+    OCPPServerHandler = object
+from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
+from tx_fsm_enums import TxFSMState
 
 ui_manager_uml="""@startuml
 [*] --> EVSEPage
@@ -47,7 +53,8 @@ Unlocking --> NormalSession : if has no locking
 CarLockedSession --> SessionEndSummary : on early stop and unlock
 CarLockedSession --> SessionEndSummary : if session fault
 CarConnected --> SessionFirstStart : on start
-SessionFirstStart --> NormalSession
+SessionFirstStart --> CarConnected : if timeout
+SessionFirstStart --> NormalSession : on ready status
 NormalSession --> EVSESelectPage : on exit
 NormalSession --> SessionEndSummary : on early stop
 NormalSession --> SessionEndSummary : if session fault
@@ -74,12 +81,30 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_locking, self.if_has_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_timeout, self.if_timeout)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_booking_not_supported, self.if_booking_not_supported)
 
-        self.on(UIManagerFSMState.session_first_start.on_exit, self.set_new_pin)
-        self.on(UIManagerFSMState.session_first_start.on_exit, self.trigger_remote_start)
+        self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
+        self.on(UIManagerFSMState.session_first_start.on_enter, self.trigger_remote_start)
         self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
         self.on(UIManagerFSMState.normal_session.on_exit, self.trigger_remote_stop)
+        
+        self.tx_fsm.on(TxFSMState.transaction.on_enter, self.on_start_transaction) 
+        
+    async def on_start_transaction(self):
+        self.handle(UIManagerFSMEvent.on_ready_status)
+        
+    @property
+    def tx_fsm(self) -> TxManagerFSMType:
+        return self.context.tx_fsm
+        
+    @property 
+    def charge_point(self) -> OCPPServerHandler:
+        cp : OCPPServerHandler | CallableInterface = self.context.charge_point
+        if isinstance(cp, OCPPServerHandler):
+            return cp
+        raise f"Failed to check type of charge point interface. Expected OCPPServerHandler got {type(cp)}"
+        
 
     @snoop
     def load_from_redis(self):
@@ -99,16 +124,13 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         if TYPE_CHECKING:
             from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
-        cp : OCPPServerHandler | CallableInterface = ctxt.charge_point
-        if isinstance(cp, OCPPServerHandler):
-            cp.do_remote_stop(evse_id=ctxt.evse.evse_id)
+        self.charge_point.do_remote_stop(evse_id=ctxt.evse.evse_id)
 
     async def trigger_remote_start(self, *vargs, **kwargs):
         from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
-        cp : OCPPServerHandler | CallableInterface = ctxt.charge_point
-        if isinstance(cp, OCPPServerHandler):
-            cp.do_remote_start(evse_id=ctxt.evse.evse_id)
+        self.charge_point.do_remote_start(evse_id=ctxt.evse.evse_id)
+        self.context.timeout_time = datetime.now() + timedelta(seconds=15)
         #ctxt.session_pin = random.randint(100000,999999)
         #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         #ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
@@ -150,6 +172,9 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     def if_has_no_locking(self, *vargs):
         return not self.if_has_locking(*vargs)
 
+    def if_timeout(self, *vargs):
+        return self.context.timeout_time < datetime.now()
+    
     @staticmethod
     def if_session_fault(*vargs):
         return False

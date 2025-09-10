@@ -124,3 +124,6 @@ def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIMan
     ui.label("Total energy consumed: 0.0 kWh")
     ui.label("Total energy returned: 0.0 kWh")
     ui.label("Total cost: 0.0 ¢ ")
+
+def session_first_start_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+    ui.label("Session is starting. Please wait.")

@@ -237,8 +237,8 @@ class OCPPClient(ChargePoint):
                 if prev_status != evse.cable_connected:
                     await self.post_status_notification(evse)
                     prev_status = evse.cable_connected
-                logger.warning(f"{evse}")
-                logger.warning(f'{self.settings["V2XChargingCtrlr"]["Setpoint"]} {fsm.current_state} {evse.cable_connected}')
+                #logger.warning(f"{evse}")
+                #logger.warning(f'{self.settings["V2XChargingCtrlr"]["Setpoint"]} {fsm.current_state} {evse.cable_connected}')
 
                 if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
                     prev_wh = evse.soc_wh
@@ -453,7 +453,7 @@ async def main(serial_number = None):
 
 @ui.page("/charge_point_panel/{serial}")
 async def charge_point(serial : str):
-    ui.page_title(f'Drive2X Charge Point Emulator ID {serial}')
+    ui.page_title(f'DriVe2X Charge Point Emulator ID {serial}')
     background_tasks.create_lazy(main(serial), name=f"main_{serial}")
 
     with ui.grid(columns=1).classes('fixed-center background'):
@@ -519,7 +519,7 @@ TxFSM(TxFSMContext(EvseModel(id=0)))
 ui.run(host="0.0.0.0", port=7500, favicon="static/cropped-Favicon-1-192x192.png")
 @ui.page("/")
 async def login():
-    ui.page_title(f'Drive2X Charge Point Emulator Login')
+    ui.page_title(f'DriVe2X Charge Point Emulator Login')
     with ui.card().classes('fixed-center background'):
         with ui.column(align_items="center"):
             lgn = ui.input(label="Username", placeholder="Type your username here")
