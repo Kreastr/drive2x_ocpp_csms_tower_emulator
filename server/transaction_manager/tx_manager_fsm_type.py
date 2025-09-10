@@ -11,7 +11,8 @@ Available --> Authorizing : on authorized
 Authorizing --> Authorized : on authorize accept
 Authorizing --> Unknown : on authorize reject
 Occupied --> Occupied : on authorized
-Occupied --> Ready : on start tx event
+Occupied --> Ready : on authorize accept
+Occupied --> Ready : on tx update event
 Authorized --> Ready : on start tx event
 Authorized --> Unknown : on deauthorized
 Ready --> Charging : if charge setpoint
@@ -25,6 +26,9 @@ Discharging --> Ready : if idle setpoint
 Charging --> Terminating : on deauthorized
 Discharging --> Terminating : on deauthorized
 Ready --> Terminating : on deauthorized
+Charging --> Unknown : on end tx event
+Discharging --> Unknown : on end tx event
+Ready --> Unknown : on end tx event
 Terminating --> Fault : on termination fault
 Fault --> Unknown : on clear fault
 Terminating --> Unknown : on end tx event

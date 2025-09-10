@@ -294,7 +294,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
         if event_type == "Updated" and tx_fsm.current_state in [TxManagerFSMState.occupied]:
-            await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+            await tx_fsm.handle(TxManagerFSMEvent.on_tx_update_event)
 
         if event_type == "Ended" and tx_fsm.context.tx_id is not None:
             await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)

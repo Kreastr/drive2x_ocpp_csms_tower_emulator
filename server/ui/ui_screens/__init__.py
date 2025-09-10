@@ -21,15 +21,15 @@ def gdpraccepted_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManager
 
 
 def new_session_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
-    
-    ui.label("Welcome to the Drive2X Project demo. ")
-    ui.label("Here is how we process your data. ")
-    with ui.scroll_area().classes('w-800 h-400 border'):
-        ui.label(lorem.paragraphs(5).split("\n"))
-    with ui.row():
+
+    with ui.column(align_items="stretch"):
+        ui.label("Welcome to the Drive2X Project demo. ")
+        ui.label("Here is how we process your data. ")
+        with ui.scroll_area().classes('w-800 h-400 border'):
+            ui.label(lorem.paragraphs(5).split("\n"))
         ui.button("Yes, I have read the policies and consent to handling of my data",
                   on_click=dispatch(fsm, UIManagerFSMEvent.on_gdpr_accept))
-        ui.button("No, do not consent and cannot use this service.",
+        ui.button("No, I do not consent and cannot use this service.",
                   on_click=dispatch(fsm, UIManagerFSMEvent.on_exit))
 
 

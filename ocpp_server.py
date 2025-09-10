@@ -206,6 +206,7 @@ async def d2x_ui_landing(cp_id : ChargePointId):
     ui.page_title(f'Drive2X UI - {cp_id}')
 
     await standard_header_footer(cp_id)
+    await styling()
 
     with ui.card().classes('fixed-center'):
         if cp_id not in charge_points:
@@ -224,15 +225,15 @@ async def d2x_ui_landing(cp_id : ChargePointId):
                         with ui.card():
                             with ui.row(align_items="center"):
                                 ui.icon('outlet', color='primary').classes('text-5xl')
-                                ui.label(evse_id).classes('text-5xl')
+                                ui.label(f"Proceed with socket {evse_id}").classes('text-5xl text-primary')
 
 
 async def standard_header_footer(cp_id):
-    with ui.header(elevated=True).classes('items-center justify-between'):
-        ui.label()
+    with ui.header(elevated=True).style('background-color: white').classes('items-center justify-between'):
+        ui.image(source="static/d2x_logo_1.svg").classes("w-40")
         timenow()
         ui.timer(1, timenow.refresh)
-    with (ui.footer(elevated=True).classes('items-center justify-between')):
+    with (ui.footer(elevated=True).style('background-color: brand').classes('items-center justify-between')):
         ui.label(f"Charging station serial number: {cp_id}.")
         ui.label("Operator: Drive2X.")
         ui.label("Contact details: support@drive2x.eu +358 XXX YYY ZZZ")
@@ -241,7 +242,7 @@ async def standard_header_footer(cp_id):
 @ui.refreshable
 def timenow():
     tnow = datetime.datetime.now()
-    ui.label(f"Current time: {tnow.date()} {tnow.time().replace(microsecond=0)}")
+    ui.label(f"Current time: {tnow.date()} {tnow.time().replace(microsecond=0)}").style("color: black;")
 
 
 STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
@@ -269,9 +270,9 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
     await standard_header_footer(cp_id)
+    await styling()
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
-
     with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired"):
         if cp_id not in charge_points:
             with ui.row(align_items="center"):
@@ -311,6 +312,12 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
         with ui.row().classes('items-center justify-around'):
             ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
     ui.timer(1, lambda : semaphore.acquire())
+
+
+async def styling():
+    ui.colors(brand="#2FAC66", primary="#2FAC66", dark="#3b4a3f", secondary="#00afc1", accent="#00afc1", info="#00798b", positive="#9eb0a2")
+    ui.query("body").style("background-color: #d4fade;")
+
 
 def format_queue_position(rank):
     return (f"This resource is busy. "

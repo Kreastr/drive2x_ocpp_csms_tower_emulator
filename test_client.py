@@ -254,7 +254,7 @@ class OCPPClient(ChargePoint):
                     elif change < 0:
                         evse.metered_power_discharge -= change
 
-                else:
+                if not evse.cable_connected:
                     if evse.soc_wh > 2:
                         evse.soc_wh -= 5000/3600
                         evse.km_driven += 25/3600
