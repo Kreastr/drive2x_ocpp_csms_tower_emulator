@@ -318,10 +318,10 @@ class OCPPClient(ChargePoint):
         ctxt = self.task_contexts[evse_id]
         ctxt.remote_start_id = remote_start_id
         fsm = self.tx_fsms[evse_id]
-        if ctxt.auth_status is not None:
-            return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected,
-                                                       transaction_id=None,
-                                                       )
+        #if ctxt.auth_status is not None:
+        #    return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected,
+        #                                               transaction_id=None,
+        #                                               )
         ctxt.auth_status = id_token
         await fsm.handle_as_deferred(TxFSMEvent.on_authorized)
         return call_result.RequestStartTransaction(status=RequestStartStopStatusEnumType.accepted,
