@@ -2,6 +2,7 @@ import asyncio
 import traceback
 from typing import cast, Self
 
+import qrcode
 from beartype import beartype
 from nicegui import ui
 from nicegui.binding import BindableProperty, bind_from
@@ -31,6 +32,17 @@ class CPCard(Element):
         self.card = ui.card()
         self.bind_online_from(self.cp_context, "online")
         self._handle_online_change(self.cp_context.online)
+        qr_dialog = None
+        try:
+            import PIL
+            with ui.dialog() as dialog, ui.card():
+                ui.label('Hello world!')
+                ui.image(qrcode.make(f"https://drive2x.lut.fi/charge_point_panel/{self.cp_context.id}")).classes('w-80')
+                ui.button('Close', on_click=dialog.close)
+                qr_dialog = dialog
+        except ImportError:
+            pass
+
         with self.card:
             with ui.row():
                 ui.label("ID").classes("w-40")
@@ -52,6 +64,7 @@ class CPCard(Element):
                     await asyncio.sleep(5)
                     ui.navigate.to(f"/cp/{self.cp_context.id}/read_reported_variables")
                 ui.button("REPORT", on_click=request_and_open_report).classes("w-40")
+                ui.button('QR', on_click=qr_dialog.open if qr_dialog is not None else None)
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
