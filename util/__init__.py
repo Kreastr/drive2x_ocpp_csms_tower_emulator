@@ -1,3 +1,5 @@
+import base64
+import io
 import logging
 from _pydatetime import datetime
 from _typing import TypeVar, Generic
@@ -5,7 +7,13 @@ from functools import wraps
 from logging import getLogger
 from typing import Callable, Iterator
 
-from nicegui import ElementFilter
+import qrcode
+from nicegui import ElementFilter, ui
+
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 ET = TypeVar("ET")
 
@@ -118,3 +126,26 @@ def log_async_call(log_sink):
         return wrapped_function
 
     return log_call_inner
+
+def pil2base64(qr):
+    buf = io.BytesIO()
+    qr.save(buf, format="PNG")
+    imb = buf.getvalue()
+    logger.warning(imb)
+    img: str = base64.b64encode(imb).decode("utf-8")
+    logger.warning(img)
+    return img
+
+def qr_link(url):
+    qr_dialog = None
+    try:
+        import PIL
+        with ui.dialog() as dialog, ui.card():
+            qr = qrcode.make(url)
+            img = pil2base64(qr)
+            ui.image("data:image/png;base64," + img).classes('w-80')
+            ui.button('Close', on_click=dialog.close)
+            qr_dialog = dialog
+    except ImportError:
+        pass
+    return qr_dialog

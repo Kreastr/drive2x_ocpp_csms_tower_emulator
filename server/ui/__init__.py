@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import io
 import traceback
 from typing import cast, Self
 
@@ -10,6 +12,7 @@ from nicegui.element import Element
 
 from server.charge_point_model import ChargePointFSMType
 from server.data import ChargePointContext
+from util import qr_link
 from util.types import EVSEId
 
 import logging
@@ -17,6 +20,8 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
 
 @beartype
 class CPCard(Element):
@@ -32,28 +37,19 @@ class CPCard(Element):
         self.card = ui.card()
         self.bind_online_from(self.cp_context, "online")
         self._handle_online_change(self.cp_context.online)
-        qr_dialog = None
-        try:
-            import PIL
-            with ui.dialog() as dialog, ui.card():
-                ui.label('Hello world!')
-                ui.image(qrcode.make(f"https://drive2x.lut.fi/charge_point_panel/{self.cp_context.id}")).classes('w-80')
-                ui.button('Close', on_click=dialog.close)
-                qr_dialog = dialog
-        except ImportError:
-            pass
+        qr_dialog = qr_link(f"https://drive2x.lut.fi/d2x_ui/{self.cp_context.id}")
 
         with self.card:
-            with ui.row():
-                ui.label("ID").classes("w-40")
+            with ui.grid(columns=2):
+                ui.label("ID")
                 ui.label().bind_text(self.cp_context, "id")
-            with ui.row():
-                ui.label("Remote IP").classes("w-40")
+
+                ui.label("Remote IP")
                 ui.label().bind_text(self.cp_context, "remote_ip")
-            with ui.row():
-                ui.label("Status").classes("w-40")
+
+                ui.label("Status")
                 ui.label().bind_text(self.fsm, "current_state")
-            ui.button("REBOOT", on_click=cp.reboot_peer_and_close_connection).classes("w-40")
+            ui.button("REBOOT", icon="refresh" ,on_click=cp.reboot_peer_and_close_connection).classes("w-40")
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()
@@ -64,10 +60,12 @@ class CPCard(Element):
                     await asyncio.sleep(5)
                     ui.navigate.to(f"/cp/{self.cp_context.id}/read_reported_variables")
                 ui.button("REPORT", on_click=request_and_open_report).classes("w-40")
-                ui.button('QR', on_click=qr_dialog.open if qr_dialog is not None else None)
+                ui.button(text="UI", icon="qr_code", on_click=qr_dialog.open if qr_dialog is not None else None)
 
         for connid in self.cp_context.transaction_fsms:
             self.on_new_evse(connid)
+
+
 
 
     def bind_online_from(self, var, name):
@@ -99,9 +97,9 @@ class CPCard(Element):
                         except:
                             logger.error(traceback.format_exc())
                     return executable
-                ui.button("Start", on_click=exec_async(evse_id, cp.do_remote_start))
-                ui.button("Stop", on_click=exec_async(evse_id, cp.do_remote_stop))
-                ui.button("Clear", on_click=exec_async(evse_id, cp.do_clear_fault))
+                ui.button("Start", icon="bolt", on_click=exec_async(evse_id, cp.do_remote_start))
+                ui.button("Stop", icon="do_not_disturb_on", on_click=exec_async(evse_id, cp.do_remote_stop))
+                ui.button("Clear", icon="build",  on_click=exec_async(evse_id, cp.do_clear_fault))
                 ui.button("+", on_click=exec_async(evse_id, cp.do_increase_setpoint))
                 ui.label("0").bind_text_from(self.fsm.context.transaction_fsms[evse_id].context.evse, "setpoint", backward=str)
                 ui.button("-", on_click=exec_async(evse_id, cp.do_decrease_setpoint))
