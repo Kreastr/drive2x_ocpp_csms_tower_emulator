@@ -9,5 +9,5 @@ COPY . /app
 
 WORKDIR /app
 
-CMD python test_client.py ws://ocpp:9000/ocpp
+CMD python test_client.py ws://ocpp:9000/ocpp redis 6379 5
 
