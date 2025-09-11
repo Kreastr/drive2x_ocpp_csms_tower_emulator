@@ -17,4 +17,4 @@ snoop~=0.6.0
 lorem-text==3.0
 python-dateutil~=2.9.0
 qrcode[pil]==8.2
-pilow==11.3.0
+pillow==11.3.0
