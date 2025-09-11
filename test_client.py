@@ -456,7 +456,7 @@ async def charge_point(serial : str):
     ui.page_title(f'DriVe2X Charge Point Emulator ID {serial}')
     background_tasks.create_lazy(main(serial), name=f"main_{serial}")
 
-    with ui.grid(columns=1).classes('fixed-center background'):
+    with ui.grid(columns=1).classes('fixed-center background').style("min-width: 20rem;"):
         await cp_control_panel(serial)
         await leaderboard()
 
@@ -465,15 +465,16 @@ async def charge_point(serial : str):
 
 async def cp_control_panel(serial):
     with (ui.card(align_items="center")):
-        ui.label(f"Charge point {serial}").classes('text-h5')
+        ui.label(f"Charge point {serial}").classes('text-bold')
         ui.label("Power plug status")
-        clmn = ui.column().mark(f"power_plug_container")
+        clmn = ui.column(align_items="stretch").mark(f"power_plug_container")
         while serial not in charge_point_objects:
             await asyncio.sleep(1)
         cp = charge_point_objects[serial]
         with clmn:
             for cid in cp.task_contexts:
                 await evse_row(cid, cp, debug=serial.startswith("CP_"))
+                ui.separator()
         with ui.link(target=f"https://drive2x.lut.fi/d2x_ui/{serial}", new_tab=True):
             ui.icon("qr_code").classes('text-h5')
 
@@ -485,8 +486,8 @@ def get_score(cp : OCPPClient):
 
 @ui.refreshable
 async def leaderboard():
-    with ui.card(align_items="center"):
-        ui.label(f"Leaderboard").classes('text-h5')
+    with (ui.card(align_items="center")):
+        ui.label(f"Leaderboard").classes('text-bold')
         stat = []
         for serial in charge_point_objects:
             cp = charge_point_objects[serial]
@@ -495,18 +496,22 @@ async def leaderboard():
         stat.sort(key=lambda x: -x[1])
         with ui.column():
             for i, (serial, score) in enumerate(stat[:5]):
-                ui.label(f"{i+1}. Charge Point ending with {serial[-6:]} ({score:0.1f} km driven)")
+                with ui.row():
+                    ui.label(f"{i+1}. Charge Point ending with {serial[-6:]}")
+                    ui.label(f"({score:0.1f} km driven)")
 
 
 async def evse_row(cid : EVSEId, cp : OCPPClient, debug=False):
-    with ui.row(align_items="center"):
-        tgl = ui.toggle({True: "CONNECT", False: "DISCONNECT"}).mark(f"plug_tgl_{cid}")
-        tgl.bind_value(cp.task_contexts[cid].evse, "cable_connected")
-        if debug:
-            ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
-        ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "soc_wh", 
-                                        backward=lambda x,c=cp.task_contexts[cid].evse: f"Charge: {(x/c.usable_capacity*100):0.2f}%")
-        ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "km_driven", backward=lambda x: f"Driven {x:0.1f} km")
+    with ui.column(align_items="center"):
+        with ui.row(align_items="center"):
+            tgl = ui.toggle({True: "CONNECT", False: "DISCONNECT"}).mark(f"plug_tgl_{cid}")
+            tgl.bind_value(cp.task_contexts[cid].evse, "cable_connected")
+            if debug:
+                ui.label("test").bind_text_from(cp.tx_fsms[cid], "current_state", backward=str)
+            with ui.row(align_items="center"):
+                ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "soc_wh",
+                                                backward=lambda x,c=cp.task_contexts[cid].evse: f"Charge: {(x/c.usable_capacity*100):0.2f}%")
+                ui.label("test").bind_text_from(cp.task_contexts[cid].evse, "km_driven", backward=lambda x: f"Driven {x:0.1f} km")
 
 
 
@@ -520,7 +525,7 @@ ui.run(host="0.0.0.0", port=7500, favicon="static/cropped-Favicon-1-192x192.png"
 @ui.page("/")
 async def login():
     ui.page_title(f'DriVe2X Charge Point Emulator Login')
-    with ui.card().classes('fixed-center background'):
+    with ui.card().classes('fixed-center background').style("min-width: 15rem;"):
         with ui.column(align_items="center"):
-            lgn = ui.input(label="Username", placeholder="Type your username here")
+            lgn = ui.input(label="Username", placeholder="Type your username here").style("min-width: 15rem;")
             ui.button(text="Login", on_click=lambda : navigate.to(f"/charge_point_panel/D2X_DEMO_{sha256(lgn.value)[:16].upper()}"))

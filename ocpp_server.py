@@ -208,7 +208,7 @@ async def d2x_ui_landing(cp_id : ChargePointId):
     await standard_header_footer(cp_id)
     await styling()
 
-    with ui.card().classes('fixed-center'):
+    with (ui.card().classes('fixed-center').style("min-width: 18rem;")):
         if cp_id not in charge_points:
             with ui.row(align_items="center"):
                 ui.icon("warning", color='red').classes('text-5xl')
@@ -216,16 +216,17 @@ async def d2x_ui_landing(cp_id : ChargePointId):
                 ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
         else:
-            evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
+            with ui.column(align_items="center"):
+                evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
 
-            ui.label("Please pick an EV charging outlet to proceed.")
-            with ui.grid().classes("justify-center"):
-                for evse_id in evse_ids:
-                    with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
-                        with ui.card():
-                            with ui.row(align_items="center"):
-                                ui.icon('outlet', color='primary').classes('text-5xl')
-                                ui.label(f"Proceed with socket {evse_id}").classes('text-5xl text-primary')
+                ui.label("Please pick an EV charging outlet to proceed.")
+                with ui.column(align_items="center"):
+                    for evse_id in evse_ids:
+                        with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
+                            with ui.card():
+                                with ui.row(align_items="center"):
+                                    ui.icon('outlet', color='primary').classes('text-5xl')
+                                    ui.label(f"Outlet {evse_id}").classes('text-4xl text-primary')
 
 
 async def standard_header_footer(cp_id):
@@ -274,7 +275,7 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     await styling()
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
-    with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired"):
+    with ui.card().classes('fixed-center').style("min-width: 20rem;").bind_visibility_from(semaphore, "acquired"):
         if cp_id not in charge_points:
             with ui.row(align_items="center"):
                 ui.icon("warning", color='red').classes('text-5xl')
