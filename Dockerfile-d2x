@@ -4,6 +4,10 @@ RUN  mkdir /d2xlib
 
 COPY . /d2xlib
 
+WORKDIR /d2xlib/bicharge-fork
+
+RUN pip install .
+
 WORKDIR /d2xlib
 
 RUN pip install .
