@@ -9,29 +9,46 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
     SetVariableDataType, EVSEType
 
 from nicegui import ui, app, background_tasks
-from server.ui.nicegui import gui_info
 
+from server.data.tx_manager_context import TxManagerContext
+from server.transaction_manager.tx_fsm import TxFSMServer
+from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
+from server.ui.nicegui import gui_info
+from tx_manager_fsm_enums import TxManagerFSMState
+
+from drive2x.interface_models import SCADataEVs, SCADatum, SetpointRequestResponse
 
 gui_info._app = app
 gui_info._ui = ui
 gui_info._background_tasks = background_tasks
 
+ui.add_head_html('''<script>
+function onResize() {
+  emitEvent('body_size', 
+  {w: document.body.innerWidth,
+   h: document.body.innerHeight});
+}
+window.onload = onResize;
+window.onresize = onResize;
+</script>''')
+
 
 from websockets import Subprotocol
 
-import server.ocpp_server_handler
 from charge_point_fsm_enums import ChargePointFSMEvent
 from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
     car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
-from util import setup_logging
+from util import setup_logging, get_slot_start, get_slot_duration
 from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
 
 from server.ui.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
 from server.callable_interface import CallableInterface
+
+from pydantic import BaseModel, Field
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
@@ -109,7 +126,7 @@ async def cp_list():
 
 
 @app.get("/cp/{cp_id}/set/{component}/{variable}/{value}")
-async def events(cp_id : str, component: str, variable: str, value: str):
+async def events(cp_id : ChargePointId, component: str, variable: str, value: str):
     if cp_id not in charge_points:
         return {"status": "error"}
 
@@ -125,21 +142,21 @@ async def events(cp_id : str, component: str, variable: str, value: str):
     return {"result": result, "status": "ok"}
 
 @app.get("/cp/{cp_id}/events/")
-async def events(cp_id : str):
+async def events(cp_id : ChargePointId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
         return {"events": charge_points[cp_id].events}
 
 @app.get("/cp/{cp_id}/reboot")
-async def reboot(cp_id : str):
+async def reboot(cp_id : ChargePointId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
         return {"result": await charge_points[cp_id].reboot_peer_and_close_connection()}
 
 @app.get("/cp/{cp_id}/transactions")
-async def transactions(cp_id : str):
+async def transactions(cp_id : ChargePointId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
@@ -147,7 +164,7 @@ async def transactions(cp_id : str):
 
 
 @app.get("/cp/{cp_id}/remote_start/{evse_id}")
-async def remote_start(cp_id : str, evse_id : int):
+async def remote_start(cp_id : ChargePointId, evse_id : EVSEId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
@@ -155,28 +172,28 @@ async def remote_start(cp_id : str, evse_id : int):
 
 
 @app.get("/cp/{cp_id}/remote_stop/{evse_id}")
-async def remote_stop(cp_id : str, evse_id : int):
+async def remote_stop(cp_id : ChargePointId, evse_id : EVSEId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
         return {"result": await charge_points[cp_id].do_remote_stop(evse_id)}
 
 @app.get("/cp/{cp_id}/report_full")
-async def report_full(cp_id : str):
+async def report_full(cp_id : ChargePointId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
         return {"result": await charge_points[cp_id].request_full_report()}
 
 @app.get("/cp/{cp_id}/read_reported_variables")
-async def report_full(cp_id : str):
+async def read_report(cp_id : ChargePointId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
         return {"result": charge_points[cp_id].fsm.context.components}
 
 @app.get("/cp/{cp_id}/setpoint/{value}")
-async def setpoint(cp_id : str, value : int):
+async def setpoint(cp_id : ChargePointId, value : int):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
@@ -188,6 +205,46 @@ async def setpoint(cp_id : str, value : int):
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
                                                                      component=ComponentType(name="V2XChargingCtrlr", instance="1", evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}
+
+
+@app.post("/sca_data/setpoints")
+async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse:
+    confirmed = SetpointRequestResponse()
+    for iid, value in setpoints.values.items():
+        cp_id_s, evse_id_s = iid.split(":")
+        cp_id = ChargePointId(cp_id_s)
+        evse_id = EVSEId(int(evse_id_s))
+        if cp_id in charge_points:
+            cp = charge_points[cp_id]
+            if evse_id in cp.fsm.context.transaction_fsms:
+                evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
+                evse.setpoint = value
+                cp.clamp_setpoint(evse)
+                confirmed.values[iid] = evse.setpoint
+    return confirmed
+
+@app.get("/sca_data/evs")
+async def sca_data_evs() -> SCADataEVs:
+    response = SCADataEVs()
+    for cp_id, cp in charge_points.items():
+        if cp.fsm.context.online:
+            for evse_id, evse_fsm in cp.fsm.context.transaction_fsms.items():
+                if evse_fsm.current_state not in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]:
+                    continue
+                evse_fsm : TxManagerFSMType
+                csoc = evse_fsm.context.evse.last_cycle_soc_percent
+                rsoc = evse_fsm.context.evse.last_report_soc_percent
+                rtime =  evse_fsm.context.evse.last_report_time
+                if rsoc is None:
+                    continue
+                if rtime is None:
+                    continue
+                if csoc is None:
+                    csoc = rsoc
+                ctime = get_slot_start(rtime)
+                pred_soc = csoc + (rsoc-csoc) / (rtime - ctime).total_seconds() * get_slot_duration()
+                response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc, "tdep": get_slot_start(datetime.datetime.now() + datetime.timedelta(hours=8)), "ev_type": 1})
+    return response
 
 
 @ui.page("/")
@@ -266,6 +323,7 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
     #ui.label(evse_id)
     if fsm.current_state in STATE_SCREEN_MAP:
         STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp)
+
 
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from attr.filters import exclude
 from nicegui import binding
 from ocpp.v201 import ChargePoint
@@ -16,3 +18,8 @@ class EvseStatus(BaseModel):
     tx_id : TransactionId = ""
     cp_interface : ChargePoint | None = Field(default=None, exclude=True)
     setpoint : float = 0.0
+    next_setpoint : float = 0.0
+    last_cycle_soc_percent : float | None = 50.0
+    last_report_soc_percent : float | None = 50.0
+    last_report_time : datetime | None = Field(default_factory=datetime.now)
+

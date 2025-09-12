@@ -149,3 +149,14 @@ def qr_link(url):
     except ImportError:
         pass
     return qr_dialog
+
+
+CYCLE_DURATION = 15
+
+
+def get_slot_start(rtime):
+    return rtime.replace(microsecond=0, second=0, minute=((rtime.minute // CYCLE_DURATION) * CYCLE_DURATION))
+
+
+def get_slot_duration():
+    return CYCLE_DURATION * 60

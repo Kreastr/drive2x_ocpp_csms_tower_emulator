@@ -1,0 +1,3 @@
+[submodule "drive2x-flow"]
+	path = drive2x-flow
+	url = ssh://git@datahub.pc.lut.fi:122/drive2x/drive2x-flow.git

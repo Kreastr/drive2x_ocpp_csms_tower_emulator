@@ -7,7 +7,7 @@ from server.callable_interface import CallableInterface
 from pydantic import BaseModel, Field
 
 from server.data.evse_status import EvseStatus
-from server.transaction_manager.tx_fsm import TxFSMS
+from server.transaction_manager.tx_fsm import TxFSMServer
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from util.types import EVSEId, TransactionId, ChargePointId
 
@@ -29,7 +29,7 @@ class ChargePointContext:
     id : ChargePointId = "provisional"
 
 
-    transaction_fsms: defaultdict[EVSEId, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMS))
+    transaction_fsms: defaultdict[EVSEId, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMServer))
 
     connection_task : Any = None
 

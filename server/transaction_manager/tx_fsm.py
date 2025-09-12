@@ -14,7 +14,7 @@ logger = setup_logging(__name__)
 
 
 
-class TxFSMS(TxManagerFSMType):
+class TxFSMServer(TxManagerFSMType):
 
     def __init__(self):
         super().__init__(transaction_manager_uml,
