@@ -263,6 +263,7 @@ async def index():
 
 @ui.page("/d2x_ui/{cp_id}")
 async def d2x_ui_landing(cp_id : ChargePointId):
+    background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}')
 
     await standard_header_footer(cp_id)
@@ -331,6 +332,7 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
+    background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
     await standard_header_footer(cp_id)
     await styling()
