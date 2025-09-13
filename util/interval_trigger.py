@@ -41,7 +41,7 @@ _main_setpoint_loop = None
 def main_setpoint_loop():
     global _main_setpoint_loop
     if _main_setpoint_loop is None:
-        _main_setpoint_loop = AIOIntervalTrigger(period=timedelta(seconds=15), name="Setpoint Timer")
+        _main_setpoint_loop = AIOIntervalTrigger(period=timedelta(minutes=15), name="Setpoint Timer")
     return _main_setpoint_loop
 
 
@@ -49,5 +49,5 @@ _client_measurand_loop = None
 def client_measurand_loop():
     global _client_measurand_loop
     if _client_measurand_loop is None:
-        _client_measurand_loop = AIOIntervalTrigger(period=timedelta(seconds=5), name="Measurand Timer")
+        _client_measurand_loop = AIOIntervalTrigger(period=timedelta(seconds=30), name="Measurand Timer")
     return _client_measurand_loop
