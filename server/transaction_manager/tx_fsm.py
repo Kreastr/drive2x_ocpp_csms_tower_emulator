@@ -6,6 +6,7 @@ from ocpp.v201.datatypes import IdTokenType, SetVariableDataType, ComponentType,
 from ocpp.v201.enums import IdTokenEnumType
 
 from server.data.tx_manager_context import TxManagerContext
+from server.transaction_manager.setpoint_interval_trigger import main_setpoint_loop
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType, transaction_manager_uml
 from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
 from util import setup_logging, time_based_id
@@ -30,9 +31,10 @@ class TxFSMServer(TxManagerFSMType):
         self.on(TxManagerFSMState.occupied.on_loop, self.send_auth_to_cp)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
 
-        self.on(TxManagerFSMState.charging.on_enter, self.send_new_setpoint)
-        self.on(TxManagerFSMState.discharging.on_enter, self.send_new_setpoint)
-        self.on(TxManagerFSMState.ready.on_enter, self.send_new_setpoint)
+        self.on(TxManagerFSMState.transition_triggered.on_exit, self.send_new_setpoint)
+
+        main_setpoint_loop().subscribe(lambda s=self: s.handle(TxManagerFSMEvent.on_setpoint_apply_mark))
+        
         
     @staticmethod
     def if_charge_setpoint(context : TxManagerContext, other):
@@ -57,12 +59,12 @@ class TxFSMServer(TxManagerFSMType):
                                                                              evse=EVSEType(id=self.context.evse.evse_id)),
                                                                          variable=VariableType(name="Setpoint"))]))
             logger.warning(f"send_new_setpoint {setpoint=} {result=}")
+            self.context.evse.setpoint = 0
             for v in result.set_variable_result:
                 status = v["attribute_status"]
                 logger.warning(status)
                 #if status == AttributeStatusType()
                 pass
-        await self.handle(TxManagerFSMEvent.on_termination_fault)
 
     async def send_deauth_to_cp(self, *vargs):
         self.context : TxManagerContext

@@ -15,23 +15,25 @@ Occupied --> Ready : on authorize accept
 Occupied --> Ready : on tx update event
 Authorized --> Ready : on start tx event
 Authorized --> Unknown : on deauthorized
-Ready --> Charging : if charge setpoint
-Discharging --> Charging : if charge setpoint
-Ready --> Discharging : if discharge setpoint
-Charging --> Discharging : if discharge setpoint
-Charging --> Ready : if idle setpoint
-Charging --> Charging : on setpoint update
-Discharging --> Discharging : on setpoint update
-Discharging --> Ready : if idle setpoint
+Ready --> TransitionTriggered : on setpoint apply mark
+Charging --> TransitionTriggered : on setpoint apply mark
+Discharging --> TransitionTriggered : on setpoint apply mark
+TransitionTriggered --> Charging : if charge setpoint
+TransitionTriggered --> Discharging : if discharge setpoint
+TransitionTriggered --> Ready : if idle setpoint
 Charging --> Terminating : on deauthorized
 Discharging --> Terminating : on deauthorized
 Ready --> Terminating : on deauthorized
-Charging --> Unknown : on end tx event
-Discharging --> Unknown : on end tx event
+TransitionTriggered --> Terminating : on deauthorized
 Ready --> Unknown : on end tx event
+Ready --> Terminating : on termination fault
+Charging --> Terminating : on termination fault
+Discharging --> Terminating : on termination fault
+TransitionTriggered --> Terminating : on termination fault
 Terminating --> Fault : on termination fault
-Fault --> Unknown : on clear fault
 Terminating --> Unknown : on end tx event
+TransitionTriggered --> Unknown : on end tx event
+Fault --> Unknown : on clear fault
 @enduml
 """
 _fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))
