@@ -19,7 +19,7 @@ class EvseStatus(BaseModel):
     cp_interface : ChargePoint | None = Field(default=None, exclude=True)
     setpoint : float = 0.0
     next_setpoint : float = 0.0
-    last_cycle_soc_percent : float | None = 50.0
-    last_report_soc_percent : float | None = 50.0
-    last_report_time : datetime | None = Field(default_factory=datetime.now)
+    last_cycle_soc_percent : float | None = None
+    last_report_soc_percent : float | None = None
+    last_report_time : datetime | None = None
 

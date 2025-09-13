@@ -18,9 +18,10 @@ from ocpp.v201 import ChargePoint, call_result, call
 
 from ocpp.v201.call import BootNotification, Heartbeat, StatusNotification
 from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, ComponentType, GetVariableDataType, \
-    GetVariableResultType, VariableType, SetVariableResultType, TransactionType, EVSEType
+    GetVariableResultType, VariableType, SetVariableResultType, TransactionType, EVSEType, MeterValueType, \
+    SampledValueType, UnitOfMeasureType
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
-    RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
+    RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType, MeasurandEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
 from nicegui import ui, background_tasks
 from ocpp.v201 import enums
@@ -37,6 +38,7 @@ from client.data import EvseModel, TxFSMContext
 from client.transaction_model import TxFSMType, transaction_uml
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
 from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call
+from util.interval_trigger import client_measurand_loop
 
 from redis_dict import RedisDict
 
@@ -171,6 +173,27 @@ class OCPPClient(ChargePoint):
         for i in self.st_tasks:
             self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{i}"] = 0.0
         self.datasaver_task = asyncio.create_task(self.data_saver_task())
+        
+        for evse_id, context in self.task_contexts.items():
+            
+            client_measurand_loop().subscribe(self.get_post_measurands(context.evse, self.tx_fsms[evse_id]))
+    
+    def get_post_measurands(self, evse : EvseModel, fsm : TxFSMType):
+        async def post_measurands():
+            if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
+                meter_values = call.MeterValues(evse.id, [MeterValueType(get_time_str(),
+                                                                          [SampledValueType(value=(evse.soc_wh / evse.usable_capacity),
+                                                                                            measurand=MeasurandEnumType.soc),
+                                                                           SampledValueType(value=evse.metered_power_charge / 1000.0,
+                                                                                            measurand=MeasurandEnumType.energy_active_import_register,
+                                                                                            unit_of_measure=UnitOfMeasureType("kWh")),
+                                                                           SampledValueType(value=evse.metered_power_discharge / 1000.0,
+                                                                                            measurand=MeasurandEnumType.energy_active_export_register,
+                                                                                            unit_of_measure=UnitOfMeasureType("kWh"))])])
+                result = await self.call(meter_values)
+                
+                logger.warning(f"post_measurands {meter_values=} {result=}")
+        return post_measurands
     
     async def data_saver_task(self):
         try:
@@ -253,6 +276,7 @@ class OCPPClient(ChargePoint):
                         evse.metered_power_charge += change
                     elif change < 0:
                         evse.metered_power_discharge -= change
+                    #await self.post_measurands(evse, fsm)
 
                 if not evse.cable_connected:
                     if evse.soc_wh > 2:

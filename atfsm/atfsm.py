@@ -34,7 +34,7 @@ def slugify(x : str, separator="_"):
 
 
 logger = setup_logging(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 SE = TypeVar("SE", bound=StateBase)
@@ -410,10 +410,9 @@ class AFSM(Generic[SE, CE, EE, FSM_ST]):
                 assert transition.name in st.conditions, (f"State machine condition tester {transition.name} for state {self.current_state} "
                                                               f"was left uninitialized. Add one to .conditions.")
 
-        logger.warning(f"FSM initial state is { self.current_state }")
+        logger.info(f"FSM initial state is { self.current_state }")
         assert self.current_state is not None, "FSM did not have any state marked as initial. Please add one using transition from [*] pseudo-state"
 
-        print(self.current_state, self.sm_states)
 
     def write_enums(self, module_name, location=None):
         if location is None:
@@ -466,7 +465,7 @@ class {module_name}Event(str, Enum):
             unlink(shadow_name)
 
     def on(self, event, callback):
-        logger.warning(f"New subscription to {event}")
+        logger.debug(f"New subscription to {event}")
         self._events.on(event, callback)
 
     def apply_context_to_all_states(self, context):
@@ -498,11 +497,11 @@ class {module_name}Event(str, Enum):
             #assert isinstance(transition.name, Type[CE])
             if st.conditions[ transition.name ](self.context, st.condition_context):
                 await self.transition_to_new_state(st, self.se_factory(transition.target_state) if transition.target_state is not None else None)
-                logger.warning(f"FSM after conditional transition is { self.current_state }")
+                logger.info(f"FSM after conditional transition is { self.current_state }")
                 return
         if st.default_transition is not None:
             await self.transition_to_new_state(st, self.se_factory(st.default_transition))
-            logger.warning(f"FSM after default transition is { self.current_state }")
+            logger.info(f"FSM after default transition is { self.current_state }")
 
 
 
@@ -516,13 +515,13 @@ class {module_name}Event(str, Enum):
         if self.in_transit:
             await self.handle_as_deferred(event)
             return
-        logger.warning(f"FSM on event {event}")
+        logger.info(f"FSM on event {event}")
         self._events.emit(str(event), event, self.current_state)
         st = self.sm_states[self.current_state]
         for transition in st.transition_events:
             if transition.name == event:
                 await self.transition_to_new_state(st, self.se_factory(transition.target_state))
-                logger.warning(f"FSM after event state is { self.current_state }")
+                logger.info(f"FSM after event state is { self.current_state }")
                 break
 
     async def handle_as_deferred(self, event):

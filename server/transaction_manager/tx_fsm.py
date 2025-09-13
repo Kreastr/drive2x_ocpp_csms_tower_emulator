@@ -6,7 +6,7 @@ from ocpp.v201.datatypes import IdTokenType, SetVariableDataType, ComponentType,
 from ocpp.v201.enums import IdTokenEnumType
 
 from server.data.tx_manager_context import TxManagerContext
-from server.transaction_manager.setpoint_interval_trigger import main_setpoint_loop
+from util.interval_trigger import main_setpoint_loop
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType, transaction_manager_uml
 from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
 from util import setup_logging, time_based_id

@@ -4,10 +4,12 @@ import logging
 from _pydatetime import datetime, timedelta
 from logging import getLogger
 
+import dateutil.parser
 from beartype import beartype
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
-from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, IdTokenInfoType
+from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
+    IdTokenInfoType, MeterValueType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
     ReportBaseEnumType, ResetEnumType
 from redis_dict import RedisDict
@@ -247,11 +249,22 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         )
 
     @on(Action.meter_values)
-    async def on_meter_values(self, **data):
-        self.log_event(("meter_values", (data)))
-        logger.warning(f"id={self.fsm.context.id} on_meter_values {data=}")
-        return call_result.MeterValues(
-        )
+    async def on_meter_values(self, evse_id : int, meter_value : list[dict], **data):
+        self.log_event(("meter_values", (evse_id, meter_value, data)))
+        logger.error(f"id={self.fsm.context.id} on_meter_values {data=}")
+        try:
+            for v in meter_value:
+                # ToDo handle real timestamp
+                #ts = dateutil.parser.parse(v["timestamp"])
+                for sv in  v["sampled_value"]:
+                    if sv["measurand"] == "SoC":
+                        evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
+                        evse.last_report_soc_percent = sv["value"]*100
+                        evse.last_report_time = datetime.now()
+                        
+        finally:
+            return call_result.MeterValues(
+            )
 
     @on(Action.authorize)
     async def on_authorize(self, **data):
