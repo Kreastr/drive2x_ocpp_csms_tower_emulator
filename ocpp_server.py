@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 
+import dateutil.parser
 import websockets
 from ocpp.v201 import call
 from ocpp.v201 import call_result
@@ -234,7 +235,10 @@ async def sca_data_evs() -> SCADataEVs:
                     csoc = rsoc
                 ctime = get_slot_start(rtime)
                 pred_soc = csoc + (rsoc-csoc) / (rtime - ctime).total_seconds() * get_slot_duration()
-                response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc, "tdep": get_slot_start(datetime.datetime.now() + datetime.timedelta(hours=8)), "ev_type": 1})
+                info = dict(departure_date=datetime.datetime.now().isoformat()[:10], departure_time="23:59")
+                info.update(evse_fsm.context.session_info)
+                dept = dateutil.parser.parse(info["departure_date"] + " " + info["departure_time"])
+                response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc, "tdep": get_slot_start(dept), "ev_type": 1})
     return response
 
 
@@ -350,7 +354,7 @@ async def screen_size_refreshable_block(cp_id, evse_id, semaphore):
                 "min-width: 20rem; text-align: justify;").bind_visibility_from(semaphore, "acquired"):
             await main_screen_block(cp_id, evse_id)
         with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-            await pend_semaphore_screen_block(semaphore)
+            await pend_semaphore_screen_block(semaphore, cp_id)
     else:
         with ui.row().classes("justify-center full-width"):
             with ui.column(align_items="center").style(

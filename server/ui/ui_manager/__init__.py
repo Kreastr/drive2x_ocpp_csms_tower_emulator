@@ -90,6 +90,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_booking_not_supported, self.if_booking_not_supported)
 
         self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
+        self.on(UIManagerFSMState.session_first_start.on_enter, self.save_booking)
         self.on(UIManagerFSMState.session_first_start.on_enter, self.trigger_remote_start)
         self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
         self.on(UIManagerFSMState.normal_session.on_exit, self.trigger_remote_stop)
@@ -151,6 +152,10 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), self.get_session_remaining_duration())
 
+    async def save_booking(self, *vargs, **kwargs):
+        ctxt : UIManagerContext = self.context
+        self.tx_fsm.context.session_info.update(ctxt.session_info)
+        
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
