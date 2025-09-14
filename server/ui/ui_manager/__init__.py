@@ -190,8 +190,8 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         return self.context.timeout_time < datetime.now()
 
     def if_session_ready(self, *vargs):
-        return self.tx_fsm.current_state in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]
+        return self.tx_fsm.current_state in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging, TxManagerFSMState.transition_triggered]
 
     def if_session_fault(self, *vargs):
-        return not self.tx_fsm.current_state in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]
+        return self.tx_fsm.current_state not in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging, TxManagerFSMState.transition_triggered]
 

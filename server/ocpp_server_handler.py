@@ -263,7 +263,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                         evse.last_report_time = datetime.now()
                     if sv["measurand"] == "Power.Active.Import":
                         evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
-                        evse.last_reported_power = sv["value"]*100
+                        evse.last_reported_power = sv["value"]
                         
         finally:
             return call_result.MeterValues(

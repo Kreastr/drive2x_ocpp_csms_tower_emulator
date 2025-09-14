@@ -269,7 +269,9 @@ class OCPPClient(ChargePoint):
 
                 if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
                     prev_wh = evse.soc_wh
-                    evse.soc_wh += float(self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{evse.id}"]) / 3600.0
+                    setpoint = float(self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{evse.id}"])
+                    evse.setpoint = setpoint
+                    evse.soc_wh += setpoint / 3600.0
                     if evse.soc_wh > evse.usable_capacity:
                         evse.soc_wh = evse.usable_capacity
                     if evse.soc_wh < 0:
