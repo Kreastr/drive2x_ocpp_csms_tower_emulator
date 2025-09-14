@@ -251,7 +251,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     @on(Action.meter_values)
     async def on_meter_values(self, evse_id : int, meter_value : list[dict], **data):
         self.log_event(("meter_values", (evse_id, meter_value, data)))
-        logger.error(f"id={self.fsm.context.id} on_meter_values {data=}")
+        logger.error(f"id={self.fsm.context.id} on_meter_values {evse_id=} {meter_value=}")
         try:
             for v in meter_value:
                 # ToDo handle real timestamp
@@ -261,6 +261,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                         evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
                         evse.last_report_soc_percent = sv["value"]*100
                         evse.last_report_time = datetime.now()
+                    if sv["measurand"] == "Power.Active.Import":
+                        evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
+                        evse.last_reported_power = sv["value"]*100
                         
         finally:
             return call_result.MeterValues(
