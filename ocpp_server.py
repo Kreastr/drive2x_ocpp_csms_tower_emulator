@@ -22,15 +22,6 @@ gui_info._app = app
 gui_info._ui = ui
 gui_info._background_tasks = background_tasks
 
-ui.add_head_html('''<script>
-function onResize() {
-  emitEvent('body_size', 
-  {w: document.body.innerWidth,
-   h: document.body.innerHeight});
-}
-window.onload = onResize;
-window.onresize = onResize;
-</script>''')
 
 
 from websockets import Subprotocol
@@ -329,53 +320,98 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
+    ui.add_head_html('''<script>
+    function onResize() {
+      emitEvent('body_size', 
+      {w: window.innerWidth,
+       h: window.innerHeight});
+    }
+    window.onload = onResize;
+    window.onresize = onResize;
+    </script>''')
+
+    ui.on('body_size', refresh_on_resize)
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
     await standard_header_footer(cp_id)
     await styling()
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
-    with ui.card(align_items="center").classes('fixed-center ').style("min-width: 20rem; text-align: justify;").bind_visibility_from(semaphore, "acquired"):
-        if cp_id not in charge_points:
-            with ui.row(align_items="center"):
-                ui.icon("warning", color='red').classes('text-5xl')
-                ui.label(f"Charge Point with this ID is not active. Please try later.")
-                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
-        elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
-            with ui.row(align_items="center"):
-                ui.icon("warning", color='red').classes('text-5xl mr-3')
-                ui.label(f"EV charging equipment with this ID is not active. Please try later.")
-                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
-
-        else:
-            fsm = UIManagerFSMType(uml=ui_manager_uml, 
-                                   context=UIManagerContext(charge_point=charge_points[cp_id],
-                                                            tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[evse_id],
-                                                            evse=charge_points[cp_id].fsm.context.transaction_fsms[evse_id].context.evse), se_factory=UIManagerFSMState)
-
-            fsm.context.session_pins = session_pins
-            fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
-            fsm.load_from_redis()
-            cp = charge_points[cp_id]
-            with ui.column(align_items="center"):
-                state_dependent_frame(cp_id, evse_id, fsm, cp)
-                fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
-                ui.timer(1, fsm.loop)
-                ui.separator()
-                with ui.row(align_items="center").classes('items-center justify-around'):
-                    ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
-
-    with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-        with ui.column(align_items="center"):
-            with ui.row(align_items="center"):
-                ui.icon("clock", color='warning').classes('text-5xl mr-3')
-                ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
-                                                                                "rank",
-                                                                                      backward=format_queue_position)
-            ui.separator()
-            with ui.row().classes('items-center justify-around'):
-                ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
+    await screen_size_refreshable_block(cp_id, evse_id, semaphore)
     ui.timer(1, lambda : semaphore.acquire())
+
+wheight = 0
+wwidth = 0
+@ui.refreshable
+async def screen_size_refreshable_block(cp_id, evse_id, semaphore):
+
+    if wheight > 700 and wwidth > 380:
+        with ui.card(align_items="center").classes('fixed-center ').style(
+                "min-width: 20rem; text-align: justify;").bind_visibility_from(semaphore, "acquired"):
+            await main_screen_block(cp_id, evse_id)
+        with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
+            await pend_semaphore_screen_block(semaphore)
+    else:
+        with ui.row().classes("justify-center full-width"):
+            with ui.column(align_items="center").style(
+                    "text-align: justify; background: white;").classes("p-5").bind_visibility_from(semaphore, "acquired"):
+                await main_screen_block(cp_id, evse_id)
+            with ui.column(align_items="center").style(
+                    "text-align: justify; background: white;").classes("p-5").bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
+                await pend_semaphore_screen_block(semaphore)
+
+def refresh_on_resize(event):
+    global wheight
+    global wwidth
+    logger.error(f"{event.args}")
+    wheight = event.args["h"]
+    wwidth =  event.args["w"]
+    screen_size_refreshable_block.refresh()
+
+
+async def pend_semaphore_screen_block(semaphore):
+    with ui.column(align_items="center"):
+        with ui.row(align_items="center"):
+            ui.icon("clock", color='warning').classes('text-5xl mr-3')
+            ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
+                                                                           "rank",
+                                                                           backward=format_queue_position)
+        ui.separator()
+        with ui.row().classes('items-center justify-around'):
+            ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
+
+
+async def main_screen_block(cp_id, evse_id):
+    if cp_id not in charge_points:
+        with ui.row(align_items="center"):
+            ui.icon("warning", color='red').classes('text-5xl')
+            ui.label(f"Charge Point with this ID is not active. Please try later.")
+            ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
+    elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
+        with ui.row(align_items="center"):
+            ui.icon("warning", color='red').classes('text-5xl mr-3')
+            ui.label(f"EV charging equipment with this ID is not active. Please try later.")
+            ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
+
+    else:
+        fsm = UIManagerFSMType(uml=ui_manager_uml,
+                               context=UIManagerContext(charge_point=charge_points[cp_id],
+                                                        tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[
+                                                            evse_id],
+                                                        evse=charge_points[cp_id].fsm.context.transaction_fsms[
+                                                            evse_id].context.evse), se_factory=UIManagerFSMState)
+
+        fsm.context.session_pins = session_pins
+        fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
+        fsm.load_from_redis()
+        cp = charge_points[cp_id]
+        with ui.column(align_items="center"):
+            state_dependent_frame(cp_id, evse_id, fsm, cp)
+            fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
+            ui.timer(1, fsm.loop)
+            ui.separator()
+            with ui.row(align_items="center").classes('items-center justify-around'):
+                ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
 
 async def styling():
