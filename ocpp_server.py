@@ -286,7 +286,7 @@ async def standard_header_footer(cp_id):
     with (ui.footer(elevated=True).style('background-color: brand').classes('items-center justify-between text-body2')):
         ui.label(f"Charging station serial number: {cp_id}.")
         ui.label("Operator: Drive2X.")
-        ui.label("Contact details: support@drive2x.eu +358 XXX YYY ZZZ")
+        ui.label("Contact details: DriVe2X@lut.fi +358 XXX YYY ZZZ")
 
 
 @ui.refreshable

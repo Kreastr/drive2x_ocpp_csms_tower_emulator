@@ -27,7 +27,7 @@ EVSEPage --> SessionUnlock : if session is active
 EVSEPage --> NewSession : if session is not active
 SeesionUnlock --> EVSESelectPage : on exit
 NewSession --> EVSESelectPage : on exit
-NewSession --> GDPRAccepted : on gdpr accept
+NewSession --> EditBooking : on gdpr accept
 GDPRAccepted --> EVSESelectPage : on exit
 GDPRAccepted --> UserHasBooking : on have booking
 GDPRAccepted --> EditBooking : if booking not supported
@@ -35,7 +35,7 @@ UserHasBooking --> GDPRAccepted : on back
 UserHasBooking --> SessionConfirmed : on confirm session
 SessionConfirmed --> GDPRAccepted : on back
 UserHasBooking --> EditBooking : on edit booking
-EditBooking --> GDPRAccepted : on back
+EditBooking --> NewSession : on back
 GDPRAccepted --> EditBooking : on continue without booking
 EditBooking --> SessionConfirmed : on confirm session
 SessionConfirmed --> CarNotConnected : on start session

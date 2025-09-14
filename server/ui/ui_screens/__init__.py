@@ -105,13 +105,15 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
         with ui.card():
             with ui.row(align_items="end"):
                 with ui.column(align_items="center"):
-                    ui.label("50%").classes('text-5xl').style("color: primary;").bind_text_from(evse, "last_report_soc_percent", backward=lambda x: "" if x is None else f"{int(x)}%")
+                    ui.label("50%").classes('text-3xl').style("color: primary;").bind_text_from(evse, "last_report_soc_percent", backward=lambda x: "" if x is None else f"{int(x)}%")
                     ui.icon("electric_car", color='brand').classes('text-5xl')
-                with ui.column(align_items="center"):
-                    ui.label("0 kW").classes('text-5xl').style("color: primary;").bind_text_from(evse, "last_reported_power", backward=lambda x: "" if x is None else f"{int(x)} kW")
+
+                with ui.column(align_items="center").classes("lm-3 rm-3"):
+                    ui.label("0 kW").classes('text-3xl').style("color: primary;").bind_text_from(evse, "last_reported_power", backward=lambda x: "" if x is None else f"{int(x)} kW")
                     ui.icon("keyboard_double_arrow_left", color='brand').classes('text-5xl').bind_visibility_from(evse, "last_reported_power", backward=lambda x: x > 0)
                     ui.icon("pause", color='brand').classes('text-5xl').bind_visibility_from(evse, "last_reported_power", backward=lambda x: x == 0)
                     ui.icon("keyboard_double_arrow_right", color='brand').classes('text-5xl').bind_visibility_from(evse, "last_reported_power", backward=lambda x: x < 0)
+
                 ui.icon("ev_station", color='brand').classes('text-5xl')
 
         ui.label("Thank you. Charging/dischargning of your EV will now occur according to the command from the Smart Charging Algorithm.")
