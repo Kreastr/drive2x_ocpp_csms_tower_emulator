@@ -358,7 +358,7 @@ async def screen_size_refreshable_block(cp_id, evse_id, semaphore):
                 await main_screen_block(cp_id, evse_id)
             with ui.column(align_items="center").style(
                     "text-align: justify; background: white;").classes("p-5").bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-                await pend_semaphore_screen_block(semaphore)
+                await pend_semaphore_screen_block(semaphore, cp_id)
 
 def refresh_on_resize(event):
     global wheight
@@ -369,7 +369,7 @@ def refresh_on_resize(event):
     screen_size_refreshable_block.refresh()
 
 
-async def pend_semaphore_screen_block(semaphore):
+async def pend_semaphore_screen_block(semaphore, cp_id):
     with ui.column(align_items="center"):
         with ui.row(align_items="center"):
             ui.icon("clock", color='warning').classes('text-5xl mr-3')
