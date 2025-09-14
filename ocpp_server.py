@@ -271,7 +271,7 @@ async def d2x_ui_landing(cp_id : ChargePointId):
             with ui.row(align_items="center"):
                 ui.icon("warning", color='red').classes('text-5xl')
                 ui.label(f"Charge Point with this ID is not active. Please try later.")
-                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"))
+                ui.timer(30.0, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"), once=True)
 
         else:
             with ui.column(align_items="center"):
@@ -289,10 +289,10 @@ async def d2x_ui_landing(cp_id : ChargePointId):
 
 async def standard_header_footer(cp_id):
     with ui.header(elevated=True).style('background-color: white').classes('items-center justify-between'):
-        ui.image(source="static/d2x_logo_1.svg").classes("w-40")
+        ui.image(source="static/d2x_logo_1.svg").classes("w-20")
         timenow()
         ui.timer(1, timenow.refresh)
-    with (ui.footer(elevated=True).style('background-color: brand').classes('items-center justify-between')):
+    with (ui.footer(elevated=True).style('background-color: brand').classes('items-center justify-between text-body2')):
         ui.label(f"Charging station serial number: {cp_id}.")
         ui.label("Operator: Drive2X.")
         ui.label("Contact details: support@drive2x.eu +358 XXX YYY ZZZ")
@@ -335,17 +335,17 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     await styling()
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
     semaphore.acquire()
-    with ui.card().classes('fixed-center').style("min-width: 20rem;").bind_visibility_from(semaphore, "acquired"):
+    with ui.card(align_items="center").classes('fixed-center ').style("min-width: 20rem; text-align: justify;").bind_visibility_from(semaphore, "acquired"):
         if cp_id not in charge_points:
             with ui.row(align_items="center"):
                 ui.icon("warning", color='red').classes('text-5xl')
                 ui.label(f"Charge Point with this ID is not active. Please try later.")
-                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
+                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
         elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
             with ui.row(align_items="center"):
-                ui.icon("warning", color='red').classes('text-5xl')
+                ui.icon("warning", color='red').classes('text-5xl mr-3')
                 ui.label(f"EV charging equipment with this ID is not active. Please try later.")
-                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"))
+                ui.timer(30, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
 
         else:
             fsm = UIManagerFSMType(uml=ui_manager_uml, 
@@ -357,22 +357,24 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
             fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
             fsm.load_from_redis()
             cp = charge_points[cp_id]
-            state_dependent_frame(cp_id, evse_id, fsm, cp)
-            fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
-            ui.timer(1, fsm.loop)
+            with ui.column(align_items="center"):
+                state_dependent_frame(cp_id, evse_id, fsm, cp)
+                fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
+                ui.timer(1, fsm.loop)
+                ui.separator()
+                with ui.row(align_items="center").classes('items-center justify-around'):
+                    ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
+
+    with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
+        with ui.column(align_items="center"):
+            with ui.row(align_items="center"):
+                ui.icon("clock", color='warning').classes('text-5xl mr-3')
+                ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
+                                                                                "rank",
+                                                                                      backward=format_queue_position)
             ui.separator()
             with ui.row().classes('items-center justify-around'):
                 ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
-
-    with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-        with ui.row(align_items="center"):
-            ui.icon("clock", color='warning').classes('text-5xl')
-            (ui.label(format_queue_position(semaphore.rank)).bind_text_from(semaphore,
-                                                                            "rank",
-                                                                                  backward=format_queue_position))
-        ui.separator()
-        with ui.row().classes('items-center justify-around'):
-            ui.button(text="Exit",on_click=lambda:ui.navigate.to(f"/d2x_ui/{cp_id}"))
     ui.timer(1, lambda : semaphore.acquire())
 
 

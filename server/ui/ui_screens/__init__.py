@@ -99,25 +99,68 @@ def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFS
 
 
 def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    ui.label("Thank you. Charging/dischargning of your EV will now occur according to the command from the Smart Charging Algorithm.")
-    ui.label().bind_text_from(fsm.context, "session_pin", lambda x: f"Your session PIN is {x}")
-    ui.label(f"Please record your PIN and use it to unlock charging progress information.")
-    ui.button(f"Stop session early", on_click=dispatch(fsm, UIManagerFSMEvent.on_early_stop))
+    txfsm = cp.fsm.context.transaction_fsms[evse_id]
+    evse = txfsm.context.evse
+    with ui.column(align_items="center"):
+        with ui.card():
+            with ui.row(align_items="end"):
+                with ui.column(align_items="center"):
+                    ui.label("50%").classes('text-5xl').style("color: primary;").bind_text_from(evse, "last_report_soc_percent", backward=lambda x: "" if x is None else f"{int(x)}%")
+                    ui.icon("electric_car", color='brand').classes('text-5xl')
+                with ui.column(align_items="center"):
+                    ui.label("0 kW").classes('text-5xl').style("color: primary;").bind_text_from(evse, "last_reported_power", backward=lambda x: "" if x is None else f"{int(x)} kW")
+                    ui.icon("keyboard_double_arrow_left", color='brand').classes('text-5xl').bind_visibility_from(evse, "last_reported_power", backward=lambda x: x > 0)
+                    ui.icon("pause", color='brand').classes('text-5xl').bind_visibility_from(evse, "last_reported_power", backward=lambda x: x == 0)
+                    ui.icon("keyboard_double_arrow_right", color='brand').classes('text-5xl').bind_visibility_from(evse, "last_reported_power", backward=lambda x: x < 0)
+                ui.icon("ev_station", color='brand').classes('text-5xl')
+
+        ui.label("Thank you. Charging/dischargning of your EV will now occur according to the command from the Smart Charging Algorithm.")
+        ui.label().bind_text_from(fsm.context, "session_pin", lambda x: f"Your session PIN is {x}")
+        ui.label(f"Please record your PIN and use it to unlock charging progress information.")
+        ui.button(f"Stop session early", on_click=dispatch(fsm, UIManagerFSMEvent.on_early_stop))
 
 
 def session_unlock_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     pin_code_test = snoop(lambda x: int(x if len(x) else "0") == fsm.context.session_pin)
 
-    pininp = ui.input(label="Session PIN", validation={"PIN is incorrect": pin_code_test}).classes("w-40")
+    with ui.column(align_items="center"):
+        pininp = ui.input(label="Session PIN", validation={"PIN is incorrect": pin_code_test}).classes("w-40")
 
-    @snoop
-    def pin_code_test_call(*vargs,pininp=pininp):
-        val = pininp.value
-        lvl = len(pininp.value)
-        return int(val if lvl else "0") == fsm.context.session_pin
+        @snoop
+        def pin_code_test_call(*vargs,pininp=pininp):
+            val = pininp.value
+            lvl = len(pininp.value)
+            return int(val if lvl else "0") == fsm.context.session_pin
 
-    ui.button(f"Unlock session", on_click=dispatch(fsm, UIManagerFSMEvent.on_session_pin_correct,
-                                                   condition=pin_code_test_call))
+        with ui.grid(columns=3):
+            for i in range(9):
+                def btnclk(i=i+1):
+                    try:
+                        pval = int(pininp.value)
+                    except:
+                        pval = 0
+                    pininp.value = str(pval * 10 + i)
+                ui.button(text=str(i+1), on_click=btnclk)
+            def btnclk0():
+                try:
+                    pval = int(pininp.value)
+                except:
+                    pval = 0
+                pininp.value = str(pval * 10)
+            def btnclck_bs():
+                try:
+                    pval = int(pininp.value)
+                except:
+                    pval = 0
+                pininp.value = str(pval // 10)
+            def btnclck_clear():
+                pininp.value = ""
+            ui.button(icon="backspace", on_click=btnclck_bs)
+            ui.button(text="0", on_click=btnclk0)
+            ui.button(icon="clear", on_click=btnclck_clear)
+
+        ui.button(f"Unlock session", on_click=dispatch(fsm, UIManagerFSMEvent.on_session_pin_correct,
+                                                       condition=pin_code_test_call))
 
 def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     ui.label("Your session has ended. Thank you for using Drive2X!")

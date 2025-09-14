@@ -22,4 +22,5 @@ class EvseStatus(BaseModel):
     last_cycle_soc_percent : float | None = None
     last_report_soc_percent : float | None = None
     last_report_time : datetime | None = None
+    last_reported_power : float = 0.0
 

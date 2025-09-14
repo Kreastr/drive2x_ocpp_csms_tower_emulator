@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import random
 import traceback
 import logging
 import ssl
@@ -184,6 +185,9 @@ class OCPPClient(ChargePoint):
                 meter_values = call.MeterValues(evse.id, [MeterValueType(get_time_str(),
                                                                           [SampledValueType(value=(evse.soc_wh / evse.usable_capacity),
                                                                                             measurand=MeasurandEnumType.soc),
+                                                                           SampledValueType(value=evse.setpoint / 1000.0,
+                                                                                            measurand=MeasurandEnumType.power_active_import,
+                                                                                            unit_of_measure=UnitOfMeasureType("kW")),
                                                                            SampledValueType(value=evse.metered_power_charge / 1000.0,
                                                                                             measurand=MeasurandEnumType.energy_active_import_register,
                                                                                             unit_of_measure=UnitOfMeasureType("kWh")),
