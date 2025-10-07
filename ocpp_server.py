@@ -198,15 +198,23 @@ async def setpoint(cp_id : ChargePointId, value : int):
                                                                      component=ComponentType(name="V2XChargingCtrlr", instance="1", evse=EVSEType(id=1)),
                                                                      variable=VariableType(name="Setpoint"))]))}
 
+EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
+           "D2X_DEMO_": "d2x_ga3_demo",
+           "PORTO_APT_": "porto_apt"}
 
 @app.post("/sca_data/setpoints")
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse:
-    confirmed = SetpointRequestResponse()
+    confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag)
     for iid, value in setpoints.values.items():
         cp_id_s, evse_id_s = iid.split(":")
         cp_id = ChargePointId(cp_id_s)
         evse_id = EVSEId(int(evse_id_s))
         if cp_id in charge_points:
+            control_allowed = check_control(cp_id, setpoints.site_tag)
+
+            if not control_allowed:
+                continue
+                        
             cp = charge_points[cp_id]
             if evse_id in cp.fsm.context.transaction_fsms:
                 evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
@@ -215,10 +223,26 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
                 confirmed.values[iid] = evse.setpoint
     return confirmed
 
-@app.get("/sca_data/evs")
-async def sca_data_evs() -> SCADataEVs:
+
+def check_control(cp_id : ChargePointId, site_tag : str):
+    control_allowed = False
+    for prefix, cp_tag in EV_TAGS.items():
+        if site_tag == cp_tag:
+            if cp_id.startswith(prefix):
+                control_allowed = True
+                break
+    return control_allowed
+
+
+@app.get("/sca_data/evs/{tag}")
+async def sca_data_evs(tag : str) -> SCADataEVs:
     response = SCADataEVs()
     for cp_id, cp in charge_points.items():
+        control_allowed = check_control(cp_id, tag)
+
+        if not control_allowed:
+            continue
+
         if cp.fsm.context.online:
             for evse_id, evse_fsm in cp.fsm.context.transaction_fsms.items():
                 if evse_fsm.current_state not in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]:
