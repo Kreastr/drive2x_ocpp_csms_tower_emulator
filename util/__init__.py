@@ -1,8 +1,8 @@
 import base64
 import io
 import logging
-from _pydatetime import datetime
-from _typing import TypeVar, Generic
+from datetime import datetime, timezone
+from typing import TypeVar, Generic
 from functools import wraps
 from logging import getLogger
 from typing import Callable, Iterator
@@ -61,7 +61,7 @@ class ResettableIterator(Generic[ERT]):
 
 
 def get_time_str():
-    return datetime.now().isoformat()
+    return datetime.now(tz=timezone.utc).isoformat()
 
 
 def setup_logging(name):

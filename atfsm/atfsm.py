@@ -34,7 +34,7 @@ def slugify(x : str, separator="_"):
 
 
 logger = setup_logging(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 
 SE = TypeVar("SE", bound=StateBase)

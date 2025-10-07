@@ -24,7 +24,7 @@ from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, Compon
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType, MeasurandEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
-from nicegui import ui, background_tasks
+from nicegui import ui, background_tasks    
 from ocpp.v201 import enums
 
 from itertools import count
@@ -96,7 +96,7 @@ class TxFSM(TxFSMType):
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value
                                                                                ),
-                                              evse=EVSEType(id=self.context.evse.id)
+                                              evse=EVSEType(id=self.context.evse.id, connector_id=1)
                                               ))
 
     async def inform_on_end_transaction_disconnected(self, *vargs):
@@ -105,7 +105,7 @@ class TxFSM(TxFSMType):
                                               trigger_reason=TriggerReasonEnumType.ev_communication_lost,
                                               seq_no=next(self._seq_no),
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,),
-                                              evse=EVSEType(id=self.context.evse.id)
+                                              evse=EVSEType(id=self.context.evse.id, connector_id=1)
                                               ))
 
     async def inform_on_remote_start(self, *vargs):
@@ -117,7 +117,7 @@ class TxFSM(TxFSMType):
                                                                                remote_start_id=self.context.remote_start_id,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.evse.id)
+                                              evse=EVSEType(id=self.context.evse.id, connector_id=1)
                                               ))
 
     async def inform_on_first_plugged_in(self, *vargs):
@@ -128,7 +128,7 @@ class TxFSM(TxFSMType):
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.evse.id)
+                                              evse=EVSEType(id=self.context.evse.id, connector_id=1)
                                               ))
 
     async def inform_on_authorized_when_plugged(self, *vargs):
@@ -140,7 +140,7 @@ class TxFSM(TxFSMType):
                                                                                remote_start_id=self.context.remote_start_id,
                                                                                ),
                                               id_token=self.context.auth_status,
-                                              evse=EVSEType(id=self.context.evse.id)
+                                              evse=EVSEType(id=self.context.evse.id, connector_id=1)
                                               ))
 
 
