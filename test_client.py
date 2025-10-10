@@ -6,6 +6,7 @@ import traceback
 import logging
 import ssl
 import sys
+from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime
 from uuid import uuid4
@@ -24,7 +25,7 @@ from ocpp.v201.datatypes import ChargingStationType, SetVariableDataType, Compon
 from ocpp.v201.enums import ConnectorStatusEnumType, GetVariableStatusEnumType, SetVariableStatusEnumType, \
     RequestStartStopStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType, MeasurandEnumType
 from ocpp.v201.enums import BootReasonEnumType, Action, AttributeEnumType
-from nicegui import ui, background_tasks    
+from nicegui import ui, background_tasks
 from ocpp.v201 import enums
 
 from itertools import count
@@ -425,22 +426,10 @@ async def main(serial_number = None):
 
     if serial_number is None:
         serial_number = "CP_ACME_BAT_0000"
-
-    uri = "ws://localhost:9000"
-    redis_host="localhost"
-    redis_port=6379
-    redis_db=1
-    if len(sys.argv) > 1:
-        uri = sys.argv[1]
-    if len(sys.argv) > 2:
-        redis_host = sys.argv[2]
-    if len(sys.argv) > 3:
-        redis_port = int(sys.argv[3])
-    if len(sys.argv) > 4:
-        redis_db = int(sys.argv[4])
-        
-    #"wss://emotion-test.eu/ocpp/1"
-    #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
+    uri = args.uri
+    redis_host = args.redis_host
+    redis_port = args.redis_port
+    redis_db = args.redis_db
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
     ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],
@@ -551,7 +540,6 @@ def sha256(val : str):
 # Dummy call to generate enum modules on every run
 TxFSM(TxFSMContext(EvseModel(id=EVSEId(0))))
 
-ui.run(host="0.0.0.0", port=7500, favicon="static/cropped-Favicon-1-192x192.png")
 @ui.page("/")
 async def login():
     ui.page_title(f'DriVe2X Charge Point Emulator Login')
@@ -559,3 +547,28 @@ async def login():
         with ui.column(align_items="center"):
             lgn = ui.input(label="Username", placeholder="Type your username here").style("min-width: 15rem;")
             ui.button(text="Login", on_click=lambda : navigate.to(f"/charge_point_panel/D2X_DEMO_{sha256(lgn.value)[:16].upper()}"))
+
+if __name__ == "__main__":
+    argparse = ArgumentParser(description="OCPP Charge Point Emulator with EV charge model.", epilog="""
+    Copyright (C) 2025 Lappeenrannan-Lahden teknillinen yliopisto LUT
+    Author: Aleksei Romanenko <aleksei.romanenko@lut.fi>
+
+    Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) only and do 
+    not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European Union nor the granting authority 
+    can be held responsible for them.""")
+
+    argparse.add_argument("--uri", type=str, help="Target OCPP server URI (starting with ws:// or wss://), "
+                                                  "e.g. wss://drive2x.lut.fi:443/ocpp/CP_ESS_01",
+                          default="ws://localhost:9000")
+    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by this client.", default="localhost")
+    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by this client.", default=6379)
+    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by this client.", default=1)
+    argparse.add_argument("--ui_host", type=str, help="Host on which NiceGUI will listen to connections.", default="0.0.0.0")
+    argparse.add_argument("--ui_port", type=int, help="Port on which NiceGUI will open web service.", default=7500)
+
+    args = argparse.parse_args()
+    # args is also used by main() as global
+
+    ui.run(host=args.ui_host,
+           port=args.ui_port,
+           favicon="static/cropped-Favicon-1-192x192.png")

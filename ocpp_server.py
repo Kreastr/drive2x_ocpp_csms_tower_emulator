@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+from argparse import ArgumentParser
 
 import dateutil.parser
 import websockets
@@ -204,7 +205,7 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
 
 @app.post("/sca_data/setpoints")
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse:
-    confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag, 
+    confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
                                         expected_slot_start_time=get_slot_start(datetime.datetime.now(),
                                                                                 offset=1))
     for iid, value in setpoints.values.items():
@@ -216,7 +217,7 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
 
             if not control_allowed:
                 continue
-                        
+
             cp = charge_points[cp_id]
             if evse_id in cp.fsm.context.transaction_fsms:
                 evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
@@ -454,5 +455,6 @@ def format_queue_position(rank):
             f"You are in the queue to access the resource. "
             f"Your place in the queue is {rank+1}")
 
-
-ui.run(host="0.0.0.0", port=8000, favicon="static/cropped-Favicon-1-192x192.png", language="en-GB")
+if __name__ == "__main__":
+    args = get_app_args()
+    ui.run(host=args.ui_host, port=args.ui_port, favicon="static/cropped-Favicon-1-192x192.png", language="en-GB")

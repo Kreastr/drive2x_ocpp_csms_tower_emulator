@@ -1,6 +1,7 @@
 import base64
 import io
 import logging
+from argparse import ArgumentParser
 from datetime import datetime, timezone
 from typing import TypeVar, Generic
 from functools import wraps
@@ -8,6 +9,7 @@ from logging import getLogger
 from typing import Callable, Iterator
 
 import qrcode
+from cachetools import cached
 from nicegui import ElementFilter, ui
 
 import logging
@@ -162,3 +164,21 @@ def get_slot_start(rtime, offset : int = 0 ):
 
 def get_slot_duration():
     return CYCLE_DURATION * 60
+
+
+@cached(cache={})
+def get_app_args():
+    argparse = ArgumentParser(description="DriVe2X test CSMS implementation.", epilog="""
+    Copyright (C) 2025 Lappeenrannan-Lahden teknillinen yliopisto LUT
+    Author: Aleksei Romanenko <aleksei.romanenko@lut.fi>
+
+    Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) only and do 
+    not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European Union nor the granting authority 
+    can be held responsible for them.""")
+    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by CSMS.", default="redis")
+    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by CSMS.", default=6379)
+    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by CSMS.", default=2)
+    argparse.add_argument("--ui_host", type=str, help="Host on which NiceGUI will listen to connections.",
+                          default="0.0.0.0")
+    argparse.add_argument("--ui_port", type=int, help="Port on which NiceGUI will open web service.", default=8000)
+    return argparse.parse_args()
