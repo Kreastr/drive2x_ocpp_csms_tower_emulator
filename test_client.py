@@ -573,7 +573,7 @@ async def login():
             lgn = ui.input(label="Username", placeholder="Type your username here").style("min-width: 15rem;")
             ui.button(text="Login", on_click=lambda : navigate.to(f"/charge_point_panel/D2X_DEMO_{sha256(lgn.value)[:16].upper()}"))
 
-if __name__ == "__main__":
+if __name__ in {"__main__", "__mp_main__"}:
     argparse = ArgumentParser(description="OCPP Charge Point Emulator with EV charge model.", epilog="""
     Copyright (C) 2025 Lappeenrannan-Lahden teknillinen yliopisto LUT
     Author: Aleksei Romanenko <aleksei.romanenko@lut.fi>

@@ -37,6 +37,7 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
 
 from nicegui import ui, app, background_tasks
 
+from server.data.car_db import SessionInfo, CAR_DB, CarDetails
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_fsm import TxFSMServer
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
@@ -287,10 +288,12 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
                     csoc = rsoc
                 ctime = get_slot_start(rtime)
                 pred_soc = csoc + (rsoc-csoc) / (rtime - ctime).total_seconds() * get_slot_duration()
-                info = dict(departure_date=datetime.datetime.now().isoformat()[:10], departure_time="23:59")
-                info.update(evse_fsm.context.session_info)
-                dept = dateutil.parser.parse(info["departure_date"] + " " + info["departure_time"])
-                response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc, "tdep": get_slot_start(dept), "ev_type": 1})
+                sinfo = SessionInfo.model_validate(evse_fsm.context.session_info)
+                dept = dateutil.parser.parse(sinfo.departure_date + " " + sinfo.departure_time)
+                car : CarDetails = CAR_DB[sinfo.car_make][sinfo.car_model]
+                response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc,
+                                                                                   "tdep": get_slot_start(dept),
+                                                                                   "usable_battery_capacity_kwh": car.usable_battery_capacity_kwh})
     return response
 
 
