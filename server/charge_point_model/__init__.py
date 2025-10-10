@@ -1,4 +1,4 @@
-from atfsm.atfsm import AFSM
+from afsm import AFSM
 from server.charge_point_model.charge_point_uml import charge_point_uml
 from server.data import ChargePointContext
 from server.data.tx_manager_context import TxManagerContext

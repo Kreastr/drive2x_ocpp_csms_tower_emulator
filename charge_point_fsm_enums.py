@@ -1,5 +1,5 @@
 from enum import Enum
-from atfsm.state_base import StateBase
+from afsm.state_base import StateBase
 
 class ChargePointFSMState(StateBase, str, Enum):
     created='created'

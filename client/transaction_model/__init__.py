@@ -1,4 +1,4 @@
-from atfsm.atfsm import AFSM
+from afsm import AFSM
 from client.data import TxFSMContext, EvseModel
 
 transaction_uml = """@startuml

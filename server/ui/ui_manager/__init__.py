@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 
 import server.ocpp_server_handler
-from atfsm.atfsm import AFSM
+from afsm import AFSM
 from server.data import UIManagerContext
 
 import snoop
