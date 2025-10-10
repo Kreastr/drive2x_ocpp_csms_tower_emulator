@@ -38,7 +38,7 @@ Fault --> Unknown : on clear fault
 """
 _fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))
 
-_fsm.write_enums("TxManagerFSM")
+_fsm.write_enum_module("TxManagerFSM")
 
 from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
 

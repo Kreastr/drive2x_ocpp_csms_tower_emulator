@@ -311,14 +311,14 @@ class OCPPClient(ChargePoint):
         request_tx_id : TransactionId = data["transaction_id"]
         
         context : TxFSMContext
+        evse_id : EVSEId | None = None
         for i_evse_id, context in self.task_contexts.items():
             if context.evse.tx_id == request_tx_id:
-                tx_found = True
                 evse_id = i_evse_id
                 logger.warning(f"Fonud {request_tx_id=} in {i_evse_id=}")
                 break
         
-        if not tx_found:
+        if evse_id is None:
             return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected)
             
         ctxt = self.task_contexts[evse_id]
@@ -549,7 +549,7 @@ def sha256(val : str):
     return hashlib.sha256(val.encode('utf-8')).hexdigest()
 
 # Dummy call to generate enum modules on every run
-TxFSM(TxFSMContext(EvseModel(id=0)))
+TxFSM(TxFSMContext(EvseModel(id=EVSEId(0))))
 
 ui.run(host="0.0.0.0", port=7500, favicon="static/cropped-Favicon-1-192x192.png")
 @ui.page("/")

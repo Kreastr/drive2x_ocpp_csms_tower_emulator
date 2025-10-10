@@ -6,7 +6,7 @@ import server.ocpp_server_handler
 from afsm import AFSM
 from server.data import UIManagerContext
 
-import snoop
+from snoop import snoop
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
 import math
@@ -67,7 +67,7 @@ SessionEndSummary --> EVSESelectPage : on exit
 """
 _fsm = AFSM(uml=ui_manager_uml, context=UIManagerContext(), se_factory=lambda x: str(x))
 
-_fsm.write_enums("UIManagerFSM")
+_fsm.write_enum_module("UIManagerFSM")
 
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMCondition, UIManagerFSMEvent
 

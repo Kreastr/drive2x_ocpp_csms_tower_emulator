@@ -43,6 +43,13 @@ boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redi
 status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
 
 
+def clamp_setpoint(evse: EvseStatus):
+    if evse.setpoint > 8000:
+        evse.setpoint = 8000
+    if evse.setpoint < -8000:
+        evse.setpoint = -8000
+
+
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
 
@@ -375,22 +382,16 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     def get_evse(self, evse_id : EVSEId):
         return self.fsm.context.transaction_fsms[evse_id].context.evse
 
-    def clamp_setpoint(self, evse: EvseStatus):
-        if evse.setpoint > 8000:
-            evse.setpoint = 8000
-        if evse.setpoint < -8000:
-            evse.setpoint = -8000
-
     async def do_increase_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Increased setpoint")
         self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint += 1000
-        self.clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
+        clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
 
     async def do_decrease_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Decreased setpoint")
         self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint -= 1000
-        self.clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
+        clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
 
 

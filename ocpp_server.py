@@ -204,7 +204,9 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
 
 @app.post("/sca_data/setpoints")
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse:
-    confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag)
+    confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag, 
+                                        expected_slot_start_time=get_slot_start(datetime.datetime.now(),
+                                                                                offset=1))
     for iid, value in setpoints.values.items():
         cp_id_s, evse_id_s = iid.split(":")
         cp_id = ChargePointId(cp_id_s)
@@ -236,7 +238,7 @@ def check_control(cp_id : ChargePointId, site_tag : str):
 
 @app.get("/sca_data/evs/{tag}")
 async def sca_data_evs(tag : str) -> SCADataEVs:
-    response = SCADataEVs()
+    response = SCADataEVs(soc_estimate_valid_at=datetime.datetime.now())
     for cp_id, cp in charge_points.items():
         control_allowed = check_control(cp_id, tag)
 

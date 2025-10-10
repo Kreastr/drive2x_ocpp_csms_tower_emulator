@@ -6,7 +6,7 @@ from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType, tra
 from tx_manager_fsm_enums import TxManagerFSMState
 
 _fsm = AFSM(uml=charge_point_uml, context=ChargePointContext(), se_factory=lambda x: str(x))
-_fsm.write_enums("ChargePointFSM")
+_fsm.write_enum_module("ChargePointFSM")
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMCondition, ChargePointFSMEvent
 

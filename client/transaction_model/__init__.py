@@ -20,7 +20,7 @@ Authorized --> Idle : on deauthorized
 """
 _fsm = AFSM(uml=transaction_uml, context=TxFSMContext(EvseModel.model_validate(dict(id=1))), se_factory=lambda x: str(x))
 
-_fsm.write_enums("TxFSM")
+_fsm.write_enum_module("TxFSM")
 
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
 

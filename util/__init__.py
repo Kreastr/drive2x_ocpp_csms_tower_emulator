@@ -21,6 +21,7 @@ ET = TypeVar("ET")
 class ResettableValue(Generic[ET]):
 
     def __init__(self, factory: Callable[[], ET]) -> None:
+        super().__init__()
         self._factory = factory
         self._current : ET | None = None
         self.reset()
@@ -41,6 +42,7 @@ ERT = TypeVar("ERT")
 class ResettableIterator(Generic[ERT]):
 
     def __init__(self, factory: Callable[[], Iterator[ERT]]) -> None:
+        super().__init__()
         self._factory = factory
         self._current : Iterator[ERT] | None = None
         self.reset()
@@ -154,8 +156,8 @@ def qr_link(url):
 CYCLE_DURATION = 15
 
 
-def get_slot_start(rtime):
-    return rtime.replace(microsecond=0, second=0, minute=((rtime.minute // CYCLE_DURATION) * CYCLE_DURATION))
+def get_slot_start(rtime, offset : int = 0 ):
+    return rtime.replace(microsecond=0, second=0, minute=(((rtime.minute // CYCLE_DURATION) + offset) * CYCLE_DURATION))
 
 
 def get_slot_duration():
