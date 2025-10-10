@@ -17,7 +17,7 @@ from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.nicegui import gui_info
 from tx_manager_fsm_enums import TxManagerFSMState
 
-from drive2x.ext_interface_models import SCADataEVs, SCADatum, SetpointRequestResponse
+from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse
 
 gui_info._app = app
 gui_info._ui = ui

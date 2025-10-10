@@ -1,4 +1,4 @@
-from atfsm.atfsm import AFSM
+from afsm import AFSM
 from server.data.tx_manager_context import TxManagerContext
 
 transaction_manager_uml = """@startuml

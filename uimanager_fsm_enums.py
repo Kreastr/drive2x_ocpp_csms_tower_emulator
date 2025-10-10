@@ -1,5 +1,5 @@
 from enum import Enum
-from atfsm.state_base import StateBase
+from afsm.state_base import StateBase
 
 class UIManagerFSMState(StateBase, str, Enum):
     evsepage='evsepage'
