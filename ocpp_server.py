@@ -34,7 +34,7 @@ from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
     car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
-from util import setup_logging, get_slot_start, get_slot_duration
+from util import setup_logging, get_slot_start, get_slot_duration, get_app_args
 from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
 
@@ -455,6 +455,6 @@ def format_queue_position(rank):
             f"You are in the queue to access the resource. "
             f"Your place in the queue is {rank+1}")
 
-if __name__ == "__main__":
+if __name__ in {"__main__", "__mp_main__"}:
     args = get_app_args()
     ui.run(host=args.ui_host, port=args.ui_port, favicon="static/cropped-Favicon-1-192x192.png", language="en-GB")
