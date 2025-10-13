@@ -27,8 +27,10 @@ import asyncio
 import datetime
 import logging
 from argparse import ArgumentParser
+from datetime import timezone
 
 import dateutil.parser
+import pytz
 import websockets
 from ocpp.v201 import call
 from ocpp.v201 import call_result
@@ -66,6 +68,8 @@ from util.types import *
 
 from server.ui.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_uml
 from server.callable_interface import CallableInterface
+
+from pytz import timezone
 
 from pydantic import BaseModel, Field
 
@@ -231,9 +235,15 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
 
 @app.post("/sca_data/setpoints")
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse:
+    if get_slot_start(setpoints.expected_slot_start_time) != setpoints.expected_slot_start_time:
+        raise Exception("Expected slot start time is not aligned.")
+    if setpoints.expected_slot_start_time < datetime.datetime.now(datetime.timezone.utc):
+        raise Exception("Expected slot start time has passed.")
+    if get_slot_start(datetime.datetime.now(datetime.timezone.utc), offset=1) != setpoints.expected_slot_start_time:
+        raise Exception("Only accepts setpoints for the next time slot.")
+        
     confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
-                                        expected_slot_start_time=get_slot_start(datetime.datetime.now(),
-                                                                                offset=1))
+                                        expected_slot_start_time=setpoints.expected_slot_start_time)
     for iid, value in setpoints.values.items():
         cp_id_s, evse_id_s = iid.split(":")
         cp_id = ChargePointId(cp_id_s)
@@ -262,10 +272,11 @@ def check_control(cp_id : ChargePointId, site_tag : str):
                 break
     return control_allowed
 
+SITE_TIMEZONES = {"d2x_ga3_demo": timezone("Europe/Helsinki")}
 
 @app.get("/sca_data/evs/{tag}")
 async def sca_data_evs(tag : str) -> SCADataEVs:
-    response = SCADataEVs(soc_estimate_valid_at=datetime.datetime.now())
+    response = SCADataEVs(soc_estimate_valid_at=datetime.datetime.now(datetime.timezone.utc))
     for cp_id, cp in charge_points.items():
         control_allowed = check_control(cp_id, tag)
 
@@ -289,7 +300,10 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
                 ctime = get_slot_start(rtime)
                 pred_soc = csoc + (rsoc-csoc) / (rtime - ctime).total_seconds() * get_slot_duration()
                 sinfo = SessionInfo.model_validate(evse_fsm.context.session_info)
-                dept = dateutil.parser.parse(sinfo.departure_date + " " + sinfo.departure_time)
+
+                site_tz : pytz.timezone = SITE_TIMEZONES.get(tag, pytz.utc)
+
+                dept = site_tz.localize(dateutil.parser.parse(sinfo.departure_date + " " + sinfo.departure_time)).astimezone(datetime.timezone.utc)
                 car : CarDetails = CAR_DB[sinfo.car_make][sinfo.car_model]
                 response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc,
                                                                                    "tdep": get_slot_start(dept),
