@@ -1,4 +1,4 @@
-FROM py312d2x:latest
+FROM python:3.12
 
 RUN  mkdir /app
 COPY requirements.txt /app
