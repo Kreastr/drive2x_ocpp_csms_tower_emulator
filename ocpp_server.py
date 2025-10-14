@@ -46,7 +46,7 @@ from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.nicegui import gui_info
 from tx_manager_fsm_enums import TxManagerFSMState
 
-from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse
+from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse, ConnectedEVId
 
 gui_info._app = app
 gui_info._ui = ui
@@ -305,9 +305,10 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
 
                 dept = site_tz.localize(dateutil.parser.parse(sinfo.departure_date + " " + sinfo.departure_time)).astimezone(datetime.timezone.utc)
                 car : CarDetails = CAR_DB[sinfo.car_make][sinfo.car_model]
-                response.values[cp_id+":"+str(evse_id)] = SCADatum.model_validate({"soc": pred_soc,
-                                                                                   "tdep": get_slot_start(dept),
-                                                                                   "usable_battery_capacity_kwh": car.usable_battery_capacity_kwh})
+                evid = ConnectedEVId.model_validate({"charge_point_id": cp_id, "evse_id": evse_id})
+                response.values[evid] = SCADatum.model_validate({"soc": pred_soc,
+                                                                 "tdep": get_slot_start(dept),
+                                                                 "usable_battery_capacity_kwh": car.usable_battery_capacity_kwh})
     return response
 
 
