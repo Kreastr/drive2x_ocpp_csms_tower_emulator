@@ -26,18 +26,22 @@ Union nor the granting authority can be held responsible for them.
 import base64
 import io
 import logging
+from _pydatetime import timedelta
 from argparse import ArgumentParser
 from datetime import datetime, timezone
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Type
 from functools import wraps
 from logging import getLogger
 from typing import Callable, Iterator
 
 import qrcode
 from cachetools import cached
+from camel_converter import dict_to_camel
 from nicegui import ElementFilter, ui
 
 import logging
+
+from pydantic import BaseModel
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -184,7 +188,8 @@ CYCLE_DURATION = 15
 
 
 def get_slot_start(rtime, offset : int = 0 ):
-    return rtime.replace(microsecond=0, second=0, minute=(((rtime.minute // CYCLE_DURATION) + offset) * CYCLE_DURATION))
+    minutes_since_hour_start = (((rtime.minute // CYCLE_DURATION) + offset) * CYCLE_DURATION)
+    return rtime.replace(microsecond=0, second=0, minute=0) + timedelta(seconds=minutes_since_hour_start*60)
 
 
 def get_slot_duration():
@@ -207,3 +212,43 @@ def get_app_args():
                           default="0.0.0.0")
     argparse.add_argument("--ui_port", type=int, help="Port on which NiceGUI will open web service.", default=8000)
     return argparse.parse_args()
+
+
+def log_req_response(f):
+    _logger = getLogger("OCPP_PROTO")
+    async def wrapped_call(self, *vargs, **kwargs):
+        logger.error(f"Called log_req_response on {f.__name__}")
+        _logger.info(f"\n==> {vargs=} {kwargs=}")
+        result = await f(self, *vargs, **kwargs)
+        _logger.info(f"\n<== {result=}")
+        return result
+
+    wrapped_call.__name__ = f.__name__
+    wrapped_call.__doc__ = f.__doc__
+    return wrapped_call
+
+
+def with_request_model(model_class: Type[BaseModel]):
+    def get_wrapper(f):
+        async def wrapper(self, *vargs, **kwargs):
+            logger.error(f"Called with_request_model on {f.__name__}")
+            model = model_class.model_validate(kwargs)
+            logger.warning(model)
+            return await f(self, model, *vargs, **kwargs)
+
+        wrapper.__name__ = f.__name__
+        wrapper.__doc__ = f.__doc__
+        return wrapper
+
+    return get_wrapper
+
+
+def async_camelize_kwargs(f):
+    @wraps(f)
+    async def wrapper(*vargs, **kwargs):
+        logger.error(f"Called async_camelize_kwargs {f.__name__}")
+        cckwargs = dict_to_camel(kwargs)
+        return await f(*vargs, **cckwargs)
+    wrapper.__name__ = f.__name__
+    wrapper.__doc__ = f.__doc__
+    return wrapper

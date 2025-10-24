@@ -38,6 +38,7 @@ from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
     ReportBaseEnumType, ResetEnumType
 from redis_dict import RedisDict
+from websockets import ConnectionClosedOK
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
 
@@ -123,11 +124,24 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     async def connect_and_request_id(self, *vargs):
 
-        self.fsm.context.connection_task = asyncio.create_task(self.start())
+        self.fsm.context.connection_task = asyncio.create_task(self.request_serial_bg())
+        await self.start()
 
-        result: call_result.GetVariables | None = await self.call_payload(
-            call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
-                                                   variable=VariableType(name="SerialNumber"))]))
+
+    async def request_serial_bg(self, **kwargs):
+        await asyncio.sleep(3)  # toDo fix with wait for connection
+        try:
+            result: call_result.GetVariables | None = await self.call_payload(
+                call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
+                                                       variable=VariableType(name="SerialNumber"))]))
+        except TimeoutError:
+            logger.error(f"Client timed out")
+            result = None
+        except ConnectionClosedOK:
+            logger.error(f"Client ConnectionClosedOK")
+            result = None
+            raise
+
         if result is None:
             await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
             return

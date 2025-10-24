@@ -78,6 +78,9 @@ logger.setLevel(logging.DEBUG)
 
 cp_card_container : ui.grid | None = None
 
+#logging.getLogger("websockets.server").setLevel(logging.WARNING)
+#logging.getLogger("ocpp").setLevel(logging.WARNING)
+#logging.getLogger("websockets.client").setLevel(logging.WARNING)
 
 
 
@@ -241,7 +244,7 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
         raise Exception("Expected slot start time has passed.")
     if get_slot_start(datetime.datetime.now(datetime.timezone.utc), offset=1) != setpoints.expected_slot_start_time:
         raise Exception("Only accepts setpoints for the next time slot.")
-        
+
     confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
                                         expected_slot_start_time=setpoints.expected_slot_start_time)
     for iid, value in setpoints.values.items():
