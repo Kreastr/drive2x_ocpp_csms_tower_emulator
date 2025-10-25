@@ -56,7 +56,7 @@ gui_info._background_tasks = background_tasks
 
 from websockets import Subprotocol
 
-from charge_point_fsm_enums import ChargePointFSMEvent
+from charge_point_fsm_enums import ChargePointFSMEvent, ChargePointFSMState
 from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
@@ -95,8 +95,9 @@ async def on_connect(websocket):
 
     if 0:
         await set_measurement_variables(cp)
-    while cp.fsm.context.connection_task is None or not cp.fsm.context.connection_task.done():
+    while cp.fsm.current_state != None:
         await asyncio.sleep(1)
+    logger.warning("Charge point FSM is done. Closing connection.")
     await cp.close_connection()
     try:
         result = cp.fsm.context.connection_task.result()
