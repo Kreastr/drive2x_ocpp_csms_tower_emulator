@@ -26,7 +26,7 @@ Union nor the granting authority can be held responsible for them.
 import base64
 import io
 import logging
-from _pydatetime import timedelta
+from datetime import timedelta
 from argparse import ArgumentParser
 from datetime import datetime, timezone
 from typing import TypeVar, Generic, Type
