@@ -126,6 +126,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
         self.fsm.context.connection_task = asyncio.create_task(self.request_serial_bg())
         await self.start()
+        await self.fsm.context.connection_task
 
 
     async def request_serial_bg(self, **kwargs):
