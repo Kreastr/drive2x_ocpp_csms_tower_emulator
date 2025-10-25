@@ -29,12 +29,13 @@ import logging
 from datetime import timedelta
 from argparse import ArgumentParser
 from datetime import datetime, timezone
-from typing import TypeVar, Generic, Type
+from beartype.typing import TypeVar, Generic, Type
 from functools import wraps
 from logging import getLogger
-from typing import Callable, Iterator
+from beartype.typing import Callable, Iterator
 
 import qrcode
+from beartype import beartype
 from cachetools import cached
 from camel_converter import dict_to_camel
 from nicegui import ElementFilter, ui
@@ -51,6 +52,7 @@ ET = TypeVar("ET")
 
 class ResettableValue(Generic[ET]):
 
+    @beartype
     def __init__(self, factory: Callable[[], ET]) -> None:
         super().__init__()
         self._factory = factory
@@ -72,6 +74,7 @@ ERT = TypeVar("ERT")
 
 class ResettableIterator(Generic[ERT]):
 
+    @beartype
     def __init__(self, factory: Callable[[], Iterator[ERT]]) -> None:
         super().__init__()
         self._factory = factory
@@ -186,8 +189,24 @@ def qr_link(url):
 
 CYCLE_DURATION = 15
 
+@beartype
+def get_slot_start(rtime : datetime, offset : int = 0 ):
+    """
 
-def get_slot_start(rtime, offset : int = 0 ):
+    :param rtime:
+    :param offset:
+    :return:
+
+    >>> get_slot_start(datetime(2023, 8, 15, 10, 4, 37))
+    datetime.datetime(2023, 8, 15, 10, 0)
+
+    >>> get_slot_start(datetime(2023, 8, 15, 10, 4, 37), offset=1)
+    datetime.datetime(2023, 8, 15, 10, 15)
+
+    >>> get_slot_start(datetime(2023, 8, 15, 10, 54, 37), offset=1)
+    datetime.datetime(2023, 8, 15, 11, 0)
+
+    """
     minutes_since_hour_start = (((rtime.minute // CYCLE_DURATION) + offset) * CYCLE_DURATION)
     return rtime.replace(microsecond=0, second=0, minute=0) + timedelta(seconds=minutes_since_hour_start*60)
 
