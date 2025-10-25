@@ -26,7 +26,7 @@ Union nor the granting authority can be held responsible for them.
 import asyncio
 import json
 import logging
-from _pydatetime import datetime, timedelta
+from datetime import datetime, timedelta
 from logging import getLogger
 
 import dateutil.parser
