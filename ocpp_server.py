@@ -26,6 +26,7 @@ Union nor the granting authority can be held responsible for them.
 import asyncio
 import datetime
 import logging
+import traceback
 from argparse import ArgumentParser
 from datetime import timezone
 
@@ -246,25 +247,28 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
     if get_slot_start(datetime.datetime.now(datetime.timezone.utc), offset=1) != setpoints.expected_slot_start_time:
         return GenericErrorResponse(error_message="Only accepts setpoints for the next time slot.")
 
-    confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
-                                        expected_slot_start_time=setpoints.expected_slot_start_time)
-    for iid, value in setpoints.values.items():
-        cp_id_s, evse_id_s = iid.split(":")
-        cp_id = ChargePointId(cp_id_s)
-        evse_id = EVSEId(int(evse_id_s))
-        if cp_id in charge_points:
-            control_allowed = check_control(cp_id, setpoints.site_tag)
-
-            if not control_allowed:
-                continue
-
-            cp = charge_points[cp_id]
-            if evse_id in cp.fsm.context.transaction_fsms:
-                evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
-                evse.setpoint = value
-                cp.clamp_setpoint(evse)
-                confirmed.values[iid] = evse.setpoint
-    return confirmed
+    try:
+        confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
+                                            expected_slot_start_time=setpoints.expected_slot_start_time)
+        for iid, value in setpoints.values.items():
+            cp_id_s, evse_id_s = iid.split(":")
+            cp_id = ChargePointId(cp_id_s)
+            evse_id = EVSEId(int(evse_id_s))
+            if cp_id in charge_points:
+                control_allowed = check_control(cp_id, setpoints.site_tag)
+    
+                if not control_allowed:
+                    continue
+    
+                cp = charge_points[cp_id]
+                if evse_id in cp.fsm.context.transaction_fsms:
+                    evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
+                    evse.setpoint = value
+                    cp.clamp_setpoint(evse)
+                    confirmed.values[iid] = evse.setpoint
+        return confirmed
+    except Exception as e:
+        return GenericErrorResponse(error_message=traceback.format_exc())
 
 
 def check_control(cp_id : ChargePointId, site_tag : str):
