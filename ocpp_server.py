@@ -46,7 +46,7 @@ from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.nicegui import gui_info
 from tx_manager_fsm_enums import TxManagerFSMState
 
-from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse, ConnectedEVId
+from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse, ConnectedEVId, GenericErrorResponse
 
 gui_info._app = app
 gui_info._ui = ui
@@ -238,13 +238,13 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "PORTO_APT_": "porto_apt"}
 
 @app.post("/sca_data/setpoints")
-async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse:
+async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse | GenericErrorResponse:
     if get_slot_start(setpoints.expected_slot_start_time) != setpoints.expected_slot_start_time:
-        raise Exception("Expected slot start time is not aligned.")
+        return GenericErrorResponse(error_message="Expected slot start time is not aligned.")
     if setpoints.expected_slot_start_time < datetime.datetime.now(datetime.timezone.utc):
-        raise Exception("Expected slot start time has passed.")
+        return GenericErrorResponse(error_message="Expected slot start time has passed.")
     if get_slot_start(datetime.datetime.now(datetime.timezone.utc), offset=1) != setpoints.expected_slot_start_time:
-        raise Exception("Only accepts setpoints for the next time slot.")
+        return GenericErrorResponse(error_message="Only accepts setpoints for the next time slot.")
 
     confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
                                         expected_slot_start_time=setpoints.expected_slot_start_time)
