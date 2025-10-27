@@ -26,31 +26,35 @@ Union nor the granting authority can be held responsible for them.
 import asyncio
 import json
 import logging
+import uuid
 from datetime import datetime, timedelta
 from asyncio import CancelledError
 from logging import getLogger
+from time import sleep
 
 from beartype import beartype
 from ocpp.routing import on
 from ocpp.v16.datatypes import IdTagInfo
-from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus
+from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus
 from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v201 import call_result as call_result_201
 from ocpp.v201.datatypes import GetVariableResultType
-from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType
+from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType
 from pydantic import BaseModel
 from websockets import Subprotocol, ConnectionClosedOK
 
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
 from ocpp_models.v16.boot_notification import BootNotificationRequest
+from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
+from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from proxy.proxy_config import ProxyConfigurator, ProxyConfig
 from proxy.proxy_connection_context import ProxyConnectionContext
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent, ProxyConnectionFSMState
 from server.callable_interface import CallableInterface
-from util import get_time_str, async_camelize_kwargs, log_req_response, with_request_model
+from util import get_time_str, async_camelize_kwargs, log_req_response, with_request_model, time_based_id
 
 from datetime import  timezone
 
@@ -75,7 +79,14 @@ logger.setLevel(logging.DEBUG)
 CONFIGURATION_MAP = {}
 STUBS_MAP = {}
 
-async def connect_as_client(client_interface, uri, serial_number):
+AUTH_STATUS_MAP = {RemoteStartStopStatus.accepted: RequestStartStopStatusEnumType.accepted,
+                   RemoteStartStopStatus.rejected: RequestStartStopStatusEnumType.rejected
+                   }
+
+TX_MAP_16_TO_201 = dict()
+TX_MAP_201_TO_16 = dict()
+
+async def connect_as_client(client_interface, uri, serial_number, on_connect):
 
     #"wss://emotion-test.eu/ocpp/1"
     #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
@@ -90,7 +101,7 @@ async def connect_as_client(client_interface, uri, serial_number):
         try:
             async with websockets.connect(uri, **ws_args) as ws:
                 cp = OCPPClientV201(client_interface, serial_number, ws)
-                return cp
+                await on_connect(cp)
 
 
         except asyncio.exceptions.CancelledError:
@@ -109,10 +120,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self))
         self.server_connection : OCPPClientV201 | None = None
 
-    async def run(self):
-        self.server_connection = await connect_as_client(client_interface=self,
-                                                         uri=ProxyConfigurator.get_global_config().upstream_uri,
-                                                         serial_number=self.id)
+    async def server_connection_task(self, cp : OCPPClientV201):
+        self.server_connection = cp
         logger.warning("self.server_connection.start")
         server_task = asyncio.create_task(self.server_connection.start())
 
@@ -124,6 +133,12 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             await server_task
             raise
         await server_task
+
+    async def run(self):
+        await connect_as_client(client_interface=self,
+                                uri=ProxyConfigurator.get_global_config().upstream_uri,
+                                serial_number=self.id,
+                                on_connect=self.server_connection_task)
 
     async def call_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
@@ -161,7 +176,29 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     @log_req_response
     @with_request_model(StatusNotificationRequest)
     async def on_status_notification(self, rq : StatusNotificationRequest, **kwargs):
+
+        await self.server_connection.status_notification_request(rq)
         return call_result.StatusNotification(
+        )
+
+
+    @on(Action.start_transaction)
+    @async_camelize_kwargs
+    @log_req_response
+    @with_request_model(StartTransactionRequest)
+    async def on_start_transaction(self, rq : StartTransactionRequest, **kwargs):
+        tx_id_16 = time_based_id()
+        # Use normal sleep here to guarantee that tx_id_16 are unique
+        sleep(0.1)
+        tx_id_201 = str(uuid.uuid4())
+        TX_MAP_16_TO_201[tx_id_16] = tx_id_201
+        TX_MAP_201_TO_16[tx_id_201] = tx_id_16
+
+        await self.server_connection.start_transaction_request(rq, tx_id_201)
+
+        return call_result.StartTransaction(
+            transaction_id=tx_id_16,
+            id_tag_info=IdTagInfo(status=AuthorizationStatus.accepted)
         )
 
     @on(Action.heartbeat)
@@ -171,7 +208,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             current_time=get_time_str()
         )
 
-    @on(Action.meter_values)
+    @on(Action.meter_values, skip_schema_validation=True)
     @log_req_response
     async def on_meter_values(self, **data):
         return call_result.MeterValues(
@@ -205,6 +242,19 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def close_connection(self, *vargs):
         await self._connection.close()
     """
+
+    async def on_request_start_transaction(self,
+                                           request: RequestStartTransactionRequest) -> call_result_201.RequestStartTransaction:
+        result : call_result.RemoteStartTransaction = await self.call_payload(call.RemoteStartTransaction(
+                                                               id_tag=request.idToken.idToken[:20],
+                                                               connector_id=request.evseId))
+        id_tag_status : RemoteStartStopStatus = result.status
+
+        if id_tag_status in AUTH_STATUS_MAP:
+            req_result = AUTH_STATUS_MAP[id_tag_status]
+        else:
+            req_result = RequestStartStopStatusEnumType.rejected
+        return call_result_201.RequestStartTransaction(status=req_result)
 
     async def on_server_get_variables(self, request: GetVariablesRequest) -> call_result_201.GetVariables:
         var : GetVariableDataType

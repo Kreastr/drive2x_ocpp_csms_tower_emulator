@@ -21,14 +21,18 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European 
 Union nor the granting authority can be held responsible for them.
 """
+import datetime
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, StringConstraints
-from typing import Annotated
 
-CiString20Type = Annotated[str, StringConstraints(max_length=20)]
-CiString25Type = Annotated[str, StringConstraints(max_length=25)]
-CiString36Type = Annotated[str, StringConstraints(max_length=36)]
-CiString50Type = Annotated[str, StringConstraints(max_length=50)]
-CiString255Type = Annotated[str, StringConstraints(max_length=255)]
-CiString500Type = Annotated[str, StringConstraints(max_length=500)]
+from ocpp_models.v16.base_types import CiString25Type, CiString20Type, CiString50Type
 
+
+
+class StartTransactionRequest(BaseModel):
+    connectorId : int
+    idTag : str
+    meterStart : int
+    reservationId : Optional[int] = None
+    timestamp : datetime.datetime

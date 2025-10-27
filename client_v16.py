@@ -21,15 +21,20 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
+import datetime
 from abc import ABC, abstractmethod
 from logging import getLogger
 
-from ocpp.v201.datatypes import ChargingStationType
-from ocpp.v201.enums import BootReasonEnumType
+from ocpp.v16.enums import ChargePointStatus
+from ocpp.v201.datatypes import ChargingStationType, TransactionType
+from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v21.enums import Action
 
 from ocpp_models.v16.boot_notification import BootNotificationRequest
+from ocpp_models.v16.start_transaction import StartTransactionRequest
+from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
+from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from util import log_req_response, with_request_model, async_camelize_kwargs
 
 logger = getLogger(__name__)
@@ -44,12 +49,35 @@ class OCPPServerV16Interface(ABC):
     async def on_server_get_variables(self, request : GetVariablesRequest) -> call_result.GetVariables:
         pass
 
+    @abstractmethod
+    async def on_request_start_transaction(self, request : RequestStartTransactionRequest) -> call_result.RequestStartTransaction:
+        pass
+
+
+STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.occupied,
+              ChargePointStatus.available: ConnectorStatusEnumType.available,
+              ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable}
 
 class OCPPClientV201(ChargePoint):
 
     def __init__(self, client_interface : OCPPServerV16Interface, serial_number, ws, response_timeout=30, _logger=logger):
         super().__init__(serial_number, ws, response_timeout=response_timeout, logger=_logger)
         self.client_interface = client_interface
+
+    async def status_notification_request(self, rq : StatusNotificationRequest):
+
+        if rq.status in STATUS_MAP:
+            fwd_status = STATUS_MAP[rq.status]
+        else:
+            logger.error(f"Failed to map status notification status {rq.status}")
+            fwd_status = ConnectorStatusEnumType.unavailable
+        req_time = rq.timestamp
+        if req_time is None:
+            req_time = datetime.datetime.now(datetime.timezone.utc)
+        return await self.call_payload(call.StatusNotification(timestamp=req_time.isoformat(),
+                                                               connector_status=fwd_status,
+                                                               evse_id=rq.connectorId,
+                                                               connector_id=1))
 
 
     async def boot_notification_request(self, rq : BootNotificationRequest):
@@ -60,6 +88,20 @@ class OCPPClientV201(ChargePoint):
                                                      firmware_version=rq.firmwareVersion),
                 reason=BootReasonEnumType.unknown
                 ))
+
+    async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str):
+        return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                                             timestamp=rq.timestamp.isoformat(),
+                                                             trigger_reason=TriggerReasonEnumType.remote_start,
+                                                             seq_no=1,
+                                                             transaction_info=TransactionType(tx_id)))
+
+    @on(Action.request_start_transaction)
+    @log_req_response
+    @async_camelize_kwargs
+    @with_request_model(RequestStartTransactionRequest)
+    async def on_request_start_transaction(self, request : RequestStartTransactionRequest, *vargs, **kwargs):
+        return await self.client_interface.on_request_start_transaction(request)
 
     @on(Action.get_variables)
     @log_req_response

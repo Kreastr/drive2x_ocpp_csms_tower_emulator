@@ -17,18 +17,29 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) 
-only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European 
+Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s)
+only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
 
-from pydantic import BaseModel, StringConstraints
-from typing import Annotated
 
-CiString20Type = Annotated[str, StringConstraints(max_length=20)]
-CiString25Type = Annotated[str, StringConstraints(max_length=25)]
-CiString36Type = Annotated[str, StringConstraints(max_length=36)]
-CiString50Type = Annotated[str, StringConstraints(max_length=50)]
-CiString255Type = Annotated[str, StringConstraints(max_length=255)]
-CiString500Type = Annotated[str, StringConstraints(max_length=500)]
+from typing import Optional
 
+from ocpp.v201.enums import AttributeEnumType, IdTokenEnumType
+from pydantic import BaseModel
+
+from ocpp_models.v201.base_types import CiString50Type, CiString36Type
+
+class AdditionalInfoType(BaseModel):
+    additionalIdToken : CiString36Type
+    type : CiString50Type
+
+class IdTokenType(BaseModel):
+    idToken : CiString36Type
+    type : IdTokenEnumType
+    additionalInfo : Optional[AdditionalInfoType] = None
+
+class RequestStartTransactionRequest(BaseModel):
+    evseId : Optional[int] = None
+    remoteStartId : int
+    idToken : IdTokenType
