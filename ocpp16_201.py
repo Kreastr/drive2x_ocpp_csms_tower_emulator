@@ -121,9 +121,15 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self))
         self.server_connection : OCPPClientV201 | None = None
 
+    async def fsm_task(self):
+        while self.fsm.current_state is not None:
+            await self.fsm.loop()
+            await asyncio.sleep(1)
+
     async def server_connection_task(self, cp : OCPPClientV201):
         self.server_connection = cp
         logger.warning("self.server_connection.start")
+        fsm_task = asyncio.create_task(self.fsm_task())
         server_task = asyncio.create_task(self.server_connection.start())
 
         try:
@@ -134,6 +140,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             await server_task
             raise
         await server_task
+        await fsm_task
 
     async def run(self):
         await connect_as_client(client_interface=self,
@@ -148,7 +155,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except websockets.exceptions.ConnectionClosedOK:
             await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
-            return 
+            return
 
 
     #@on(Action.notify_event)
