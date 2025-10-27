@@ -205,8 +205,9 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     @on(Action.heartbeat)
     @log_req_response
     async def on_heartbeat(self, **data):
+        response : call_result_201.Heartbeat = await self.server_connection.heartbeat_request()
         return call_result.Heartbeat(
-            current_time=get_time_str()
+            current_time=response.current_time
         )
 
     @on(Action.meter_values, skip_schema_validation=True)

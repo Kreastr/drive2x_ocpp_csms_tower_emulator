@@ -64,7 +64,7 @@ class OCPPClientV201(ChargePoint):
         super().__init__(serial_number, ws, response_timeout=response_timeout, logger=_logger)
         self.client_interface = client_interface
 
-    async def status_notification_request(self, rq : StatusNotificationRequest):
+    async def status_notification_request(self, rq : StatusNotificationRequest) -> call_result.StatusNotification:
 
         if rq.status in STATUS_MAP:
             fwd_status = STATUS_MAP[rq.status]
@@ -80,7 +80,7 @@ class OCPPClientV201(ChargePoint):
                                                                connector_id=1))
 
 
-    async def boot_notification_request(self, rq : BootNotificationRequest):
+    async def boot_notification_request(self, rq : BootNotificationRequest) -> call_result.BootNotification:
         return await self.call_payload(call.BootNotification(
                 charging_station=ChargingStationType(vendor_name=rq.chargePointVendor,
                                                      model=rq.chargePointModel,
@@ -89,12 +89,15 @@ class OCPPClientV201(ChargePoint):
                 reason=BootReasonEnumType.unknown
                 ))
 
-    async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str):
+    async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
                                                              seq_no=1,
                                                              transaction_info=TransactionType(tx_id)))
+    
+    async def heartbeat_request(self) -> call_result.Heartbeat:
+        return await self.call_payload(call.Heartbeat())
 
     @on(Action.request_start_transaction)
     @log_req_response
