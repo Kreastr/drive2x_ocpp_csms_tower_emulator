@@ -250,10 +250,12 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
     try:
         confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
                                             expected_slot_start_time=setpoints.expected_slot_start_time)
+        iid : ConnectedEVId
         for iid, value in setpoints.values.items():
-            cp_id_s, evse_id_s = iid.split(":")
-            cp_id = ChargePointId(cp_id_s)
-            evse_id = EVSEId(int(evse_id_s))
+            cp_id = ChargePointId(iid.charge_point_id)
+            evse_id = EVSEId(int(iid.evse_id))
+            # Ignored
+            connector_id = iid.connector_id
             if cp_id in charge_points:
                 control_allowed = check_control(cp_id, setpoints.site_tag)
     
