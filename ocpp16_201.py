@@ -54,7 +54,8 @@ from proxy.proxy_connection_context import ProxyConnectionContext
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent, ProxyConnectionFSMState
 from server.callable_interface import CallableInterface
-from util import get_time_str, async_camelize_kwargs, log_req_response, with_request_model, time_based_id
+from util import get_time_str, async_camelize_kwargs, log_req_response, with_request_model, time_based_id, \
+    get_proxy_app_args
 
 from datetime import  timezone
 
@@ -319,7 +320,8 @@ async def on_connect(websocket):
 
 async def main():
     logging.warning("main start")
-    server = await websockets.serve(on_connect, '0.0.0.0', 16000, subprotocols=[Subprotocol('ocpp1.6')])
+    config : ProxyConfig = ProxyConfigurator.get_global_config()
+    server = await websockets.serve(on_connect, '0.0.0.0', config.service_port, subprotocols=[Subprotocol('ocpp1.6')])
     logging.warning("main server ready")
     try:
         await server.serve_forever()
@@ -328,5 +330,6 @@ async def main():
     logging.warning("main exit")
 
 if __name__ == "__main__":
-    ProxyConfigurator.set_global_config(ProxyConfig(upstream_uri="ws://127.0.0.1:9000"))
+    args = get_proxy_app_args()
+    ProxyConfigurator.set_global_config(ProxyConfig.model_validate(args.__dict__))
     asyncio.run(main())

@@ -233,6 +233,25 @@ def get_app_args():
     return argparse.parse_args()
 
 
+@cached(cache={})
+def get_proxy_app_args():
+    argparse = ArgumentParser(description="DriVe2X OCPP 1.6 to 2.0.1 converter proxy.", epilog="""
+    Copyright (C) 2025 Lappeenrannan-Lahden teknillinen yliopisto LUT
+    Author: Aleksei Romanenko <aleksei.romanenko@lut.fi>
+
+    Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) only and do 
+    not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European Union nor the granting authority 
+    can be held responsible for them.""")
+    argparse.add_argument("--service_host", type=str, help="Host on which proxy expects WS connections.", default="0.0.0.0")
+    argparse.add_argument("--service_port", type=str, help="Port on which proxy expects WS connections.", default=16000)
+    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by CSMS.", default="redis")
+    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by CSMS.", default=6379)
+    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by CSMS.", default=3)
+    argparse.add_argument("--upstream_uri", type=str, help="OCPP URI which serves OCPP 2.0.1 CSMS.",
+                          default="ws://127.0.0.1:9000")
+    return argparse.parse_args()
+
+
 def log_req_response(f):
     _logger = getLogger("OCPP_PROTO")
     async def wrapped_call(self, *vargs, **kwargs):

@@ -27,6 +27,16 @@ services:
         - ocpp
       networks:
         - ocpp_net
+   proxy:
+      image: proxy:latest
+      ports:
+        - 16000:16000
+      restart: unless-stopped
+      depends_on:
+        - redis
+        - ocpp
+      networks:
+        - ocpp_net
 volumes:
   redisdb:
     driver: local
