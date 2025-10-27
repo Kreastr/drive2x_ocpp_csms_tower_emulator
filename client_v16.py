@@ -128,6 +128,6 @@ class OCPPClientV201(ChargePoint):
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except websockets.exceptions.ConnectionClosedOK:
-            await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_client_disconnect)
+            await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
 
