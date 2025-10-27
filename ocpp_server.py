@@ -58,7 +58,7 @@ gui_info._background_tasks = background_tasks
 from websockets import Subprotocol
 
 from charge_point_fsm_enums import ChargePointFSMEvent, ChargePointFSMState
-from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points
+from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points, clamp_setpoint
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
     car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
@@ -262,11 +262,11 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
                 if not control_allowed:
                     continue
     
-                cp = charge_points[cp_id]
+                cp : OCPPServerHandler = charge_points[cp_id]
                 if evse_id in cp.fsm.context.transaction_fsms:
                     evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
                     evse.setpoint = value
-                    cp.clamp_setpoint(evse)
+                    clamp_setpoint(evse)
                     confirmed.values[iid] = evse.setpoint
         return confirmed
     except Exception as e:
