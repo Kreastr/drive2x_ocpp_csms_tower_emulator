@@ -144,7 +144,11 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def call_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
-        return await self.call(payload, suppress, unique_id, skip_schema_validation)
+        try:
+            return await self.call(payload, suppress, unique_id, skip_schema_validation)
+        except websockets.exceptions.ConnectionClosedOK:
+            await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
+            return 
 
 
     #@on(Action.notify_event)
@@ -244,6 +248,9 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def close_connection(self, *vargs):
         await self._connection.close()
     """
+
+    def get_state_machine(self) -> ProxyConnectionFSM:
+        return self.fsm
 
     async def on_request_start_transaction(self,
                                            request: RequestStartTransactionRequest) -> call_result_201.RequestStartTransaction:

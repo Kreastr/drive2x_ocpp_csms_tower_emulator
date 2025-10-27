@@ -25,6 +25,7 @@ import datetime
 from abc import ABC, abstractmethod
 from logging import getLogger
 
+import websockets
 from ocpp.v16.enums import ChargePointStatus
 from ocpp.v201.datatypes import ChargingStationType, TransactionType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
@@ -35,6 +36,8 @@ from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
+from proxy.proxy_connection_fsm import ProxyConnectionFSM
+from proxy_connection_fsm_enums import ProxyConnectionFSMEvent
 from util import log_req_response, with_request_model, async_camelize_kwargs
 
 logger = getLogger(__name__)
@@ -53,6 +56,9 @@ class OCPPServerV16Interface(ABC):
     async def on_request_start_transaction(self, request : RequestStartTransactionRequest) -> call_result.RequestStartTransaction:
         pass
 
+    @abstractmethod
+    def get_state_machine(self) -> ProxyConnectionFSM:
+        pass
 
 STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.occupied,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
@@ -118,6 +124,10 @@ class OCPPClientV201(ChargePoint):
     async def call_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
-        return await self.call(payload, suppress, unique_id, skip_schema_validation)
+
+        try:
+            return await self.call(payload, suppress, unique_id, skip_schema_validation)
+        except websockets.exceptions.ConnectionClosedOK:
+            await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_client_disconnect)
 
 
