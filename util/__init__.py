@@ -255,7 +255,7 @@ def get_proxy_app_args():
 def log_req_response(f):
     _logger = getLogger("OCPP_PROTO")
     async def wrapped_call(self, *vargs, **kwargs):
-        logger.error(f"Called log_req_response on {f.__name__}")
+        #logger.error(f"Called log_req_response on {f.__name__}")
         _logger.info(f"\n==> {vargs=} {kwargs=}")
         result = await f(self, *vargs, **kwargs)
         _logger.info(f"\n<== {result=}")
@@ -269,9 +269,9 @@ def log_req_response(f):
 def with_request_model(model_class: Type[BaseModel]):
     def get_wrapper(f):
         async def wrapper(self, *vargs, **kwargs):
-            logger.error(f"Called with_request_model on {f.__name__}")
+            #logger.error(f"Called with_request_model on {f.__name__}")
             model = model_class.model_validate(kwargs)
-            logger.warning(model)
+            #logger.warning(model)
             return await f(self, model, *vargs, **kwargs)
 
         wrapper.__name__ = f.__name__
@@ -284,7 +284,7 @@ def with_request_model(model_class: Type[BaseModel]):
 def async_camelize_kwargs(f):
     @wraps(f)
     async def wrapper(*vargs, **kwargs):
-        logger.error(f"Called async_camelize_kwargs {f.__name__}")
+        #logger.error(f"Called async_camelize_kwargs {f.__name__}")
         cckwargs = dict_to_camel(kwargs)
         return await f(*vargs, **cckwargs)
     wrapper.__name__ = f.__name__

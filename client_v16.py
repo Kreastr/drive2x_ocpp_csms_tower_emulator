@@ -56,7 +56,8 @@ class OCPPServerV16Interface(ABC):
 
 STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.occupied,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
-              ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable}
+              ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable,
+              ChargePointStatus.charging: ConnectorStatusEnumType.occupied}
 
 class OCPPClientV201(ChargePoint):
 

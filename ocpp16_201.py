@@ -73,9 +73,9 @@ from camel_converter import dict_to_camel
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-#getLogger("websockets.server").setLevel(logging.WARNING)
-#getLogger("ocpp").setLevel(logging.WARNING)
-#getLogger("websockets.client").setLevel(logging.WARNING)
+getLogger("websockets.server").setLevel(logging.WARNING)
+getLogger("ocpp").setLevel(logging.WARNING)
+getLogger("websockets.client").setLevel(logging.WARNING)
 
 CONFIGURATION_MAP = {}
 STUBS_MAP = {}
