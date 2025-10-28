@@ -32,14 +32,16 @@ from asyncio import CancelledError
 from logging import getLogger
 from time import sleep
 
+import ocpp.v16.enums
 from beartype import beartype
 from ocpp.routing import on
 from ocpp.v16.datatypes import IdTagInfo
-from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus
+from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus, ResetType
 from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v201 import call_result as call_result_201
 from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType
-from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType
+from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType, \
+    ResetEnumType, ResetStatusEnumType
 from pydantic import BaseModel
 from websockets import Subprotocol, ConnectionClosedOK
 
@@ -50,6 +52,7 @@ from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
+from ocpp_models.v201.reset import ResetRequest
 from proxy.proxy_config import ProxyConfigurator, ProxyConfig
 from proxy.proxy_connection_context import ProxyConnectionContext
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
@@ -87,6 +90,12 @@ AUTH_STATUS_MAP = {RemoteStartStopStatus.accepted: RequestStartStopStatusEnumTyp
 
 TX_MAP_16_TO_201 = dict()
 TX_MAP_201_TO_16 = dict()
+
+RESET_TYPE_MAP = {ResetEnumType.immediate: ResetType.hard,
+                  ResetEnumType.on_idle: ResetType.soft}
+
+RESET_STATUS_MAP = {ocpp.v16.enums.ResetStatus.accepted : ResetStatusEnumType.accepted,
+                    ocpp.v16.enums.ResetStatus.rejected : ResetStatusEnumType.rejected}
 
 async def connect_as_client(client_interface, uri, serial_number, on_connect):
 
@@ -263,6 +272,23 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         await self.call_payload(call.Reset(type=ResetEnumType.immediate))
         await self.close_connection(*vargs)
     """
+
+    async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
+        if request.type in RESET_TYPE_MAP:
+            v16_type = RESET_TYPE_MAP[request.type]
+        else:
+            v16_type = ResetType.hard
+        response : call_result.Reset = await self.call_payload(call.Reset(type=v16_type))
+        
+        if response.status in RESET_STATUS_MAP:
+            v201_status = RESET_STATUS_MAP[response.status]
+        else:
+            v201_status = ResetStatusEnumType.rejected
+        
+        return call_result_201.Reset(status=v201_status)
+        
+        
+        
 
     async def close_server_connection(self, *vargs):
         await self.server_connection.close_connection()

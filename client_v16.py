@@ -36,6 +36,7 @@ from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
+from ocpp_models.v201.reset import ResetRequest
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent
 from util import log_req_response, with_request_model, async_camelize_kwargs
@@ -59,6 +60,11 @@ class OCPPServerV16Interface(ABC):
     @abstractmethod
     def get_state_machine(self) -> ProxyConnectionFSM:
         pass
+
+    @abstractmethod
+    async def on_reset(self, request) -> call_result.Reset:
+        pass
+
 
 STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.occupied,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
@@ -112,6 +118,15 @@ class OCPPClientV201(ChargePoint):
     @with_request_model(RequestStartTransactionRequest)
     async def on_request_start_transaction(self, request : RequestStartTransactionRequest, *vargs, **kwargs):
         return await self.client_interface.on_request_start_transaction(request)
+
+
+    @on(Action.reset)
+    @log_req_response
+    @async_camelize_kwargs
+    @with_request_model(ResetRequest)
+    async def on_reset(self, request : ResetRequest, *vargs, **kwargs) -> call_result.Reset:
+        return await self.client_interface.on_reset(request)
+        #  ToDo: return await self.client_interface.on_server_get_variables(request)
 
     @on(Action.get_variables)
     @log_req_response
