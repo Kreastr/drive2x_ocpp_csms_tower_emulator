@@ -102,7 +102,7 @@ class OCPPClientV201(ChargePoint):
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
                                                              seq_no=1,
                                                              transaction_info=TransactionType(tx_id)))
-    
+
     async def heartbeat_request(self) -> call_result.Heartbeat:
         return await self.call_payload(call.Heartbeat())
 
@@ -130,4 +130,6 @@ class OCPPClientV201(ChargePoint):
         except websockets.exceptions.ConnectionClosedOK:
             await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
-
+    async def close_connection(self):
+        await self._connection.close()
+        await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
