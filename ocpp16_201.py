@@ -275,10 +275,13 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     """
 
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
-        if request.type in RESET_TYPE_MAP:
-            v16_type = RESET_TYPE_MAP[request.type]
+        if self.id.starts_with("Latinki"):
+            v16_type = ResetType.soft
         else:
-            v16_type = ResetType.hard
+            if request.type in RESET_TYPE_MAP:
+                v16_type = RESET_TYPE_MAP[request.type]
+            else:
+                v16_type = ResetType.hard
         response : call_result.Reset = await self.call_payload(call.Reset(type=v16_type))
         
         if response.status in RESET_STATUS_MAP:
