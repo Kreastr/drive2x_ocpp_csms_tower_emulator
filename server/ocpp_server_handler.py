@@ -124,8 +124,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     async def connect_and_request_id(self, *vargs):
 
-        await self.start()
+        start_task = asyncio.create_task(self.start())
         await self.request_serial_bg()
+        await start_task
 
 
     async def request_serial_bg(self, **kwargs):
