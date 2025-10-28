@@ -120,8 +120,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
         self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self))
-        self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_connection)
-        self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.server_connection.close_connection)
+        self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
+        self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
         self.server_connection : OCPPClientV201 | None = None
 
 
@@ -264,8 +264,10 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         await self.close_connection(*vargs)
     """
 
+    async def close_server_connection(self, *vargs):
+        await self.server_connection.close_connection()
 
-    async def close_connection(self, *vargs):
+    async def close_client_connection(self, *vargs):
         await self._connection.close()
 
     def get_state_machine(self) -> ProxyConnectionFSM:
