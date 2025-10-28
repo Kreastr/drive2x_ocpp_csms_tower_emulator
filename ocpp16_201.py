@@ -161,6 +161,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
                                 serial_number=self.id,
                                 on_connect=self.server_connection_task)
 
+    @log_req_response
     async def call_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
@@ -286,9 +287,6 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             v201_status = ResetStatusEnumType.rejected
         
         return call_result_201.Reset(status=v201_status)
-        
-        
-        
 
     async def close_server_connection(self, *vargs):
         await self.server_connection.close_connection()
