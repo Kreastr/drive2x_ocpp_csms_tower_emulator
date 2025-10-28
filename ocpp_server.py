@@ -181,7 +181,7 @@ async def reboot(cp_id : ChargePointId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
-        return {"result": await charge_points[cp_id].reboot_peer_and_close_connection()}
+        return {"result": await charge_points[cp_id].try_reboot_peer()}
 
 @app.get("/cp/{cp_id}/transactions")
 async def transactions(cp_id : ChargePointId):

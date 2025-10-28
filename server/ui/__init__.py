@@ -74,7 +74,7 @@ class CPCard(Element):
 
                 ui.label("Status")
                 ui.label().bind_text(self.fsm, "current_state")
-            ui.button("REBOOT", icon="refresh" ,on_click=cp.reboot_peer_and_close_connection).classes("w-40")
+            ui.button("REBOOT", icon="refresh", on_click=cp.try_reboot_peer).classes("w-40")
             ui.separator()
             self.connector_container = ui.column()
             ui.separator()

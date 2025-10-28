@@ -90,7 +90,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.try_cached_boot_notification)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.start_boot_timeout)
-        self.fsm.on(ChargePointFSMState.failed.on_enter, self.reboot_peer_and_close_connection)
+        self.fsm.on(ChargePointFSMState.failing.on_enter, self.try_reboot_peer)
+        self.fsm.on(ChargePointFSMState.failed.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.closing.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
@@ -399,7 +400,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                                report_base=ReportBaseEnumType.full_inventory))
         logging.warning(f"request_full_report {result=}")
 
-    async def reboot_peer_and_close_connection(self, *vargs):
+    async def try_reboot_peer(self, *vargs):
         if self.fsm.context.id in boot_notification_cache:
             del boot_notification_cache[self.fsm.context.id]
         if self.fsm.context.id in status_notification_cache:
@@ -407,7 +408,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         response : call_result.Reset = await self.call_payload(call.Reset(type=ResetEnumType.immediate))
         if response.status == ResetStatusEnumType.accepted:
             await self.fsm.handle(ChargePointFSMEvent.on_reset_accepted)
-            await self.close_connection(*vargs)
         else:
             await self.fsm.handle(ChargePointFSMEvent.on_reset_rejected)
 
