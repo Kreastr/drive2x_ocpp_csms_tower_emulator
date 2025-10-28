@@ -7,7 +7,9 @@ class ChargePointFSMState(StateBase, str, Enum):
     identified='identified'
     rejected='rejected'
     booted='booted'
+    failing='failing'
     failed='failed'
+    force_booted='force_booted'
     running_transaction='running_transaction'
     closing='closing'
 
@@ -25,3 +27,5 @@ class ChargePointFSMEvent(str, Enum):
     on_boot_timeout='on_boot_timeout'
     on_transaction_manager_request='on_transaction_manager_request'
     on_reboot_confirmed='on_reboot_confirmed'
+    on_reset_accepted='on_reset_accepted'
+    on_reset_rejected='on_reset_rejected'

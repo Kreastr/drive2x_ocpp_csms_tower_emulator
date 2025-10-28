@@ -36,7 +36,7 @@ from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
     IdTokenInfoType, MeterValueType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
-    ReportBaseEnumType, ResetEnumType
+    ReportBaseEnumType, ResetEnumType, ResetStatusEnumType
 from redis_dict import RedisDict
 from websockets import ConnectionClosedOK
 
@@ -94,6 +94,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.fsm.on(ChargePointFSMState.closing.on_enter, self.close_connection)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
+        self.fsm.on(ChargePointFSMState.force_booted.on_enter, self.add_to_ui)
+        self.fsm.on(ChargePointFSMState.force_booted.on_enter, self.set_online)
 
     @log_async_call(logger.warning)
     async def call_payload(
@@ -116,6 +118,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             if self.fsm.context.id in status_notification_cache:
                 for _, notification in status_notification_cache[self.fsm.context.id].items():
                     await self.handle_status_notification_inner(EvseStatus.model_validate(json.loads(notification)))
+        else:
+            if self.has_icl_v16_hacks():
+                await self.fsm.handle(ChargePointFSMEvent.on_missing_boot_notification)
 
     async def add_to_ui(self, *vargs):
         assert  self.fsm.context.id != "provisional"
@@ -399,8 +404,12 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             del boot_notification_cache[self.fsm.context.id]
         if self.fsm.context.id in status_notification_cache:
             del status_notification_cache[self.fsm.context.id]
-        await self.call_payload(call.Reset(type=ResetEnumType.immediate))
-        await self.close_connection(*vargs)
+        response : call_result.Reset = await self.call_payload(call.Reset(type=ResetEnumType.immediate))
+        if response.status == ResetStatusEnumType.accepted:
+            await self.fsm.handle(ChargePointFSMEvent.on_reset_accepted)
+            await self.close_connection(*vargs)
+        else:
+            await self.fsm.handle(ChargePointFSMEvent.on_reset_rejected)
 
 
     async def close_connection(self, *vargs):
@@ -433,6 +442,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint -= 1000
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
+
+    def has_icl_v16_hacks(self):
+        return self.id.startswith("Latiniki")
 
 
 charge_points : dict[ChargePointId, OCPPServerHandler] = dict()

@@ -32,12 +32,16 @@ Unknown --> Booted : on boot notification
 Rejected --> [*]
 Identified --> Booted : on boot notification
 Identified --> Booted : on cached boot notification
-Identified --> Failed : on boot timeout
+Identified --> Failing : on boot timeout
+Failing --> Failed : on reset accepted
+Failing --> ForceBooted : on reset rejected
 Failed --> [*]
 Booted --> RunningTransaction : on transaction_manager request
 Booted --> Identified : on boot notification
+ForceBooted --> Identified : on boot notification
 RunningTransaction --> RunningTransaction
 RunningTransaction --> Booted : if no active transactions
+ForceBooted --> Closing : on reboot confirmed
 Booted --> Closing : on reboot confirmed
 Closing --> [*]
 @enduml
