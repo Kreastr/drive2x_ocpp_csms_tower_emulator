@@ -38,7 +38,7 @@ from ocpp.v16.datatypes import IdTagInfo
 from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus
 from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v201 import call_result as call_result_201
-from ocpp.v201.datatypes import GetVariableResultType
+from ocpp.v201.datatypes import GetVariableResultType, VariableType
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType
 from pydantic import BaseModel
 from websockets import Subprotocol, ConnectionClosedOK
@@ -48,7 +48,7 @@ from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
-from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
+from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType, ComponentType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from proxy.proxy_config import ProxyConfigurator, ProxyConfig
 from proxy.proxy_connection_context import ProxyConnectionContext
@@ -314,15 +314,20 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         #    conf_key
         for var in reject_list:
             var_val = self.get_stub_variable_value(var)
+            resp_cmpnt = ComponentType(name=var.component.name,
+                                       instance=var.component.instance,
+                                       evse=var.component.evse)
+            resp_var = VariableType(name=var.variable.name,
+                                    instance=var.variable.instance)
             if var_val is not None:
                 response_variables.append(GetVariableResultType(attribute_status=GetVariableStatusEnumType.accepted,
-                                                                component=var.component,
-                                                                variable=var.variable,
+                                                                component=resp_cmpnt,
+                                                                variable=resp_var,
                                                                 attribute_value=var_val))
             else:
                 response_variables.append(GetVariableResultType(attribute_status=GetVariableStatusEnumType.unknown_variable,
-                                                                component=var.component,
-                                                                variable=var.variable))
+                                                                component=resp_cmpnt,
+                                                                variable=resp_var))
         logger.warning(f"{response_variables=}")
         return call_result_201.GetVariables(response_variables)
 
