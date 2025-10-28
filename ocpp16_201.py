@@ -38,7 +38,7 @@ from ocpp.v16.datatypes import IdTagInfo
 from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus
 from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v201 import call_result as call_result_201
-from ocpp.v201.datatypes import GetVariableResultType, VariableType
+from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType
 from pydantic import BaseModel
 from websockets import Subprotocol, ConnectionClosedOK
@@ -48,7 +48,7 @@ from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
-from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType, ComponentType
+from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from proxy.proxy_config import ProxyConfigurator, ProxyConfig
 from proxy.proxy_connection_context import ProxyConnectionContext
