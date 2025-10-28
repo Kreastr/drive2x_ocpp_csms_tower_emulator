@@ -275,7 +275,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     """
 
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
-        if self.id.startswith("Latinki"):
+        logger.warning(f"{self.id=}")
+        if self.id.startswith("ocpp16/Latinki"):
             v16_type = ResetType.soft
         else:
             if request.type in RESET_TYPE_MAP:
