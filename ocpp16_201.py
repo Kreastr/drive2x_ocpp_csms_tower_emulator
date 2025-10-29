@@ -50,6 +50,7 @@ from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
+from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
@@ -227,6 +228,26 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             id_tag_info=IdTagInfo(status=AuthorizationStatus.accepted)
         )
 
+    @on(Action.stop_transaction)
+    @async_camelize_kwargs
+    @log_req_response
+    @with_request_model(StopTransactionRequest)
+    async def on_stop_transaction(self, rq : StopTransactionRequest, **kwargs):
+        #tx_id_16 = time_based_id()
+        # Use normal sleep here to guarantee that tx_id_16 are unique
+        #sleep(0.1)
+        #tx_id_201 = str(uuid.uuid4())
+        #TX_MAP_16_TO_201[tx_id_16] = tx_id_201
+        #TX_MAP_201_TO_16[tx_id_201] = tx_id_16
+
+        if rq.transactionId in TX_MAP_16_TO_201:
+            tx_id_201 = TX_MAP_16_TO_201[rq.transactionId]
+            await self.server_connection.stop_transaction_request(rq, tx_id_201)
+        else:
+            logger.warning(f"Unknown transaction has ended {rq.transactionId=}. Cannot notify CSMS. {rq=}")
+
+        return call_result.StopTransaction()
+    
     @on(Action.heartbeat)
     @log_req_response
     async def on_heartbeat(self, **data):

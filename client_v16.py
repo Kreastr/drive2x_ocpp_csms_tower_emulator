@@ -26,14 +26,15 @@ from abc import ABC, abstractmethod
 from logging import getLogger
 
 import websockets
-from ocpp.v16.enums import ChargePointStatus
+from ocpp.v16.enums import ChargePointStatus, Reason
 from ocpp.v201.datatypes import ChargingStationType, TransactionType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
-from ocpp.v21.enums import Action
+from ocpp.v201.enums import Action
 
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
+from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
@@ -71,11 +72,24 @@ STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.occupied,
               ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable,
               ChargePointStatus.charging: ConnectorStatusEnumType.occupied}
 
+STOP_REASON_MAP = {Reason.emergency_stop: TriggerReasonEnumType.abnormal_condition,
+              Reason.ev_disconnected: TriggerReasonEnumType.ev_communication_lost,
+                Reason.hard_reset: TriggerReasonEnumType.reset_command,
+                Reason.local: TriggerReasonEnumType.stop_authorized,
+                Reason.other: TriggerReasonEnumType.abnormal_condition,
+                Reason.power_loss: TriggerReasonEnumType.abnormal_condition,
+                Reason.reboot: TriggerReasonEnumType.reset_command,
+                Reason.remote: TriggerReasonEnumType.remote_stop,
+                Reason.soft_reset: TriggerReasonEnumType.reset_command,
+                Reason.unlock_command: TriggerReasonEnumType.unlock_command,
+                Reason.de_authorized: TriggerReasonEnumType.deauthorized}
+
 class OCPPClientV201(ChargePoint):
 
     def __init__(self, client_interface : OCPPServerV16Interface, serial_number, ws, response_timeout=30, _logger=logger):
         super().__init__(serial_number, ws, response_timeout=response_timeout, logger=_logger)
         self.client_interface = client_interface
+        self.tx_seq_no = None
 
     async def status_notification_request(self, rq : StatusNotificationRequest) -> call_result.StatusNotification:
 
@@ -103,11 +117,26 @@ class OCPPClientV201(ChargePoint):
                 ))
 
     async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
+        self.tx_seq_no = 1
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
-                                                             seq_no=1,
+                                                             seq_no=self.tx_seq_no,
                                                              transaction_info=TransactionType(tx_id)))
+
+
+    async def stop_transaction_request(self, rq : StopTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
+        self.tx_seq_no += 1
+        if rq.reason in STOP_REASON_MAP:
+            reason = STOP_REASON_MAP[rq.reason]
+        else:
+            reason = TriggerReasonEnumType.abnormal_condition
+        return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
+                                                             timestamp=rq.timestamp.isoformat(),
+                                                             trigger_reason=reason,
+                                                             seq_no=self.tx_seq_no,
+                                                             transaction_info=TransactionType(tx_id)),
+                                                             custom_data={"original_reason": str(rq.reason)})
 
     async def heartbeat_request(self) -> call_result.Heartbeat:
         return await self.call_payload(call.Heartbeat())
