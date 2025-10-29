@@ -203,7 +203,6 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     @log_req_response
     @with_request_model(StatusNotificationRequest)
     async def on_status_notification(self, rq : StatusNotificationRequest, **kwargs):
-
         await self.server_connection.status_notification_request(rq)
         return call_result.StatusNotification(
         )

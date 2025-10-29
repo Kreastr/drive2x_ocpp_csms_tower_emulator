@@ -68,13 +68,11 @@ session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
 boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redis=redis)
 status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
 
-
 def clamp_setpoint(evse: EvseStatus):
     if evse.setpoint > 8000:
         evse.setpoint = 8000
     if evse.setpoint < -8000:
         evse.setpoint = -8000
-
 
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
@@ -85,7 +83,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.onl_task = asyncio.create_task(self.online_status_task())
         self.fsm = get_charge_point_fsm(ChargePointContext())
         self.fsm.context : ChargePointContext
-        
 
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.try_cached_boot_notification)
@@ -129,11 +126,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.ui_effects_on_connected()
 
     async def connect_and_request_id(self, *vargs):
-
         start_task = asyncio.create_task(self.start())
         await self.request_serial_bg()
         await start_task
-
 
     async def request_serial_bg(self, **kwargs):
         await asyncio.sleep(3)  # toDo fix with wait for connection
@@ -167,7 +162,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
             return
         await self.fsm.handle(ChargePointFSMEvent.on_serial_number_obtained)
-
 
     async def ui_effects_on_connected(self):
         from server.ui import CPCard
@@ -257,12 +251,12 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         status_notification_cache[self.fsm.context.id] = status_data
         
         await self.handle_status_notification_inner(conn_status)
-        return call_result.StatusNotification(
-        )
+        return call_result.StatusNotification()
 
     async def handle_status_notification_inner(self, conn_status):
         if self.fsm.current_state in [ChargePointFSMState.identified,
                                       ChargePointFSMState.booted,
+                                      ChargePointFSMState.force_booted,
                                       ChargePointFSMState.running_transaction,
                                       ChargePointFSMState.closing]:
 
@@ -392,8 +386,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     def log_event(self, event_data):
         self.events.append(event_data)
-        
-        
+
     async def request_full_report(self, *vargs):
         result = await self.call_payload(
             call.GetBaseReport(request_id=time_based_id(),
@@ -411,14 +404,12 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         else:
             await self.fsm.handle(ChargePointFSMEvent.on_reset_rejected)
 
-
     async def close_connection(self, *vargs):
         self.fsm.context.shutdown = True
         self.fsm.context.online = False
         await self._connection.close()
         await self.onl_task
 
-    
     async def do_clear_fault(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
     
