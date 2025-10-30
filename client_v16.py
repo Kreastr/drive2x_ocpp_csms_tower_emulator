@@ -136,8 +136,8 @@ class OCPPClientV201(ChargePoint):
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=reason,
                                                              seq_no=self.tx_seq_no,
-                                                             transaction_info=TransactionType(tx_id)),
-                                                             custom_data={"original_reason": str(rq.reason)})
+                                                             transaction_info=TransactionType(tx_id),
+                                                             custom_data={"original_reason": str(rq.reason)}))
 
     async def heartbeat_request(self) -> call_result.Heartbeat:
         return await self.call_payload(call.Heartbeat())
