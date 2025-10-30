@@ -89,7 +89,8 @@ class OCPPClientV201(ChargePoint):
     def __init__(self, client_interface : OCPPServerV16Interface, serial_number, ws, response_timeout=30, _logger=logger):
         super().__init__(serial_number, ws, response_timeout=response_timeout, logger=_logger)
         self.client_interface = client_interface
-        self.tx_seq_no = None
+        # ToDo store in redis
+        self.tx_seq_no = 1
 
     async def status_notification_request(self, rq : StatusNotificationRequest) -> call_result.StatusNotification:
 
