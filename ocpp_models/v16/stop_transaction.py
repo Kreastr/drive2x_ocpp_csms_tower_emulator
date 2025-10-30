@@ -43,9 +43,9 @@ class MeterValue(BaseModel):
     sampledValue : list[SampledValue]
 
 class StopTransactionRequest(BaseModel):
-    idTag : Optional[str]
+    idTag : Optional[str] = None
     meterStop : int
     timestamp : datetime.datetime
     transactionId: int
-    reason : Optional[Reason]
-    transactionData : Optional[list[MeterValue]]
+    reason : Optional[Reason] = None
+    transactionData : Optional[list[MeterValue]] = None
