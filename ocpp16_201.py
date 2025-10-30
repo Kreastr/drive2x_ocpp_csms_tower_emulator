@@ -183,6 +183,9 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     @with_request_model(BootNotificationRequest)
     async def on_boot_notification(self, rq : BootNotificationRequest, **kwargs):
         try:
+            if rq.chargePointSerialNumber is None:
+                if self.has_icl_latiniki_hack():
+                    rq.chargePointSerialNumber = self.id
             await self.server_connection.boot_notification_request(rq)
             await self.fsm.handle(ProxyConnectionFSMEvent.on_client_boot_notification_forwarded)
             return call_result.BootNotification(
@@ -294,9 +297,12 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         await self.close_connection(*vargs)
     """
 
+    def has_icl_latiniki_hack(self):
+        return self.id.startswith("Latinki")
+
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
         logger.warning(f"{self.id=}")
-        #if self.id.startswith("Latinki"):
+        #if self.has_icl_latiniki_hack:
         #    v16_type = ResetType.soft
         #else:
         if request.type in RESET_TYPE_MAP:
