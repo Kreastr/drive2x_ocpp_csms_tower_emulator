@@ -58,7 +58,7 @@ class OCPPServerV16Interface(ABC):
     @abstractmethod
     async def on_server_set_variables(self, request : SetVariablesRequest) -> call_result.SetVariables:
         pass
-    
+
     @abstractmethod
     async def on_request_start_transaction(self, request : RequestStartTransactionRequest) -> call_result.RequestStartTransaction:
         pass
@@ -175,7 +175,7 @@ class OCPPClientV201(ChargePoint):
     @log_req_response
     @async_camelize_kwargs
     @with_request_model(SetVariablesRequest)
-    async def on_get_variables(self, request : SetVariablesRequest, *vargs, **kwargs):
+    async def on_set_variables(self, request : SetVariablesRequest, *vargs, **kwargs):
         return await self.client_interface.on_server_set_variables(request)
 
     @log_req_response
@@ -186,6 +186,8 @@ class OCPPClientV201(ChargePoint):
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except websockets.exceptions.ConnectionClosedOK:
+            await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
+        except websockets.exceptions.ConnectionClosedError:
             await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
     async def close_connection(self):

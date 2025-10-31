@@ -39,7 +39,6 @@ from util import setup_logging, time_based_id
 logger = setup_logging(__name__)
 
 
-
 class TxFSMServer(TxManagerFSMType):
 
     def __init__(self):
@@ -59,8 +58,7 @@ class TxFSMServer(TxManagerFSMType):
         self.on(TxManagerFSMState.transition_triggered.on_exit, self.send_new_setpoint)
 
         main_setpoint_loop().subscribe(lambda s=self: s.handle(TxManagerFSMEvent.on_setpoint_apply_mark))
-        
-        
+
     @staticmethod
     def if_charge_setpoint(context : TxManagerContext, other):
         return context.evse.setpoint > 0

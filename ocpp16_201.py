@@ -34,6 +34,7 @@ from time import sleep
 
 import ocpp.v16.enums
 from beartype import beartype
+from ocpp.exceptions import TypeConstraintViolationError
 from ocpp.routing import on
 from ocpp.v16.datatypes import IdTagInfo
 from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus, ResetType
@@ -210,6 +211,9 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except websockets.exceptions.ConnectionClosedOK:
+            await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
+            return
+        except websockets.exceptions.ConnectionClosedError:
             await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
             return
 
@@ -425,19 +429,28 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
         logger.warning(f"{list(request_list)=}")
         logger.warning(f"{reject_list=}")
-        if len(request_list):
-            result : call_result.GetConfiguration = await self.call_payload(call.GetConfiguration(key=list(request_list)))
-            logger.warning(f"get varaibles {result=}")
-        else:
-            result: call_result.GetConfiguration = await self.call_payload(call.GetConfiguration(key=None))
-            logger.warning(f"get all varaibles {result=}")
-        # ToDo: There is nothing to request yet
-        #for conf_key in result.configuration_key:
-        #    conf_key
+        try:
+            if len(request_list):
+                result : call_result.GetConfiguration | None = await self.call_payload(call.GetConfiguration(key=list(request_list)))
+                logger.warning(f"get varaibles {result=}")
+            else:
+                result = await self.call_payload(call.GetConfiguration(key=None))
+                logger.warning(f"get all varaibles {result=}")
+        except TypeConstraintViolationError:
+            result = None
+
         for v16key, var in request_list.items():
-            value = find_value_from_v16_response(result, v16key)
-            var_val = value
             resp_cmpnt, resp_var = clone_var_component(var)
+            if result is not None:
+                value = find_value_from_v16_response(result, v16key)
+                response_variables.append(GetVariableResultType(attribute_status=GetVariableStatusEnumType.accepted,
+                                                                component=resp_cmpnt,
+                                                                variable=resp_var,
+                                                                attribute_value=str(value)))
+            else:
+                response_variables.append(GetVariableResultType(attribute_status=GetVariableStatusEnumType.unknown_variable,
+                                                                component=resp_cmpnt,
+                                                                variable=resp_var))
 
         for var in reject_list:
             var_val = self.get_stub_variable_value(var)
