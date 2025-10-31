@@ -38,6 +38,7 @@ from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
+from ocpp_models.v201.set_variables import SetVariablesRequest
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent
 from util import log_req_response, with_request_model, async_camelize_kwargs
@@ -54,6 +55,10 @@ class OCPPServerV16Interface(ABC):
     async def on_server_get_variables(self, request : GetVariablesRequest) -> call_result.GetVariables:
         pass
 
+    @abstractmethod
+    async def on_server_set_variables(self, request : SetVariablesRequest) -> call_result.SetVariables:
+        pass
+    
     @abstractmethod
     async def on_request_start_transaction(self, request : RequestStartTransactionRequest) -> call_result.RequestStartTransaction:
         pass
@@ -164,6 +169,14 @@ class OCPPClientV201(ChargePoint):
     @with_request_model(GetVariablesRequest)
     async def on_get_variables(self, request : GetVariablesRequest, *vargs, **kwargs):
         return await self.client_interface.on_server_get_variables(request)
+
+
+    @on(Action.set_variables)
+    @log_req_response
+    @async_camelize_kwargs
+    @with_request_model(SetVariablesRequest)
+    async def on_get_variables(self, request : SetVariablesRequest, *vargs, **kwargs):
+        return await self.client_interface.on_server_set_variables(request)
 
     @log_req_response
     async def call_payload(

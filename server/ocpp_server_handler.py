@@ -69,10 +69,10 @@ boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redi
 status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
 
 def clamp_setpoint(evse: EvseStatus):
-    if evse.setpoint > 8000:
-        evse.setpoint = 8000
-    if evse.setpoint < -8000:
-        evse.setpoint = -8000
+    if evse.setpoint > 3500:
+        evse.setpoint = 3500
+    if evse.setpoint < 0:
+        evse.setpoint = 0
 
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
@@ -438,6 +438,11 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
 
+    async def force_setpoint_update(self, evse_id : EVSEId):
+        new_setpoint = self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint
+        logger.warning(f"Forced setpoint update {evse_id=} {new_setpoint=}")
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_apply_mark)
+        
     def has_icl_v16_hacks(self):
         return self.id.startswith("Latiniki")
 

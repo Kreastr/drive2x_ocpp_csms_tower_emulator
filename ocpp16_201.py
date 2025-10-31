@@ -38,11 +38,13 @@ from ocpp.routing import on
 from ocpp.v16.datatypes import IdTagInfo
 from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus, ResetType
 from ocpp.v16 import ChargePoint, call_result, call
+from ocpp.v16 import enums as v16enums
 from ocpp.v201 import call_result as call_result_201
-from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType
+from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType, SetVariableResultType, EVSEType
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType, \
     ResetEnumType, ResetStatusEnumType
 from pydantic import BaseModel
+from typing_extensions import TypeVar
 from websockets import Subprotocol, ConnectionClosedOK
 
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
@@ -54,6 +56,7 @@ from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
+from ocpp_models.v201.set_variables import SetVariablesRequest, SetVariableDataType
 from proxy.proxy_config import ProxyConfigurator, ProxyConfig
 from proxy.proxy_connection_context import ProxyConnectionContext
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
@@ -82,7 +85,7 @@ getLogger("websockets.server").setLevel(logging.WARNING)
 getLogger("ocpp").setLevel(logging.WARNING)
 getLogger("websockets.client").setLevel(logging.WARNING)
 
-CONFIGURATION_MAP = {}
+CONFIGURATION_MAP = {"V2XChargingCtrlr": {"Setpoint": "pBaseline"}}
 STUBS_MAP = {}
 
 AUTH_STATUS_MAP = {RemoteStartStopStatus.accepted: RequestStartStopStatusEnumType.accepted,
@@ -122,6 +125,44 @@ async def connect_as_client(client_interface, uri, serial_number, on_connect):
             logger.error(traceback.format_exc())
             await asyncio.sleep(fallback)
             fallback *= 1.5
+
+
+def find_value_from_v16_response(result, v16key):
+    for key_data in result.configuration_key:
+        if key_data["key"] == v16key:
+            value = key_data["value"]
+            break
+    return value
+
+T = TypeVar("T")
+
+
+def categorize_variables(rq_list : list[T]):
+    request_list: dict[str, T] = {}
+    reject_list: list[T] = []
+    for var in rq_list:
+        cname = var.component.name
+        vname = var.variable.name
+        if cname in CONFIGURATION_MAP:
+            if vname in CONFIGURATION_MAP[cname]:
+                request_list[CONFIGURATION_MAP[cname][vname]] = var
+                continue
+        reject_list.append(var)
+    return reject_list, request_list
+
+
+def clone_var_component(var):
+    if var.component.evse:
+        resp_cmpnt = ComponentType(name=var.component.name,
+                                   instance=var.component.instance,
+                                   evse=EVSEType(id=var.component.evse.id,
+                                                 connector_id=var.component.evse.connectorId) )
+    else:
+        resp_cmpnt = ComponentType(name=var.component.name,
+                                   instance=var.component.instance)
+    resp_var = VariableType(name=var.variable.name,
+                            instance=var.variable.instance)
+    return resp_cmpnt, resp_var
 
 
 @beartype
@@ -297,6 +338,43 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         await self.close_connection(*vargs)
     """
 
+    async def on_server_set_variables(self, request: SetVariablesRequest) -> call_result_201.SetVariables:
+        var: SetVariableDataType
+        response_variables: list[SetVariableResultType] = []
+        reject_list, request_list = categorize_variables(request.setVariableData)
+
+        logger.warning(f"{list(request_list)=}")
+        logger.warning(f"{reject_list=}")
+
+        for key, var in request_list.items():
+            response = await self.forward_set_variable(key, var)
+            response_variables.append(response)
+
+        for var in reject_list:
+            resp_cmpnt, resp_var = clone_var_component(var)
+
+            response_variables.append(SetVariableResultType(attribute_status=SetVariableStatusEnumType.rejected,
+                                                            component=resp_cmpnt,
+                                                            variable=resp_var))
+        logger.warning(f"{response_variables=}")
+        return call_result_201.SetVariables(response_variables)
+
+    async def forward_set_variable(self, key, var):
+        resp_cmpnt, resp_var = clone_var_component(var)
+        value = var.attributeValue
+        result: call_result.ChangeConfiguration = await self.call_payload(
+            call.ChangeConfiguration(key=key, value=value))
+        logger.warning(f"get varaibles {key=} {value=} {result=}")
+        if result.status == v16enums.ConfigurationStatus.accepted:
+            response = SetVariableResultType(attribute_status=SetVariableStatusEnumType.accepted,
+                                             component=resp_cmpnt,
+                                             variable=resp_var)
+        else:
+            response = SetVariableResultType(attribute_status=SetVariableStatusEnumType.rejected,
+                                             component=resp_cmpnt,
+                                             variable=resp_var)
+        return response
+
     def has_icl_latiniki_hack(self):
         return self.id.startswith("Latinki")
 
@@ -343,17 +421,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def on_server_get_variables(self, request: GetVariablesRequest) -> call_result_201.GetVariables:
         var : GetVariableDataType
         response_variables : list[GetVariableResultType] = []
-        request_list : dict[str, GetVariableDataType] = {}
-        reject_list : list[GetVariableDataType] = []
-
-        for var in request.getVariableData:
-            cname = var.component.name
-            vname = var.variable.name
-            if cname in CONFIGURATION_MAP:
-                if vname in CONFIGURATION_MAP[cname]:
-                    request_list[CONFIGURATION_MAP[cname][vname]] = var
-                    continue
-            reject_list.append(var)
+        reject_list, request_list = categorize_variables(request.getVariableData)
 
         logger.warning(f"{list(request_list)=}")
         logger.warning(f"{reject_list=}")
@@ -366,13 +434,14 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         # ToDo: There is nothing to request yet
         #for conf_key in result.configuration_key:
         #    conf_key
+        for v16key, var in request_list.items():
+            value = find_value_from_v16_response(result, v16key)
+            var_val = value
+            resp_cmpnt, resp_var = clone_var_component(var)
+
         for var in reject_list:
             var_val = self.get_stub_variable_value(var)
-            resp_cmpnt = ComponentType(name=var.component.name,
-                                       instance=var.component.instance,
-                                       evse=var.component.evse)
-            resp_var = VariableType(name=var.variable.name,
-                                    instance=var.variable.instance)
+            resp_cmpnt, resp_var = clone_var_component(var)
             if var_val is not None:
                 response_variables.append(GetVariableResultType(attribute_status=GetVariableStatusEnumType.accepted,
                                                                 component=resp_cmpnt,

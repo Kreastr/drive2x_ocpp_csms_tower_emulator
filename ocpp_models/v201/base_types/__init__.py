@@ -23,7 +23,7 @@ Union nor the granting authority can be held responsible for them.
 """
 
 from pydantic import BaseModel, StringConstraints
-from typing import Annotated
+from typing import Annotated, Optional
 
 CiString20Type = Annotated[str, StringConstraints(max_length=20)]
 CiString25Type = Annotated[str, StringConstraints(max_length=25)]
@@ -31,4 +31,18 @@ CiString36Type = Annotated[str, StringConstraints(max_length=36)]
 CiString50Type = Annotated[str, StringConstraints(max_length=50)]
 CiString255Type = Annotated[str, StringConstraints(max_length=255)]
 CiString500Type = Annotated[str, StringConstraints(max_length=500)]
+CiString1000Type = Annotated[str, StringConstraints(max_length=1000)]
 
+
+class EVSEType(BaseModel):
+    id : int
+    connectorId : Optional[int] = None
+
+class ComponentType(BaseModel):
+    name : CiString50Type
+    instance : Optional[CiString50Type] = None
+    evse : Optional[EVSEType] = None
+
+class VariableType(BaseModel):
+    name : CiString50Type
+    instance : Optional[CiString50Type] = None

@@ -17,8 +17,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) 
-only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European 
+Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s)
+only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
 
@@ -28,14 +28,15 @@ from typing import Optional
 from ocpp.v201.enums import AttributeEnumType
 from pydantic import BaseModel
 
-from ocpp_models.v201.base_types import CiString50Type, ComponentType, VariableType
+from ocpp_models.v201.base_types import ComponentType, CiString1000Type, VariableType
 
 
-class GetVariableDataType(BaseModel):
-     attributeType : Optional[AttributeEnumType] = None
-     component : ComponentType
-     variable : VariableType
+class SetVariableDataType(BaseModel):
+    attributeType : Optional[AttributeEnumType] = None
+    attributeValue : CiString1000Type
+    component : ComponentType
+    variable : VariableType
 
-class GetVariablesRequest(BaseModel):
+class SetVariablesRequest(BaseModel):
 
-    getVariableData :  list[GetVariableDataType]
+    setVariableData :  list[SetVariableDataType]

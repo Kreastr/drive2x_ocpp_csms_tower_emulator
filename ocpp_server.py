@@ -96,7 +96,7 @@ async def on_connect(websocket):
 
     if 0:
         await set_measurement_variables(cp)
-    while cp.fsm.current_state != None:
+    while cp.fsm.current_state is not None:
         await asyncio.sleep(1)
     logger.warning("Charge point FSM is done. Closing connection.")
     await cp.close_connection()
@@ -190,14 +190,12 @@ async def transactions(cp_id : ChargePointId):
     else:
         return {"events": charge_points[cp_id].fsm.context.transactions}
 
-
 @app.get("/cp/{cp_id}/remote_start/{evse_id}")
 async def remote_start(cp_id : ChargePointId, evse_id : EVSEId):
     if cp_id not in charge_points:
         return {"status": "error"}
     else:
         return {"result": await charge_points[cp_id].do_remote_start(evse_id)}
-
 
 @app.get("/cp/{cp_id}/remote_stop/{evse_id}")
 async def remote_stop(cp_id : ChargePointId, evse_id : EVSEId):
