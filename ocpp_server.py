@@ -58,7 +58,8 @@ gui_info._background_tasks = background_tasks
 from websockets import Subprotocol
 
 from charge_point_fsm_enums import ChargePointFSMEvent, ChargePointFSMState
-from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points, clamp_setpoint
+from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points, clamp_setpoint, \
+    status_notification_cache, boot_notification_cache
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
     car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
@@ -281,6 +282,14 @@ def check_control(cp_id : ChargePointId, site_tag : str):
     return control_allowed
 
 SITE_TIMEZONES = {"d2x_ga3_demo": timezone("Europe/Helsinki")}
+
+@app.get("/status_cache")
+async def status_cache():
+    return dict(status_notification_cache)
+
+@app.get("/boot_cache")
+async def boot_cache():
+    return dict(boot_notification_cache)
 
 @app.get("/sca_data/evs/{tag}")
 async def sca_data_evs(tag : str) -> SCADataEVs:
