@@ -79,9 +79,9 @@ logger.setLevel(logging.DEBUG)
 
 cp_card_container : ui.grid | None = None
 
-#logging.getLogger("websockets.server").setLevel(logging.WARNING)
+logging.getLogger("websockets.server").setLevel(logging.WARNING)
 #logging.getLogger("ocpp").setLevel(logging.WARNING)
-#logging.getLogger("websockets.client").setLevel(logging.WARNING)
+logging.getLogger("websockets.client").setLevel(logging.WARNING)
 
 
 

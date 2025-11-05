@@ -7,6 +7,7 @@ class TxManagerFSMState(StateBase, str, Enum):
     available='available'
     authorizing='authorizing'
     authorized='authorized'
+    upkeep='upkeep'
     ready='ready'
     transition_triggered='transition_triggered'
     charging='charging'
@@ -24,9 +25,9 @@ class TxManagerFSMCondition(str, Enum):
 
 class TxManagerFSMEvent(str, Enum):
     on_state_changed = 'on_state_changed'
-    on_authorized='on_authorized'
     on_authorize_accept='on_authorize_accept'
     on_tx_update_event='on_tx_update_event'
+    on_authorized_by_app='on_authorized_by_app'
     on_authorize_reject='on_authorize_reject'
     on_start_tx_event='on_start_tx_event'
     on_deauthorized='on_deauthorized'

@@ -34,7 +34,7 @@ from server.data.tx_manager_context import TxManagerContext
 from util.interval_trigger import main_setpoint_loop
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType, transaction_manager_uml
 from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
-from util import setup_logging, time_based_id
+from util import setup_logging, time_based_id, get_app_args
 
 logger = setup_logging(__name__)
 
@@ -52,7 +52,8 @@ class TxFSMServer(TxManagerFSMType):
         self.apply_to_all_conditions(TxManagerFSMCondition.if_discharge_setpoint, self.if_discharge_setpoint)
 
         self.on(TxManagerFSMState.authorizing.on_enter, self.send_auth_to_cp)
-        self.on(TxManagerFSMState.occupied.on_loop, self.send_auth_to_cp)
+        self.on(TxManagerFSMState.occupied.on_enter, self.send_auth_to_cp)
+        self.on(TxManagerFSMState.upkeep.on_enter, self.enter_upkeep)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
 
         self.on(TxManagerFSMState.transition_triggered.on_exit, self.send_new_setpoint)
@@ -70,6 +71,10 @@ class TxFSMServer(TxManagerFSMType):
     @staticmethod
     def if_discharge_setpoint(context : TxManagerContext, other):
         return context.evse.setpoint < 0
+    
+    async def enter_upkeep(self, *vargs):
+        self.context.evse.setpoint = get_app_args().upkeep_power
+        self.handle(TxManagerFSMEvent.on_setpoint_apply_mark)
 
     async def send_new_setpoint(self, *vargs):
         self.context: TxManagerContext

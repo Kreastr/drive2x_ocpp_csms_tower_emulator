@@ -164,7 +164,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         if self.tx_fsm.current_state in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]:
             self.handle_as_deferred(UIManagerFSMEvent.on_ready_status)
         else:
-            await self.tx_fsm.handle(TxManagerFSMEvent.on_authorized)
+            await self.tx_fsm.handle(TxManagerFSMEvent.on_authorized_by_app)
             self.context.timeout_time = datetime.now() + timedelta(seconds=15)
         #ctxt.session_pin = random.randint(100000,999999)
         #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin

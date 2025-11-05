@@ -32,12 +32,12 @@ Unknown --> Occupied : if occupied
 Available --> Occupied : if occupied
 Unknown --> Available : if available
 Occupied --> Available : if available
-Available --> Authorizing : on authorized
+Available --> Authorizing : on authorized by app
 Authorizing --> Authorized : on authorize accept
 Authorizing --> Unknown : on authorize reject
-Occupied --> Occupied : on authorized
-Occupied --> Ready : on authorize accept
-Occupied --> Ready : on tx update event
+Occupied --> Upkeep : on authorize accept
+Occupied --> Upkeep : on tx update event
+Upkeep --> Ready : on authorized by app
 Authorized --> Ready : on start tx event
 Authorized --> Unknown : on deauthorized
 Ready --> TransitionTriggered : on setpoint apply mark
