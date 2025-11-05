@@ -96,8 +96,8 @@ AUTH_STATUS_MAP = {RemoteStartStopStatus.accepted: RequestStartStopStatusEnumTyp
                    RemoteStartStopStatus.rejected: RequestStartStopStatusEnumType.rejected
                    }
 
-TX_MAP_16_TO_201 = RedisDict(redis=get_default_redis(get_proxy_app_args))
-TX_MAP_201_TO_16 = RedisDict(redis=get_default_redis(get_proxy_app_args))
+TX_MAP_16_TO_201 = RedisDict("proxy-TX_MAP_16_TO_201-", redis=get_default_redis(get_proxy_app_args))
+TX_MAP_201_TO_16 = RedisDict("proxy-TX_MAP_201_TO_16-", redis=get_default_redis(get_proxy_app_args))
 
 RESET_TYPE_MAP = {ResetEnumType.immediate: ResetType.hard,
                   ResetEnumType.on_idle: ResetType.soft}
