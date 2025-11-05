@@ -40,6 +40,7 @@ Occupied --> Upkeep : on tx update event
 Upkeep --> Ready : on authorized by app
 Authorized --> Ready : on start tx event
 Authorized --> Unknown : on deauthorized
+Upkeep --> Available : if available
 Ready --> TransitionTriggered : on setpoint apply mark
 Charging --> TransitionTriggered : on setpoint apply mark
 Discharging --> TransitionTriggered : on setpoint apply mark

@@ -48,7 +48,7 @@ from server.data import ChargePointContext, EvseStatus
 from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
-from util import get_time_str, any_of, time_based_id, broadcast_to, log_async_call
+from util import get_time_str, any_of, time_based_id, broadcast_to, log_async_call, get_app_args
 
 from server.ui.nicegui import gui_info
 from util.types import *
@@ -73,6 +73,15 @@ def clamp_setpoint(evse: EvseStatus):
         evse.setpoint = 3500
     if evse.setpoint < 0:
         evse.setpoint = 0
+
+    upkeep_power = get_app_args().upkeep_power
+    # Minimal charge/discharge for connection stability
+    if evse.setpoint < 0:
+        if evse.setpoint > -upkeep_power:
+            evse.setpoint = -upkeep_power
+    else:
+        if evse.setpoint < upkeep_power:
+            evse.setpoint = upkeep_power
 
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
@@ -162,6 +171,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             return
 
         self.fsm.context.id = result.get_variable_result[0].attribute_value
+        charge_points[self.fsm.context.id] = self
         if self.fsm.context.id is None:
             await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
             return
@@ -402,7 +412,11 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             del boot_notification_cache[self.fsm.context.id]
         if self.fsm.context.id in status_notification_cache:
             del status_notification_cache[self.fsm.context.id]
-        response : call_result.Reset = await self.call_payload(call.Reset(type=ResetEnumType.immediate))
+        response : call_result.Reset | None = await self.call_payload(call.Reset(type=ResetEnumType.immediate))
+        if response is None:
+            await self.fsm.handle(ChargePointFSMEvent.on_reset_rejected)
+            return
+
         if response.status == ResetStatusEnumType.accepted:
             await self.fsm.handle(ChargePointFSMEvent.on_reset_accepted)
         else:
@@ -421,7 +435,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_deauthorized)
     
     async def do_remote_start(self, evse_id : EVSEId):
-        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized)
+        await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_authorized_by_app)
 
     def get_evse(self, evse_id : EVSEId):
         return self.fsm.context.transaction_fsms[evse_id].context.evse
@@ -442,7 +456,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         new_setpoint = self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint
         logger.warning(f"Forced setpoint update {evse_id=} {new_setpoint=}")
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_apply_mark)
-        
+
     def has_icl_v16_hacks(self):
         return self.id.startswith("Latiniki")
 

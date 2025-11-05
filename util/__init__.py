@@ -167,9 +167,7 @@ def pil2base64(qr):
     buf = io.BytesIO()
     qr.save(buf, format="PNG")
     imb = buf.getvalue()
-    logger.warning(imb)
     img: str = base64.b64encode(imb).decode("utf-8")
-    logger.warning(img)
     return img
 
 def qr_link(url):

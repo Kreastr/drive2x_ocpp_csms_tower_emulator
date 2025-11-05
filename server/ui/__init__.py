@@ -58,7 +58,7 @@ class CPCard(Element):
         super().__init__(tag="div")
         self.fsm = fsm
         self.cp_context : ChargePointContext = fsm.context
-        cp = charge_points[self.cp_context.id]
+        cp = charge_points[str(self.cp_context.id)]
         self.card = ui.card()
         self.bind_online_from(self.cp_context, "online")
         self._handle_online_change(self.cp_context.online)
