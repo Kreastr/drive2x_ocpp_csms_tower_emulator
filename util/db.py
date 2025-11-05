@@ -25,11 +25,11 @@ Union nor the granting authority can be held responsible for them.
 
 from redis import Redis
 from snoop import snoop
+from . import get_app_args
 
 @snoop
-def get_default_redis():
-    from . import get_app_args
-    args = get_app_args()
+def get_default_redis(arg_provider=get_app_args):
+    args = arg_provider()
     redis_host = args.redis_host
     redis_port = args.redis_port
     redis_db = args.redis_db

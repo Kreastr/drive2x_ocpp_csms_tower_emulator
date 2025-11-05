@@ -45,6 +45,7 @@ from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentTy
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType, \
     ResetEnumType, ResetStatusEnumType
 from pydantic import BaseModel
+from redis_dict import RedisDict
 from typing_extensions import TypeVar
 from websockets import Subprotocol, ConnectionClosedOK
 
@@ -67,6 +68,8 @@ from util import get_time_str, async_camelize_kwargs, log_req_response, with_req
     get_proxy_app_args
 
 from datetime import  timezone
+
+from util.db import get_default_redis
 
 UTC_TZ = timezone(timedelta(0))
 import sys
@@ -93,8 +96,8 @@ AUTH_STATUS_MAP = {RemoteStartStopStatus.accepted: RequestStartStopStatusEnumTyp
                    RemoteStartStopStatus.rejected: RequestStartStopStatusEnumType.rejected
                    }
 
-TX_MAP_16_TO_201 = dict()
-TX_MAP_201_TO_16 = dict()
+TX_MAP_16_TO_201 = RedisDict(redis=get_default_redis(get_proxy_app_args))
+TX_MAP_201_TO_16 = RedisDict(redis=get_default_redis(get_proxy_app_args))
 
 RESET_TYPE_MAP = {ResetEnumType.immediate: ResetType.hard,
                   ResetEnumType.on_idle: ResetType.soft}
