@@ -69,10 +69,10 @@ boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redi
 status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
 
 def clamp_setpoint(evse: EvseStatus):
-    if evse.setpoint > 3500:
-        evse.setpoint = 3500
-    if evse.setpoint < 0:
-        evse.setpoint = 0
+    if evse.setpoint > 8000:
+        evse.setpoint = 8000
+    if evse.setpoint < -8000:
+        evse.setpoint = -8000
 
     upkeep_power = get_app_args().upkeep_power
     # Minimal charge/discharge for connection stability
@@ -442,13 +442,19 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     async def do_increase_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Increased setpoint")
-        self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint += 1000
+        if self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint >= -get_app_args().upkeep_power:
+            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint = get_app_args().upkeep_power
+        else:
+            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint += 200
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
 
     async def do_decrease_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Decreased setpoint")
-        self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint -= 1000
+        if self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint <= get_app_args().upkeep_power:
+            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint = -get_app_args().upkeep_power
+        else:
+            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint -= 200
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
 
