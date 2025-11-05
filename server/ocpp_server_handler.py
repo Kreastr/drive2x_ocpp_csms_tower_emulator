@@ -217,7 +217,10 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         self.fsm.context.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
 
+        self.id = charging_station["serial_number"]
         self.fsm.context.id = charging_station["serial_number"]
+        boot_notification_cache[self.id] = (charging_station, reason, vargs, kwargs)
+        boot_notification_cache[self.fsm.context.id] = (charging_station, reason, vargs, kwargs)
 
         logger.warning(f"id={self.fsm.context.id} boot_notification {charging_station=} {reason=} {vargs=} {kwargs=}")
 
@@ -232,8 +235,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         if self.fsm.current_state not in [ChargePointFSMState.unknown,
                                           ChargePointFSMState.identified]:
             #await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
-            if self.fsm.context.id in boot_notification_cache:
-                del boot_notification_cache[self.fsm.context.id]
+            #if self.fsm.context.id in boot_notification_cache:
+            #    del boot_notification_cache[self.fsm.context.id]
             await self.fsm.handle(ChargePointFSMEvent.on_boot_notification)
             return call_result.BootNotification(
                 current_time=get_time_str(),
@@ -241,8 +244,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 status=RegistrationStatusEnumType.rejected
             )
 
-        self.fsm.context.id = charging_station["serial_number"]
-        boot_notification_cache[self.fsm.context.id] = (charging_station, reason, vargs, kwargs)
         await self.fsm.handle(ChargePointFSMEvent.on_boot_notification)
         return call_result.BootNotification(
             current_time=get_time_str(),
@@ -264,7 +265,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
         if self.id not in status_notification_cache:
             status_data.update(status_notification_cache[self.id])
-            
+
         status_data.update({conn_status.evse_id: conn_status.model_dump_json()})
         status_notification_cache[self.fsm.context.id] = status_data
         status_notification_cache[self.id] = status_data
