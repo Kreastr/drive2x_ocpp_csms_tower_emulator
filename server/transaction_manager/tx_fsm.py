@@ -74,7 +74,7 @@ class TxFSMServer(TxManagerFSMType):
     
     async def enter_upkeep(self, *vargs):
         self.context.evse.setpoint = get_app_args().upkeep_power
-        self.handle(TxManagerFSMEvent.on_setpoint_apply_mark)
+        await self.handle(TxManagerFSMEvent.on_setpoint_apply_mark)
 
     async def send_new_setpoint(self, *vargs):
         self.context: TxManagerContext
