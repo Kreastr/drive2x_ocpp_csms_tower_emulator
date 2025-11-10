@@ -142,7 +142,7 @@ class OCPPClientV201(ChargePoint):
                                                              trigger_reason=reason,
                                                              seq_no=self.tx_seq_no,
                                                              transaction_info=TransactionType(tx_id),
-                                                             custom_data={"original_reason": str(rq.reason)}))
+                                                             custom_data={"original_reason": str(rq.reason), "vendor_id": "OCPP v16 Proxy"}))
 
     async def heartbeat_request(self) -> call_result.Heartbeat:
         return await self.call_payload(call.Heartbeat())
