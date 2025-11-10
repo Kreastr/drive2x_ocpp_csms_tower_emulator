@@ -31,6 +31,7 @@ from logging import getLogger
 
 import dateutil.parser
 from beartype import beartype
+from cachetools import cached
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
@@ -41,6 +42,7 @@ from redis_dict import RedisDict
 from websockets import ConnectionClosedOK
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
+from server.transaction_manager.tx_fsm import TxFSMServer
 
 from util.db import get_default_redis
 from server.charge_point_model import get_charge_point_fsm
@@ -63,10 +65,14 @@ from server.ui import CPCard
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-redis = get_default_redis()
-session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
-boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redis=redis)
-status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
+@cached(cache={})
+def get_redis_caches_cp():
+    redis = get_default_redis()
+    session_pins = RedisDict("ocpp_server-session-pins-", expire=30, redis=redis)
+    boot_notification_cache = RedisDict("ocpp_server-boot-notifications-cache", redis=redis)
+    status_notification_cache = RedisDict("ocpp_server-status-notifications-cache", redis=redis)
+
+    return session_pins, boot_notification_cache, status_notification_cache
 
 def clamp_setpoint(evse: EvseStatus):
     if evse.setpoint > 8000:
@@ -119,6 +125,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.fsm.handle(ChargePointFSMEvent.on_boot_timeout)
 
     async def try_cached_boot_notification(self, *vargs):
+        session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         if self.fsm.context.id in boot_notification_cache:
             self.fsm.context.boot_notifications.append( boot_notification_cache[self.fsm.context.id] )
             await self.fsm.handle(ChargePointFSMEvent.on_cached_boot_notification)
@@ -129,6 +136,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 await self.try_cached_status_notifications()
 
     async def try_cached_status_notifications(self):
+        session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         if self.fsm.context.id in status_notification_cache:
             for _, notification in status_notification_cache[self.fsm.context.id].items():
                 await self.handle_status_notification_inner(EvseStatus.model_validate(json.loads(notification)))
@@ -214,6 +222,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     @on(Action.boot_notification)
     async def on_boot_notification(self,  charging_station, reason, *vargs, **kwargs):
+        session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         self.fsm.context.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
 
@@ -253,6 +262,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     @on(Action.status_notification)
     async def on_status_notification(self, **status_data):
+        session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         from server.ui import CPCard
         self.log_event(("status_notification", (status_data)))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {status_data=}")
@@ -280,7 +290,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                                       ChargePointFSMState.running_transaction,
                                       ChargePointFSMState.closing]:
 
-            tx_fsm: TxManagerFSMType = self.fsm.context.transaction_fsms[conn_status.evse_id]
+            tx_fsm: TxFSMServer = self.fsm.context.transaction_fsms[conn_status.evse_id]
 
             if tx_fsm.context.cp_interface is None:
                 tx_fsm.context.cp_interface = self
@@ -288,6 +298,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             tx_fsm.context.evse.connector_status = conn_status.connector_status
             tx_fsm.context.evse.evse_id = conn_status.evse_id
             tx_fsm.context.evse.connector_id = conn_status.connector_id
+
+            await tx_fsm.try_restore_fsm(self.get_charge_point_id()+"-"+str(tx_fsm.context.evse.evse_id))
 
             logger.warning(" tx_fsm.loop")
             await tx_fsm.loop()
@@ -414,6 +426,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         logging.warning(f"request_full_report {result=}")
 
     async def try_reboot_peer(self, *vargs):
+        session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         if self.fsm.context.id in boot_notification_cache:
             del boot_notification_cache[self.fsm.context.id]
         if self.fsm.context.id in status_notification_cache:
@@ -472,6 +485,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     def has_icl_v16_hacks(self):
         return self.id.startswith("Latiniki")
 
+    def get_charge_point_id(self) -> str:
+        return self.id
 
 charge_points : dict[ChargePointId, OCPPServerHandler] = dict()
 ui_pages : dict[ChargePointId, UIManagerFSMType] = dict()

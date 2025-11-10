@@ -21,20 +21,32 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European 
 Union nor the granting authority can be held responsible for them.
 """
-
-
+import copy
+import json
 from typing import Any
 from uuid import uuid4
 
+from cachetools import cached
 from ocpp.v201 import call
 from ocpp.v201.datatypes import IdTokenType, SetVariableDataType, ComponentType, EVSEType, VariableType
 from ocpp.v201.enums import IdTokenEnumType
+from pydantic import BaseModel
+from redis_dict import RedisDict
 
 from server.data.tx_manager_context import TxManagerContext
+from util.db import get_default_redis
 from util.interval_trigger import main_setpoint_loop
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType, transaction_manager_uml
 from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
 from util import setup_logging, time_based_id, get_app_args
+
+@cached(cache={})
+def get_cache_dicts():
+    redis = get_default_redis()
+    latest_transaction_cache = RedisDict("ocpp_server-tx-cache", redis=redis)
+    fsm_state_cache = RedisDict("ocpp_server-tx-fsm-cache", redis=redis)
+    fsm_context_cache = RedisDict("ocpp_server-tx-fsm-context-cache", redis=redis)
+    return latest_transaction_cache, fsm_state_cache, fsm_context_cache
 
 logger = setup_logging(__name__)
 
@@ -58,7 +70,34 @@ class TxFSMServer(TxManagerFSMType):
 
         self.on(TxManagerFSMState.transition_triggered.on_exit, self.send_new_setpoint)
 
+        self.on("on_state_changed", self.save_fsm_state)
+
         main_setpoint_loop().subscribe(lambda s=self: s.handle(TxManagerFSMEvent.on_setpoint_apply_mark))
+
+        self.my_fsm_id : str = ""
+
+    async def try_restore_fsm(self, fsm_id):
+        logger.warning(f"try_restore_fsm {fsm_id=}")
+        latest_transaction_cache, fsm_state_cache, fsm_context_cache = get_cache_dicts()
+        self.my_fsm_id = fsm_id
+        if self.my_fsm_id in fsm_state_cache:
+            saved_state = fsm_state_cache[self.my_fsm_id]
+            await self.transition_to_new_state(TxManagerFSMState(saved_state))
+            logger.warning(f"restored FSM state {self.my_fsm_id=} {self.current_state=} {saved_state=}")
+            if self.my_fsm_id in fsm_context_cache:
+                saved_context = TxManagerContext.model_validate(json.loads(fsm_context_cache[self.my_fsm_id]))
+                saved_context.cp_interface = self.context.cp_interface
+                self.context = saved_context
+                logger.warning(f"restored FSM context {self.my_fsm_id=} {self.context=} {saved_context=}")
+
+    async def save_fsm_state(self, *vargs):
+        if self.my_fsm_id != "":
+            latest_transaction_cache, fsm_state_cache, fsm_context_cache = get_cache_dicts()
+            fsm_state_cache[self.my_fsm_id] = self.current_state.value
+            ctxt = self.context
+            copy_context = copy.copy(ctxt)
+            copy_context.cp_interface = None
+            fsm_context_cache[self.my_fsm_id] = copy_context.model_dump_json()
 
     @staticmethod
     def if_charge_setpoint(context : TxManagerContext, other):
@@ -71,7 +110,7 @@ class TxFSMServer(TxManagerFSMType):
     @staticmethod
     def if_discharge_setpoint(context : TxManagerContext, other):
         return context.evse.setpoint < 0
-    
+
     async def enter_upkeep(self, *vargs):
         self.context.evse.setpoint = get_app_args().upkeep_power
         await self.handle(TxManagerFSMEvent.on_setpoint_apply_mark)

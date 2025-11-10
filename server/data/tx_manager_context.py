@@ -25,6 +25,8 @@ Union nor the granting authority can be held responsible for them.
 
 from dataclasses import field, dataclass
 
+from pydantic import BaseModel, Field, ConfigDict
+
 from server.callable_interface import CallableInterface
 
 from server.data.evse_status import EvseStatus
@@ -33,9 +35,10 @@ from util.types import TransactionId
 from typing import Any
 
 
-@dataclass 
-class TxManagerContext:
-    evse : EvseStatus = field(default_factory=EvseStatus)
+class TxManagerContext(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    evse : EvseStatus = Field(default_factory=EvseStatus)
     tx_id : TransactionId | None = None
     cp_interface : CallableInterface | None = None
-    session_info : dict[str, Any] = field(default_factory=dict)
+    session_info : dict[str, Any] = Field(default_factory=dict)

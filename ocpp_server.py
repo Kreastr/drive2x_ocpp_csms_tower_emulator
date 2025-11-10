@@ -49,6 +49,8 @@ from tx_manager_fsm_enums import TxManagerFSMState
 
 from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse, ConnectedEVId, GenericErrorResponse
 
+from util.db import get_default_redis
+
 gui_info._app = app
 gui_info._ui = ui
 gui_info._background_tasks = background_tasks
@@ -58,8 +60,7 @@ gui_info._background_tasks = background_tasks
 from websockets import Subprotocol
 
 from charge_point_fsm_enums import ChargePointFSMEvent, ChargePointFSMState
-from server.ocpp_server_handler import redis, session_pins, OCPPServerHandler, charge_points, clamp_setpoint, \
-    status_notification_cache, boot_notification_cache
+from server.ocpp_server_handler import OCPPServerHandler, charge_points, clamp_setpoint, get_redis_caches_cp
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
     car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
@@ -285,10 +286,12 @@ SITE_TIMEZONES = {"d2x_ga3_demo": timezone("Europe/Helsinki")}
 
 @app.get("/status_cache")
 async def status_cache():
+    session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
     return dict(status_notification_cache)
 
 @app.get("/boot_cache")
 async def boot_cache():
+    session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
     return dict(boot_notification_cache)
 
 @app.get("/sca_data/evs/{tag}")
@@ -426,7 +429,7 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
     await standard_header_footer(cp_id)
     await styling()
-    semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=redis, session_timeout=5)
+    semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=get_default_redis(), session_timeout=5)
     semaphore.acquire()
     await screen_size_refreshable_block(cp_id, evse_id, semaphore)
     ui.timer(1, lambda : semaphore.acquire())
@@ -473,6 +476,7 @@ async def pend_semaphore_screen_block(semaphore, cp_id):
 
 
 async def main_screen_block(cp_id, evse_id):
+    session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
     if cp_id not in charge_points:
         with ui.row(align_items="center"):
             ui.icon("warning", color='red').classes('text-5xl')

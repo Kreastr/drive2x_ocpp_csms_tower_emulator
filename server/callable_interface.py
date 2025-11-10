@@ -33,3 +33,7 @@ class CallableInterface(ABC):
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
         pass
+
+    @abstractmethod
+    def get_charge_point_id(self) -> str:
+        pass

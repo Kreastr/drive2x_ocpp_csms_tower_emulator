@@ -345,6 +345,9 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         await self.close_connection(*vargs)
     """
 
+    def get_charge_point_id(self) -> str:
+        return  self.id
+
     async def on_server_set_variables(self, request: SetVariablesRequest) -> call_result_201.SetVariables:
         var: SetVariableDataType
         response_variables: list[SetVariableResultType] = []
