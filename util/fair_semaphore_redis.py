@@ -59,9 +59,14 @@ class FairSemaphoreRedis:
         lock_current = self.redis.get(self.name_lock)
         if lock_current is not None:
             try:
-                lock_current = lock_current.encode("utf-8")
+                if isinstance(lock_current, str):
+                    lock_current = lock_current.encode("utf-8")
             except Exception as e:
                 logger.warning(f"Failed to encode lock_current {lock_current=} {e=}")
+
+        if not isinstance(lock_current, bytes):
+            logger.warning(f"lock_current has unexpected datatype {lock_current=}")
+        
         mid = self.my_id
         if lock_current == mid:
             self.redis.expire(self.name_lock, int(ceil(session_timeout)))

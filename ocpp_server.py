@@ -236,7 +236,8 @@ async def setpoint(cp_id : ChargePointId, value : int):
 
 EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "D2X_DEMO_": "d2x_ga3_demo",
-           "PORTO_APT_": "porto_apt"}
+           "PORTO_APT_": "porto_apt",
+           "LatinkiHQ": "d2x_ga3_demo"}
 
 @app.post("/sca_data/setpoints")
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse | GenericErrorResponse:
