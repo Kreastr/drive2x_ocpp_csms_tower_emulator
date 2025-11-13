@@ -29,7 +29,6 @@ class TxManagerFSMEvent(str, Enum):
     on_tx_update_event='on_tx_update_event'
     on_authorized_by_app='on_authorized_by_app'
     on_authorize_reject='on_authorize_reject'
-    on_start_tx_event='on_start_tx_event'
     on_deauthorized='on_deauthorized'
     on_setpoint_apply_mark='on_setpoint_apply_mark'
     on_end_tx_event='on_end_tx_event'

@@ -38,7 +38,7 @@ Authorizing --> Unknown : on authorize reject
 Occupied --> Upkeep : on authorize accept
 Occupied --> Upkeep : on tx update event
 Upkeep --> Ready : on authorized by app
-Authorized --> Ready : on start tx event
+Authorized --> Ready : if occupied
 Authorized --> Unknown : on deauthorized
 Upkeep --> Available : if available
 Ready --> TransitionTriggered : on setpoint apply mark
