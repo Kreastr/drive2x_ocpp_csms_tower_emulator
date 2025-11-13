@@ -273,7 +273,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         else:
             status_data = status_notification_cache[self.fsm.context.id]
 
-        if self.id not in status_notification_cache:
+        if self.id in status_notification_cache:
             status_data.update(status_notification_cache[self.id])
 
         status_data.update({conn_status.evse_id: conn_status.model_dump_json()})
