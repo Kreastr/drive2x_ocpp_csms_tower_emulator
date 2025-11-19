@@ -130,6 +130,10 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             self.fsm.context.boot_notifications.append( boot_notification_cache[self.fsm.context.id] )
             await self.fsm.handle(ChargePointFSMEvent.on_cached_boot_notification)
             await self.try_cached_status_notifications()
+        elif self.id in boot_notification_cache:
+            self.fsm.context.boot_notifications.append( boot_notification_cache[self.id] )
+            await self.fsm.handle(ChargePointFSMEvent.on_cached_boot_notification)
+            await self.try_cached_status_notifications()
         else:
             if self.has_icl_v16_hacks():
                 await self.fsm.handle(ChargePointFSMEvent.on_missing_boot_notification)
@@ -179,6 +183,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             return
 
         self.fsm.context.id = result.get_variable_result[0].attribute_value
+        self.id = result.get_variable_result[0].attribute_value
         charge_points[self.fsm.context.id] = self
         if self.fsm.context.id is None:
             await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
@@ -226,8 +231,11 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         self.fsm.context.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
 
-        self.id = charging_station["serial_number"]
-        self.fsm.context.id = charging_station["serial_number"]
+        if "serial_number" in charging_station:
+            self.id = charging_station["serial_number"]
+            self.fsm.context.id = charging_station["serial_number"]
+        else:
+            self.fsm.context.id = self.id
         boot_notification_cache[self.id] = (charging_station, reason, vargs, kwargs)
         boot_notification_cache[self.fsm.context.id] = (charging_station, reason, vargs, kwargs)
 
