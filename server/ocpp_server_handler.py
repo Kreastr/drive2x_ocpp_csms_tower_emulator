@@ -109,6 +109,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.fsm.on(ChargePointFSMState.booted.on_enter, self.set_online)
         self.fsm.on(ChargePointFSMState.force_booted.on_enter, self.add_to_ui)
         self.fsm.on(ChargePointFSMState.force_booted.on_enter, self.set_online)
+        self.fsm.on(ChargePointFSMState.force_booted.on_enter, self.try_cached_status_notifications)
 
     @log_async_call(logger.warning)
     async def call_payload(
