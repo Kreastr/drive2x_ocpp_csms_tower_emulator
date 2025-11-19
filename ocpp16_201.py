@@ -43,7 +43,7 @@ from ocpp.v16 import enums as v16enums
 from ocpp.v201 import call_result as call_result_201
 from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType, SetVariableResultType, EVSEType
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType, \
-    ResetEnumType, ResetStatusEnumType
+    ResetEnumType, ResetStatusEnumType, RegistrationStatusEnumType
 from pydantic import BaseModel
 from redis_dict import RedisDict
 from typing_extensions import TypeVar
@@ -232,21 +232,26 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def on_boot_notification(self, rq : BootNotificationRequest, **kwargs):
         try:
             if rq.chargePointSerialNumber is None:
-                if self.has_icl_latiniki_hack():
-                    rq.chargePointSerialNumber = self.id
-            await self.server_connection.boot_notification_request(rq)
-            await self.fsm.handle(ProxyConnectionFSMEvent.on_client_boot_notification_forwarded)
-            return call_result.BootNotification(
-                current_time=datetime.now(UTC_TZ).isoformat(),
-                interval=10,
-                status=RegistrationStatus.accepted,
-            )
+                rq.chargePointSerialNumber = self.id
+            result = await self.server_connection.boot_notification_request(rq)
+            if result.status == RegistrationStatusEnumType.accepted:
+                await self.fsm.handle(ProxyConnectionFSMEvent.on_client_boot_notification_forwarded)
+                return call_result.BootNotification(
+                    current_time=datetime.now(UTC_TZ).isoformat(),
+                    interval=10,
+                    status=RegistrationStatus.accepted,
+                )
         except ConnectionClosedOK:
             return call_result.BootNotification(
                 current_time=datetime.now(UTC_TZ).isoformat(),
                 interval=60,
                 status=RegistrationStatus.rejected,
             )
+        return call_result.BootNotification(
+            current_time=datetime.now(UTC_TZ).isoformat(),
+            interval=60,
+            status=RegistrationStatus.rejected,
+        )
 
 
     @on(Action.status_notification)
@@ -384,9 +389,6 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
                                              component=resp_cmpnt,
                                              variable=resp_var)
         return response
-
-    def has_icl_latiniki_hack(self):
-        return self.id.startswith("Latinki")
 
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
         logger.warning(f"{self.id=}")
