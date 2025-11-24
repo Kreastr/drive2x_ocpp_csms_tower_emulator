@@ -72,7 +72,7 @@ class OCPPServerV16Interface(ABC):
         pass
 
 
-STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.occupied,
+STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.available,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
               ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable,
               ChargePointStatus.charging: ConnectorStatusEnumType.occupied}
