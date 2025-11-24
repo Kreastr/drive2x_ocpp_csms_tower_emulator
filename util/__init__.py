@@ -250,6 +250,27 @@ def get_proxy_app_args():
                           default="ws://127.0.0.1:9000")
     return argparse.parse_args()
 
+@cached(cache={})
+def get_virtual_cp_args():
+    argparse = ArgumentParser(description="OCPP Charge Point Emulator with EV charge model.", epilog="""
+    Copyright (C) 2025 Lappeenrannan-Lahden teknillinen yliopisto LUT
+    Author: Aleksei Romanenko <aleksei.romanenko@lut.fi>
+
+    Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) only and do 
+    not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European Union nor the granting authority 
+    can be held responsible for them.""")
+
+    argparse.add_argument("--uri", type=str, help="Target OCPP server URI (starting with ws:// or wss://), "
+                                                  "e.g. wss://drive2x.lut.fi:443/ocpp/CP_ESS_01",
+                          default="ws://localhost:9000")
+    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by this client.", default="localhost")
+    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by this client.", default=6379)
+    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by this client.", default=1)
+    argparse.add_argument("--ui_host", type=str, help="Host on which NiceGUI will listen to connections.", default="0.0.0.0")
+    argparse.add_argument("--ui_port", type=int, help="Port on which NiceGUI will open web service.", default=7500)
+    argparse.add_argument("--connectors", type=int, help="Number of connectors.", default=3)
+
+    return argparse.parse_args()
 
 def log_req_response(f):
     _logger = getLogger("OCPP_PROTO")

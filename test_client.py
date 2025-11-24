@@ -64,7 +64,7 @@ from redis import Redis
 from client.data import EvseModel, TxFSMContext
 from client.transaction_model import TxFSMType, transaction_uml
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
-from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call
+from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call, get_virtual_cp_args
 from util.interval_trigger import client_measurand_loop
 
 from redis_dict import RedisDict
@@ -451,6 +451,7 @@ async def main(serial_number = None):
 
     if serial_number is None:
         serial_number = "CP_ACME_BAT_0000"
+    args = get_virtual_cp_args()
     uri = args.uri
     redis_host = args.redis_host
     redis_port = args.redis_port
@@ -574,24 +575,7 @@ async def login():
             ui.button(text="Login", on_click=lambda : navigate.to(f"/charge_point_panel/D2X_DEMO_{sha256(lgn.value)[:16].upper()}"))
 
 if __name__ in {"__main__", "__mp_main__"}:
-    argparse = ArgumentParser(description="OCPP Charge Point Emulator with EV charge model.", epilog="""
-    Copyright (C) 2025 Lappeenrannan-Lahden teknillinen yliopisto LUT
-    Author: Aleksei Romanenko <aleksei.romanenko@lut.fi>
-
-    Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s) only and do 
-    not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European Union nor the granting authority 
-    can be held responsible for them.""")
-
-    argparse.add_argument("--uri", type=str, help="Target OCPP server URI (starting with ws:// or wss://), "
-                                                  "e.g. wss://drive2x.lut.fi:443/ocpp/CP_ESS_01",
-                          default="ws://localhost:9000")
-    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by this client.", default="localhost")
-    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by this client.", default=6379)
-    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by this client.", default=1)
-    argparse.add_argument("--ui_host", type=str, help="Host on which NiceGUI will listen to connections.", default="0.0.0.0")
-    argparse.add_argument("--ui_port", type=int, help="Port on which NiceGUI will open web service.", default=7500)
-
-    args = argparse.parse_args()
+    args = get_virtual_cp_args()
     # args is also used by main() as global
 
     ui.run(host=args.ui_host,
