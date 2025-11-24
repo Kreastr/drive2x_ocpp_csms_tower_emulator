@@ -66,7 +66,7 @@ _main_setpoint_loop = None
 def main_setpoint_loop():
     global _main_setpoint_loop
     if _main_setpoint_loop is None:
-        _main_setpoint_loop = AIOIntervalTrigger(period=timedelta(minutes=15), name="Setpoint Timer")
+        _main_setpoint_loop = AIOIntervalTrigger(period=timedelta(minutes=5), name="Setpoint Timer")
     return _main_setpoint_loop
 
 

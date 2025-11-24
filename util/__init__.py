@@ -185,7 +185,7 @@ def qr_link(url):
     return qr_dialog
 
 
-CYCLE_DURATION = 15
+CYCLE_DURATION = 5
 
 @beartype
 def get_slot_start(rtime : datetime, offset : int = 0 ):
