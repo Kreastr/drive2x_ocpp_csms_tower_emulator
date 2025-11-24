@@ -51,6 +51,12 @@ from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse
 
 from util.db import get_default_redis
 
+from nicegui import __version__
+
+ui.add_body_html(f'''
+    <script src="/_nicegui/{__version__}/static/lang/pt.umd.prod.js"></script>
+''')
+
 gui_info._app = app
 gui_info._ui = ui
 gui_info._background_tasks = background_tasks
@@ -376,6 +382,10 @@ async def d2x_ui_landing(cp_id : ChargePointId):
 async def standard_header_footer(cp_id):
     with ui.header(elevated=True).style('background-color: white').classes('items-center justify-between'):
         ui.image(source="static/d2x_logo_1.svg").classes("w-20")
+        ui.select(options={
+            'pt': 'Português',
+            'en': 'English',
+        }, value='en', on_change=lambda e: set_lang(e.value))
         timenow()
         ui.timer(1, timenow.refresh)
     with (ui.footer(elevated=True).style('background-color: brand').classes('items-center justify-between text-body2')):
@@ -402,6 +412,13 @@ STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.session_end_summary: session_end_summary_screen,
                     UIManagerFSMState.session_first_start: session_first_start_screen
                     }
+
+
+def set_lang(lang: str) -> None:
+    ui.run_javascript(f'''
+        Quasar.lang.set(Quasar.lang["{lang.replace('-', '')}"])
+    ''')
+
 
 @ui.refreshable
 def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
