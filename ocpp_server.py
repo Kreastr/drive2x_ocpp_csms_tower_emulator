@@ -373,7 +373,7 @@ async def d2x_ui_landing(cp_id : ChargePointId):
                 if len(filtered_evse_ids) > 1:
                     ui.label("Please pick an EV charging outlet to proceed.")
                 with ui.column(align_items="center"):
-                    for evse_id in evse_ids:
+                    for evse_id in filtered_evse_ids:
                         with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
                             with ui.card():
                                 with ui.row(align_items="center"):
