@@ -160,11 +160,12 @@ class OCPPClientV201(ChargePoint):
         v201_meter_values = convert_meter_values_to_201(rq)
         if tx_id is not None:
             self.tx_seq_no += 1
-            await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
-                                                          timestamp=rq.timestamp.isoformat(),
-                                                          trigger_reason=TriggerReasonEnumType.meter_value_periodic,
-                                                          seq_no=self.tx_seq_no,
-                                                          transaction_info=TransactionType(tx_id)))
+            if len(rq.meterValue):
+                await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
+                                                              timestamp=rq.meterValue[0].timestamp.isoformat(),
+                                                              trigger_reason=TriggerReasonEnumType.meter_value_periodic,
+                                                              seq_no=self.tx_seq_no,
+                                                              transaction_info=TransactionType(tx_id)))
         await self.call_payload(call.MeterValues(evse_id=rq.connectorId, meter_value=v201_meter_values))
 
 
