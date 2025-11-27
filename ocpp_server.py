@@ -369,9 +369,10 @@ async def d2x_ui_landing(cp_id : ChargePointId):
             with ui.column(align_items="center"):
                 evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
 
-                ui.label("Please pick an EV charging outlet to proceed.")
+                filtered_evse_ids = [x for x in evse_ids if x > 0]
+                if len(filtered_evse_ids) > 1:
+                    ui.label("Please pick an EV charging outlet to proceed.")
                 with ui.column(align_items="center"):
-                    filtered_evse_ids = (x for x in evse_ids if x > 0)
                     for evse_id in evse_ids:
                         with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
                             with ui.card():
