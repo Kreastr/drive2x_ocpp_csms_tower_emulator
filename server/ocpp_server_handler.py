@@ -140,7 +140,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 await self.fsm.handle(ChargePointFSMEvent.on_missing_boot_notification)
                 await self.try_cached_status_notifications()
 
-    async def try_cached_status_notifications(self):
+    async def try_cached_status_notifications(self, *vargs):
         session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         if self.fsm.context.id in status_notification_cache:
             for _, notification in status_notification_cache[self.fsm.context.id].items():
