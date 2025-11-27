@@ -21,7 +21,11 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
-
+"""
+Available --> Authorizing : on authorized by app
+Authorizing --> Authorized : on authorize accept
+Authorizing --> Unknown : on authorize reject
+"""
 
 from afsm import AFSM
 from server.data.tx_manager_context import TxManagerContext
@@ -32,9 +36,6 @@ Unknown --> Occupied : if occupied
 Available --> Occupied : if occupied
 Unknown --> Available : if available
 Occupied --> Available : if available
-Available --> Authorizing : on authorized by app
-Authorizing --> Authorized : on authorize accept
-Authorizing --> Unknown : on authorize reject
 Occupied --> Upkeep : on authorize accept
 Occupied --> Upkeep : on tx update event
 Upkeep --> Ready : on authorized by app

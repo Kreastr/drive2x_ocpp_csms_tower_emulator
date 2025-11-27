@@ -63,7 +63,7 @@ class TxFSMServer(TxManagerFSMType):
         self.apply_to_all_conditions(TxManagerFSMCondition.if_idle_setpoint, self.if_idle_setpoint)
         self.apply_to_all_conditions(TxManagerFSMCondition.if_discharge_setpoint, self.if_discharge_setpoint)
 
-        self.on(TxManagerFSMState.authorizing.on_enter, self.send_auth_to_cp)
+        #self.on(TxManagerFSMState.authorizing.on_enter, self.send_auth_to_cp)
         self.on(TxManagerFSMState.occupied.on_enter, self.send_auth_to_cp)
         self.on(TxManagerFSMState.upkeep.on_enter, self.enter_upkeep)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
