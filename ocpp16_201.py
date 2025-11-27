@@ -51,6 +51,7 @@ from websockets import Subprotocol, ConnectionClosedOK
 
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
 from ocpp_models.v16.boot_notification import BootNotificationRequest
+from ocpp_models.v16.meter_values import MeterValuesRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
@@ -313,7 +314,18 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     @on(Action.meter_values, skip_schema_validation=True)
     @log_req_response
-    async def on_meter_values(self, **data):
+    @async_camelize_kwargs
+    @with_request_model(MeterValuesRequest)
+    async def on_meter_values(self, request : MeterValuesRequest, *vargs, **kwargs):
+        txid16 = request.transactionId
+        txid = None
+        if txid16 is not None:
+            if txid16 not in TX_MAP_16_TO_201:
+                tx_id_201 = str(uuid.uuid4())
+                TX_MAP_16_TO_201[txid16] = tx_id_201
+                TX_MAP_201_TO_16[tx_id_201] = txid16
+            txid = TX_MAP_16_TO_201[txid16]
+        await self.server_connection.meter_values_request(request, tx_id=txid)
         return call_result.MeterValues(
         )
 
@@ -429,6 +441,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         else:
             req_result = RequestStartStopStatusEnumType.rejected
         return call_result_201.RequestStartTransaction(status=req_result)
+
 
     async def on_server_get_variables(self, request: GetVariablesRequest) -> call_result_201.GetVariables:
         var : GetVariableDataType

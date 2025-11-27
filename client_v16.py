@@ -20,18 +20,29 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 Funded by the European Union and UKRI. Views and opinions expressed are however those of the author(s)
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
+
+>>> import json
+>>> from camel_converter import dict_to_camel
+>>> data='{"connector_id": 1, "transaction_id": 282683992, "meter_value": [{"timestamp": "2025-11-26T13:20:51.934Z", "sampled_value": [{"unit": "Wh", "value": 0, "location": "Outlet", "measurand": "Energy.Active.Import.Register"}, {"unit": "W", "value": 180000, "location": "Outlet", "measurand": "Power.Active.Import"}, {"unit": "W", "value": 180000, "location": "Outlet", "measurand": "Power.Offered"}, {"unit": "Percent", "value": 19.5444, "location": "EV", "measurand": "SoC"}]}]}'
+>>> jdata = dict_to_camel(json.loads(data))
+>>> jdata
+{'connectorId': 1, 'transactionId': 282683992, 'meterValue': [{'timestamp': '2025-11-26T13:20:51.934Z', 'sampledValue': [{'unit': 'Wh', 'value': 0, 'location': 'Outlet', 'measurand': 'Energy.Active.Import.Register'}, {'unit': 'W', 'value': 180000, 'location': 'Outlet', 'measurand': 'Power.Active.Import'}, {'unit': 'W', 'value': 180000, 'location': 'Outlet', 'measurand': 'Power.Offered'}, {'unit': 'Percent', 'value': 19.5444, 'location': 'EV', 'measurand': 'SoC'}]}]}
+>>> rq = MeterValuesRequest.model_validate(jdata)
+>>> convert_meter_values_to_201(rq)
+[MeterValueType(timestamp='2025-11-26 13:20:51.934000+00:00', sampled_value=[SampledValueType(value=0.0, context=None, measurand=<MeasurandEnumType.energy_active_import_register: 'Energy.Active.Import.Register'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<StandardizedUnitsOfMeasureType.wh: 'Wh'>), SampledValueType(value=180000.0, context=None, measurand=<MeasurandEnumType.power_active_import: 'Power.Active.Import'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<StandardizedUnitsOfMeasureType.w: 'W'>), SampledValueType(value=180000.0, context=None, measurand=<MeasurandEnumType.power_offered: 'Power.Offered'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<StandardizedUnitsOfMeasureType.w: 'W'>), SampledValueType(value=19.5444, context=None, measurand=<MeasurandEnumType.soc: 'SoC'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<StandardizedUnitsOfMeasureType.percent: 'Percent'>)])]
 """
 import datetime
 from abc import ABC, abstractmethod
 from logging import getLogger
 
 import websockets
-from ocpp.v16.enums import ChargePointStatus, Reason
-from ocpp.v201.datatypes import ChargingStationType, TransactionType
+from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
+from ocpp.v201.datatypes import ChargingStationType, TransactionType, MeterValueType, SampledValueType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import Action
 
 from ocpp_models.v16.boot_notification import BootNotificationRequest
+from ocpp_models.v16.meter_values import MeterValuesRequest, MeterValue, SampledValue
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v16.stop_transaction import StopTransactionRequest
@@ -47,6 +58,8 @@ logger = getLogger(__name__)
 
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call, call_result
+from ocpp.v201 import enums as enums201
+
 
 
 class OCPPServerV16Interface(ABC):
@@ -71,10 +84,22 @@ class OCPPServerV16Interface(ABC):
     async def on_reset(self, request) -> call_result.Reset:
         pass
 
+MEASURAND_MAPPING = {Measurand.soc : enums201.MeasurandEnumType.soc,
+                     Measurand.energy_active_import_register : enums201.MeasurandEnumType.energy_active_import_register,
+                     Measurand.energy_active_export_register : enums201.MeasurandEnumType.energy_active_export_register,
+                     Measurand.power_active_import : enums201.MeasurandEnumType.power_active_import,
+                     Measurand.power_active_export : enums201.MeasurandEnumType.power_active_export,
+                     Measurand.power_offered : enums201.MeasurandEnumType.power_offered}
+
+UNIT_MAP = {UnitOfMeasure.w: enums201.StandardizedUnitsOfMeasureType.w,
+            UnitOfMeasure.wh: enums201.StandardizedUnitsOfMeasureType.wh,
+            UnitOfMeasure.percent: enums201.StandardizedUnitsOfMeasureType.percent}
 
 STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.available,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
               ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable,
+              ChargePointStatus.suspended_evse: ConnectorStatusEnumType.occupied,
+              ChargePointStatus.suspended_ev: ConnectorStatusEnumType.occupied,
               ChargePointStatus.charging: ConnectorStatusEnumType.occupied}
 
 STOP_REASON_MAP = {Reason.emergency_stop: TriggerReasonEnumType.abnormal_condition,
@@ -89,6 +114,40 @@ STOP_REASON_MAP = {Reason.emergency_stop: TriggerReasonEnumType.abnormal_conditi
                 Reason.unlock_command: TriggerReasonEnumType.unlock_command,
                 Reason.de_authorized: TriggerReasonEnumType.deauthorized}
 
+
+def convert_meter_values_to_201(rq):
+    v201_meter_values: list[MeterValueType] = list()
+    mv: MeterValue
+    for mv in rq.meterValue:
+        v201_sampled_values: list[SampledValueType] = list()
+        sv: SampledValue
+        for sv in mv.sampledValue:
+            try:
+                fv = float(sv.value)
+            except:
+                logger.warning(f"Failed to convert sampled value {sv} to destination format (float)")
+                continue
+            reading_context = enums201.ReadingContextEnumType
+            measurand = None
+            if sv.measurand is not None:
+                if sv.measurand in MEASURAND_MAPPING:
+                    measurand = MEASURAND_MAPPING[sv.measurand]
+                else:
+                    logger.warning(f"Failed to convert measurand info {sv.measurand}")
+            unit = None
+            if sv.unit is not None:
+                if sv.unit in UNIT_MAP:
+                    unit = UNIT_MAP[sv.unit]
+                else:
+                    logger.warning(f"Failed to convert measurand unit {sv.unit}")
+            v201_sampled_values.append(SampledValueType(fv,
+                                                        measurand=measurand,
+                                                        unit_of_measure=unit))
+        v201_meter_values.append(MeterValueType(timestamp=str(mv.timestamp),
+                                                sampled_value=v201_sampled_values))
+    return v201_meter_values
+
+
 class OCPPClientV201(ChargePoint):
 
     def __init__(self, client_interface : OCPPServerV16Interface, serial_number, ws, response_timeout=30, _logger=logger):
@@ -97,9 +156,26 @@ class OCPPClientV201(ChargePoint):
         # ToDo store in redis
         self.tx_seq_no = 1
 
+    async def meter_values_request(self, rq: MeterValuesRequest, tx_id : str | None):
+        v201_meter_values = convert_meter_values_to_201(rq)
+        if tx_id is not None:
+            self.tx_seq_no += 1
+            await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
+                                                          timestamp=rq.timestamp.isoformat(),
+                                                          trigger_reason=TriggerReasonEnumType.meter_value_periodic,
+                                                          seq_no=self.tx_seq_no,
+                                                          transaction_info=TransactionType(tx_id)))
+        await self.call_payload(call.MeterValues(evse_id=rq.connectorId, meter_value=v201_meter_values))
+
+
     async def status_notification_request(self, rq : StatusNotificationRequest) -> call_result.StatusNotification:
 
-        if rq.status in STATUS_MAP:
+        if rq.status == ChargePointStatus.preparing and rq.info is not None: 
+            if rq.info == 'EVConnected':
+                fwd_status = ConnectorStatusEnumType.occupied
+            else:
+                fwd_status = ConnectorStatusEnumType.available
+        elif rq.status in STATUS_MAP:        
             fwd_status = STATUS_MAP[rq.status]
         else:
             logger.error(f"Failed to map status notification status {rq.status}")
@@ -122,6 +198,11 @@ class OCPPClientV201(ChargePoint):
                 reason=BootReasonEnumType.unknown
                 ))
 
+    async def send_transaction_event(self, rq : call.TransactionEvent):
+        self.tx_seq_no += 1
+        rq.seq_no = self.tx_seq_no
+        await self.call_payload(rq)
+
     async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
         self.tx_seq_no = 1
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
@@ -143,6 +224,7 @@ class OCPPClientV201(ChargePoint):
                                                              seq_no=self.tx_seq_no,
                                                              transaction_info=TransactionType(tx_id),
                                                              custom_data={"original_reason": str(rq.reason), "vendor_id": "OCPP v16 Proxy"}))
+
 
     async def heartbeat_request(self) -> call_result.Heartbeat:
         return await self.call_payload(call.Heartbeat())
