@@ -35,6 +35,7 @@ Occupied --> Available : if available
 Available --> Authorizing : on authorized by app
 Authorizing --> Authorized : on authorize accept
 Authorizing --> Unknown : on authorize reject
+Authorizing --> Unknown : on deauthorized
 Occupied --> Upkeep : on authorize accept
 Occupied --> Upkeep : on tx update event
 Upkeep --> Ready : on authorized by app
