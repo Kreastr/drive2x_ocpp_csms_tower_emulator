@@ -347,11 +347,12 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 for sv in  v["sampled_value"]:
                     if sv["measurand"] == "SoC":
                         evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
-                        evse.last_report_soc_percent = sv["value"]*100
+                        evse.last_report_soc_percent = sv["value"]
                         evse.last_report_time = datetime.now()
                     if sv["measurand"] == "Power.Active.Import":
                         evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
-                        evse.last_reported_power = sv["value"]
+                        evse.last_reported_power = sv["value"]/1000.0
+                    logger.error(f"post meter values {evse=} {sv=}")
                         
         finally:
             return call_result.MeterValues(
