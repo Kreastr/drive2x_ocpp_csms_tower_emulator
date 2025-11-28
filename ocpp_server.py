@@ -310,6 +310,7 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
         control_allowed = check_control(cp_id, tag)
 
         if not control_allowed:
+            logger.info(f"Ignored {cp_id=} {tag=}")
             continue
 
         if cp.fsm.context.online:
