@@ -322,8 +322,10 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
                 rsoc = evse_fsm.context.evse.last_report_soc_percent
                 rtime =  evse_fsm.context.evse.last_report_time
                 if rsoc is None:
+                    logger.info(f"No SoC info {cp_id=} {tag=}")
                     continue
                 if rtime is None:
+                    logger.info(f"No time info {cp_id=} {tag=}")
                     continue
                 if csoc is None:
                     csoc = rsoc
