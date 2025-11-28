@@ -39,6 +39,7 @@ from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
     ReportBaseEnumType, ResetEnumType, ResetStatusEnumType
 from redis_dict import RedisDict
+from snoop.pp_module import traceback
 from websockets import ConnectionClosedOK
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
@@ -61,6 +62,7 @@ from typing import Any
 from server.callable_interface import CallableInterface
 
 from server.ui import CPCard
+import traceback
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -354,6 +356,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                         evse.last_reported_power = sv["value"]/1000.0
                     logger.error(f"post meter values {evse=} {sv=}")
                         
+        except:
+            logger.error(f"{traceback.format_exc()=}")
         finally:
             return call_result.MeterValues(
             )
