@@ -67,6 +67,8 @@ import traceback
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+logging.lastResort.setFormatter(logging.Formatter(fmt="[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+
 @cached(cache={})
 def get_redis_caches_cp():
     redis = get_default_redis()
