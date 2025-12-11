@@ -34,10 +34,12 @@ from .proxy_connection_fsm_type import ProxyConnectionFSMType, proxy_connection_
 class ProxyConnectionFSM(ProxyConnectionFSMType):
     
     @beartype
-    def __init__(self, context : ProxyConnectionContext ):
+    def __init__(self, context : ProxyConnectionContext, *vargs, **kwargs):
         super().__init__(proxy_connection_uml,
+                         *vargs,
                          se_factory=ProxyConnectionFSMState,
-                         context=context)
+                         context=context,
+                         **kwargs)
         
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_new_state_timeout, callback=lambda *vargs, **kwargs: False)
         self.on(ProxyConnectionFSMState.new.on_enter, self.start_new_timeout_timer)
