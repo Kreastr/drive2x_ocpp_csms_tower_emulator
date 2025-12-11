@@ -128,7 +128,7 @@ class TxFSMServer(TxManagerFSMType):
             self.context.evse.next_setpoint = 0
             logger.warning(f"send_new_setpoint {setpoint=}")
 
-    async def update_baseline_via_ocpp(self):
+    async def update_baseline_via_ocpp(self, *vargs, **kwargs):
         setpoint = self.context.evse.setpoint
         result = await self.context.cp_interface.call_payload(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(setpoint),

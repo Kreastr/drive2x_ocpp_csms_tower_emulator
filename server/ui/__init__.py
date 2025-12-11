@@ -126,6 +126,7 @@ class CPCard(Element):
                 ui.button("Stop", icon="do_not_disturb_on", on_click=exec_async(evse_id, cp.do_remote_stop))
                 ui.button("Clear", icon="build",  on_click=exec_async(evse_id, cp.do_clear_fault))
                 ui.button("+", on_click=exec_async(evse_id, cp.do_increase_setpoint))
-                ui.label("0").bind_text_from(self.fsm.context.transaction_fsms[evse_id].context.evse, "setpoint", backward=str)
+                ui.label("0").bind_text_from(self.fsm.context.transaction_fsms[evse_id].context.evse, "next_setpoint", backward=str)
                 ui.button("-", on_click=exec_async(evse_id, cp.do_decrease_setpoint))
                 ui.button("F", on_click=exec_async(evse_id, cp.force_setpoint_update))
+                ui.label("-").bind_text_from(self.fsm.context.transaction_fsms[evse_id].context.evse, "setpoint", backward=str)
