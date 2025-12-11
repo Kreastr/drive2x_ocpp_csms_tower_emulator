@@ -188,6 +188,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
         self.fsm.context.id = result.get_variable_result[0].attribute_value
         self.id = result.get_variable_result[0].attribute_value
+        self.fsm.fsm_name = f"CP <{self.id}>"
         charge_points[self.fsm.context.id] = self
         if self.fsm.context.id is None:
             await self.fsm.handle(ChargePointFSMEvent.on_serial_number_not_obtained)
@@ -240,6 +241,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             self.fsm.context.id = charging_station["serial_number"]
         else:
             self.fsm.context.id = self.id
+        self.fsm.fsm_name = f"CP <{self.id}>"
         boot_notification_cache[self.id] = (charging_station, reason, vargs, kwargs)
         boot_notification_cache[self.fsm.context.id] = (charging_station, reason, vargs, kwargs)
 
