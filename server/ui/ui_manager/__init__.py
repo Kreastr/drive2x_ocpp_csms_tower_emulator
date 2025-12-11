@@ -38,6 +38,7 @@ import math
 
 from server.callable_interface import CallableInterface
 from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
+from util.db import get_default_redis
 
 if TYPE_CHECKING:
     from server.ocpp_server_handler import OCPPServerHandler
@@ -175,7 +176,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = random.randint(100000,999999)
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
-        server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), self.get_session_remaining_duration())
+        server.ocpp_server_handler.redfis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), self.get_session_remaining_duration())
 
     async def save_booking(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
@@ -183,7 +184,8 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
-        server.ocpp_server_handler.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
+        redis = get_default_redis()
+        redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
         ctxt.session_pin = -1
 
     def if_session_is_active(self, *vargs):
