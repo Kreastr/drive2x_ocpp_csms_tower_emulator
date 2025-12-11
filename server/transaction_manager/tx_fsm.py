@@ -121,11 +121,13 @@ class TxFSMServer(TxManagerFSMType):
         await self.update_baseline_via_ocpp()
 
     async def send_new_setpoint(self, *vargs):
+        from ..ocpp_server_handler import clamp_setpoint
         self.context: TxManagerContext
         setpoint = int(self.context.evse.next_setpoint)
         if self.context.cp_interface is not None:
             self.context.evse.setpoint = setpoint
             self.context.evse.next_setpoint = 0
+            clamp_setpoint(self.context.evse)
             logger.warning(f"send_new_setpoint {setpoint=}")
 
     async def update_baseline_via_ocpp(self, *vargs, **kwargs):
