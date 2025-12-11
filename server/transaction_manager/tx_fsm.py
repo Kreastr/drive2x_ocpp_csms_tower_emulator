@@ -132,6 +132,9 @@ class TxFSMServer(TxManagerFSMType):
 
     async def update_baseline_via_ocpp(self, *vargs, **kwargs):
         setpoint = self.context.evse.setpoint
+        if self.context.cp_interface is None:
+            logger.warning(f"update_baseline_via_ocpp cannot send setpoint because CP interface is not set")
+            return
         result = await self.context.cp_interface.call_payload(
             call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(setpoint),
                                                                      component=ComponentType(
