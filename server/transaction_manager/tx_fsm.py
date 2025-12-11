@@ -69,9 +69,9 @@ class TxFSMServer(TxManagerFSMType):
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
 
         self.on(TxManagerFSMState.transition_triggered.on_exit, self.send_new_setpoint)
-        self.on(TxManagerFSMState.ready.on_enter, self.update_baseline_via_ocpp)
-        self.on(TxManagerFSMState.charging.on_enter, self.update_baseline_via_ocpp)
-        self.on(TxManagerFSMState.discharging.on_enter, self.update_baseline_via_ocpp)
+        self.on(TxManagerFSMState.ready.on_loop, self.update_baseline_via_ocpp)
+        self.on(TxManagerFSMState.charging.on_loop, self.update_baseline_via_ocpp)
+        self.on(TxManagerFSMState.discharging.on_loop, self.update_baseline_via_ocpp)
 
         self.on("on_state_changed", self.save_fsm_state)
 
