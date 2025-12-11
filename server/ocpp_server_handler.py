@@ -99,6 +99,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.events = []
         self.onl_task = asyncio.create_task(self.online_status_task())
         self.fsm = get_charge_point_fsm(ChargePointContext())
+        self.fsm.fsm_name = f"CP <{self.id}>"
         self.fsm.context : ChargePointContext
 
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
@@ -319,6 +320,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
             if conn_status.evse_id not in self.fsm.context.transaction_fsms:
+                self.fsm.fsm_name = f"EVSE <{self.id}:{conn_status.evse_id}>"
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse = conn_status
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
                 await broadcast_to(app=gui_info.app,

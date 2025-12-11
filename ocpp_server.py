@@ -520,6 +520,7 @@ async def main_screen_block(cp_id, evse_id):
 
     else:
         fsm = UIManagerFSMType(uml=ui_manager_uml,
+                               fsm_name=f"UI <{cp_id}:{evse_id}>",
                                context=UIManagerContext(charge_point=charge_points[cp_id],
                                                         tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[
                                                             evse_id],
