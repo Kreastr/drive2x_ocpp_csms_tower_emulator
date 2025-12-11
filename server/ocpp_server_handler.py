@@ -354,6 +354,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                             evse.connector_status = "Occupied"
                             evse.last_report_soc_percent = sv["value"]
                             evse.last_report_time = datetime.now()
+                            await self.fsm.loop()
+                            await self.fsm.handle(TxManagerFSMEvent.on_soc_info_updated_event)
                         if sv["measurand"] == "Power.Active.Import":
                             evse.last_reported_power = sv["value"]/1000.0
                     logger.error(f"post meter values {evse=} {sv=}")

@@ -38,6 +38,7 @@ Authorizing --> Unknown : on authorize reject
 Authorizing --> Unknown : on deauthorized
 Occupied --> Upkeep : on authorize accept
 Occupied --> Upkeep : on tx update event
+Occupied --> Upkeep : on soc info updated event
 Upkeep --> Upkeep : on setpoint refresh mark
 Upkeep --> Ready : on authorized by app
 Authorized --> Ready : if occupied

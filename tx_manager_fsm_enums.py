@@ -27,6 +27,7 @@ class TxManagerFSMEvent(str, Enum):
     on_state_changed = 'on_state_changed'
     on_authorize_accept='on_authorize_accept'
     on_tx_update_event='on_tx_update_event'
+    on_soc_info_updated_event='on_soc_info_updated_event'
     on_authorized_by_app='on_authorized_by_app'
     on_authorize_reject='on_authorize_reject'
     on_deauthorized='on_deauthorized'
