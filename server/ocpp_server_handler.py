@@ -322,7 +322,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
             if conn_status.evse_id not in self.fsm.context.transaction_fsms:
-                self.fsm.fsm_name = f"EVSE <{self.id}:{conn_status.evse_id}>"
+                self.fsm.context.transaction_fsms[conn_status.evse_id].fsm_name = f"EVSE <{self.id}:{conn_status.evse_id}>"
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse = conn_status
                 self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
                 await broadcast_to(app=gui_info.app,
