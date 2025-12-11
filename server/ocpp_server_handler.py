@@ -352,13 +352,14 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 #ts = dateutil.parser.parse(v["timestamp"])
                 for sv in  v["sampled_value"]:
                     evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
+                    self.fsm.context.transaction_fsms[evse_id].fsm_name = f"EVSE <{self.id}:{evse_id}>"
                     evse.evse_id = evse_id
                     if "measurand" in sv:
                         if sv["measurand"] == "SoC":
                             evse.connector_status = "Occupied"
                             evse.last_report_soc_percent = sv["value"]
                             evse.last_report_time = datetime.now()
-                            await self.fsm.handle_as_deferred(TxManagerFSMEvent.on_soc_info_updated_event)
+                            await self.fsm.context.transaction_fsms[evse_id].handle_as_deferred(TxManagerFSMEvent.on_soc_info_updated_event)
                         if sv["measurand"] == "Power.Active.Import":
                             evse.last_reported_power = sv["value"]/1000.0
                     logger.error(f"post meter values {evse=} {sv=}")
@@ -404,6 +405,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
             tx_fsm.context.tx_id = reported_tx_id
             self.fsm.context.transaction_fsms[evse_id].context.tx_id = reported_tx_id
+            self.fsm.context.transaction_fsms[evse_id].fsm_name = f"EVSE <{self.id}:{evse_id}>"
             await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
             
         if event_type == "Started":
