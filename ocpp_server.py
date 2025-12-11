@@ -274,9 +274,9 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
                 cp : OCPPServerHandler = charge_points[cp_id]
                 if evse_id in cp.fsm.context.transaction_fsms:
                     evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
-                    evse.setpoint = value
+                    evse.next_setpoint = value
                     clamp_setpoint(evse)
-                    confirmed.values[iid] = evse.setpoint
+                    confirmed.values[iid] = evse.next_setpoint
         return confirmed
     except Exception as e:
         return GenericErrorResponse(error_message=traceback.format_exc())

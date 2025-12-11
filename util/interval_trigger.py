@@ -35,9 +35,10 @@ logger.setLevel(DEBUG)
 
 class AIOIntervalTrigger:
 
-    def __init__(self, period : timedelta, name :str = ""):
+    def __init__(self, period : timedelta, offset : timedelta = timedelta(seconds=0), name :str = ""):
         self.events = pyee.asyncio.AsyncIOEventEmitter()
         self.period = period
+        self.offset = offset
         self.keep_running = True
         self.task = asyncio.create_task(self._loop())
         self.name = name
@@ -46,7 +47,7 @@ class AIOIntervalTrigger:
         self.events.on("timer", callback)
 
     def floor_period_towards_last_midnight(self, time : datetime):
-        since = datetime.now().replace(microsecond=0,second=0,hour=0,minute=0)
+        since = (datetime.now() - self.offset).replace(microsecond=0,second=0,hour=0,minute=0)
         raw_s = (time - since).total_seconds()
         period_s = self.period.total_seconds()
         return since + timedelta(seconds=(raw_s // period_s) * period_s)
@@ -61,6 +62,14 @@ class AIOIntervalTrigger:
                 self.events.emit("timer")
                 logger.warning(f"Emitting Timer interval {self.name}")
                 last_event = floored
+
+
+_refresh_setpoint_loop = None
+def refresh_setpoint_loop():
+    global _refresh_setpoint_loop
+    if _refresh_setpoint_loop is None:
+        _refresh_setpoint_loop = AIOIntervalTrigger(period=timedelta(seconds=30), offset=timedelta(seconds=15), name="Setpoint Refresh Timer")
+    return _refresh_setpoint_loop
 
 _main_setpoint_loop = None
 def main_setpoint_loop():

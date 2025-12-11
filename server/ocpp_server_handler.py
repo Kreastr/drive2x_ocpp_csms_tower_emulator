@@ -77,19 +77,19 @@ def get_redis_caches_cp():
     return session_pins, boot_notification_cache, status_notification_cache
 
 def clamp_setpoint(evse: EvseStatus):
-    if evse.setpoint > 8000:
-        evse.setpoint = 8000
-    if evse.setpoint < -8000:
-        evse.setpoint = -8000
+    if evse.next_setpoint > 8000:
+        evse.next_setpoint = 8000
+    if evse.next_setpoint < -8000:
+        evse.next_setpoint = -8000
 
     upkeep_power = get_app_args().upkeep_power
     # Minimal charge/discharge for connection stability
-    if evse.setpoint < 0:
-        if evse.setpoint > -upkeep_power:
-            evse.setpoint = -upkeep_power
+    if evse.next_setpoint < 0:
+        if evse.next_setpoint > -upkeep_power:
+            evse.next_setpoint = -upkeep_power
     else:
-        if evse.setpoint < upkeep_power:
-            evse.setpoint = upkeep_power
+        if evse.next_setpoint < upkeep_power:
+            evse.next_setpoint = upkeep_power
 
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
@@ -475,24 +475,24 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     async def do_increase_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Increased setpoint")
-        if -get_app_args().upkeep_power <= self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint <= 0:
-            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint = get_app_args().upkeep_power
+        if -get_app_args().upkeep_power <= self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint <= 0:
+            self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint = get_app_args().upkeep_power
         else:
-            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint += 200
+            self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint += 200
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
-        logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
+        logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint}")
 
     async def do_decrease_setpoint(self, evse_id : EVSEId):
         logger.warning(f"Decreased setpoint")
-        if 0 <= self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint <= get_app_args().upkeep_power:
-            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint = -get_app_args().upkeep_power
+        if 0 <= self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint <= get_app_args().upkeep_power:
+            self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint = -get_app_args().upkeep_power
         else:
-            self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint -= 200
+            self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint -= 200
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
-        logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint}")
+        logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint}")
 
     async def force_setpoint_update(self, evse_id : EVSEId):
-        new_setpoint = self.fsm.context.transaction_fsms[evse_id].context.evse.setpoint
+        new_setpoint = self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint
         logger.warning(f"Forced setpoint update {evse_id=} {new_setpoint=}")
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_setpoint_apply_mark)
 

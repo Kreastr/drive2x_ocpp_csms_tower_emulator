@@ -38,6 +38,7 @@ Authorizing --> Unknown : on authorize reject
 Authorizing --> Unknown : on deauthorized
 Occupied --> Upkeep : on authorize accept
 Occupied --> Upkeep : on tx update event
+Upkeep --> Upkeep : on setpoint refresh mark
 Upkeep --> Ready : on authorized by app
 Authorized --> Ready : if occupied
 Authorized --> Unknown : on deauthorized
@@ -48,6 +49,9 @@ Discharging --> TransitionTriggered : on setpoint apply mark
 TransitionTriggered --> Charging : if charge setpoint
 TransitionTriggered --> Discharging : if discharge setpoint
 TransitionTriggered --> Ready : if idle setpoint
+Ready --> Ready : on setpoint refresh mark
+Discharging --> Discharging : on setpoint refresh mark
+Charging --> Charging : on setpoint refresh mark
 Charging --> Terminating : on deauthorized
 Discharging --> Terminating : on deauthorized
 Ready --> Terminating : on deauthorized
