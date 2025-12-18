@@ -228,7 +228,7 @@ def get_app_args():
     argparse.add_argument("--ui_host", type=str, help="Host on which NiceGUI will listen to connections.",
                           default="0.0.0.0")
     argparse.add_argument("--ui_port", type=int, help="Port on which NiceGUI will open web service.", default=8000)
-    argparse.add_argument("--upkeep_power", type=int, help="Minimal charge discharge power to help with unstable EV controllers", default=0)
+    argparse.add_argument("--upkeep_power", type=int, help="Minimal charge discharge power to help with unstable EV controllers", default=100)
     return argparse.parse_args()
 
 
