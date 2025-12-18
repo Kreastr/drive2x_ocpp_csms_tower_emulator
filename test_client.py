@@ -209,8 +209,9 @@ class OCPPClient(ChargePoint):
         async def post_measurands():
             if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
                 meter_values = call.MeterValues(evse.id, [MeterValueType(get_time_str(),
-                                                                          [SampledValueType(value=(evse.soc_wh / evse.usable_capacity),
-                                                                                            measurand=MeasurandEnumType.soc),
+                                                                          [SampledValueType(value=(evse.soc_wh / evse.usable_capacity * 100.0),
+                                                                                            measurand=MeasurandEnumType.soc,
+                                                                                            unit_of_measure=UnitOfMeasureType("Percent")),
                                                                            SampledValueType(value=evse.setpoint / 1000.0,
                                                                                             measurand=MeasurandEnumType.power_active_import,
                                                                                             unit_of_measure=UnitOfMeasureType("kW")),

@@ -553,4 +553,7 @@ def format_queue_position(rank):
 
 if __name__ in {"__main__", "__mp_main__"}:
     args = get_app_args()
-    ui.run(host=args.ui_host, port=args.ui_port, favicon="static/cropped-Favicon-1-192x192.png", language="en-GB")
+    ui.run(host=args.ui_host,
+           port=args.ui_port,
+           favicon="static/cropped-Favicon-1-192x192.png",
+           language="en-GB")
