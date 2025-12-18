@@ -85,6 +85,7 @@ def clamp_setpoint(evse: EvseStatus):
         evse.next_setpoint = -8000
 
     upkeep_power = get_app_args().upkeep_power
+    logger.warning(f"{upkeep_power=}")
     # Minimal charge/discharge for connection stability
     if evse.next_setpoint < 0:
         if evse.next_setpoint > -upkeep_power:
@@ -490,6 +491,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint = get_app_args().upkeep_power
         else:
             self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint += 200
+        
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint}")
 
@@ -499,6 +501,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint = -get_app_args().upkeep_power
         else:
             self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint -= 200
+        
         clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint}")
 
