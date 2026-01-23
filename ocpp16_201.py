@@ -512,7 +512,7 @@ async def on_connect(websocket):
 async def main():
     logging.warning("main start")
     config : ProxyConfig = ProxyConfigurator.get_global_config()
-    server = await websockets.serve(on_connect, '0.0.0.0', config.service_port, subprotocols=[Subprotocol('ocpp1.6')])
+    server = await websockets.serve(on_connect, config.service_host, config.service_port, subprotocols=[Subprotocol('ocpp1.6')])
     logging.warning("main server ready")
     try:
         await server.serve_forever()

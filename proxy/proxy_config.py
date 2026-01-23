@@ -29,7 +29,7 @@ from util.app_configurator import Configurator
 class ProxyConfig(BaseModel):
     service_port : int = 160000
     service_host : str = "0.0.0.0"
-    upstream_uri: str = "ws://127.0.0.1:5000"
+    upstream_uri: str = "wss://drive2x.lut.fi/ocpp/"
     
 class ProxyConfigurator(Configurator[ProxyConfig]):
     pass

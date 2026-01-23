@@ -243,9 +243,9 @@ def get_proxy_app_args():
     can be held responsible for them.""")
     argparse.add_argument("--service_host", type=str, help="Host on which proxy expects WS connections.", default="0.0.0.0")
     argparse.add_argument("--service_port", type=str, help="Port on which proxy expects WS connections.", default=16000)
-    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by CSMS.", default="redis")
-    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by CSMS.", default=6379)
-    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by CSMS.", default=3)
+    argparse.add_argument("--redis_host", type=str, help="Host of Redis used by converting proxy.", default="redis")
+    argparse.add_argument("--redis_port", type=int, help="Port of Redis used by converting proxy.", default=6379)
+    argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by converting proxy.", default=3)
     argparse.add_argument("--upstream_uri", type=str, help="OCPP URI which serves OCPP 2.0.1 CSMS.",
                           default="ws://127.0.0.1:9000")
     return argparse.parse_args()
