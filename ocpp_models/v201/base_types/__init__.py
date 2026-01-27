@@ -27,6 +27,7 @@ from typing import Annotated, Optional
 
 CiString20Type = Annotated[str, StringConstraints(max_length=20)]
 CiString25Type = Annotated[str, StringConstraints(max_length=25)]
+CiString32Type = Annotated[str, StringConstraints(max_length=32)]
 CiString36Type = Annotated[str, StringConstraints(max_length=36)]
 CiString50Type = Annotated[str, StringConstraints(max_length=50)]
 CiString255Type = Annotated[str, StringConstraints(max_length=255)]
