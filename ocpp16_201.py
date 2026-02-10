@@ -27,7 +27,7 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from asyncio import CancelledError
 from logging import getLogger
 from time import sleep
@@ -75,6 +75,7 @@ from util import get_time_str, async_camelize_kwargs, log_req_response, with_req
 from datetime import  timezone
 
 from util.db import get_default_redis
+from util.interval_trigger import proxy_setpoint_update_loop
 
 UTC_TZ = timezone(timedelta(0))
 import sys
@@ -183,6 +184,13 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
         self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
         self.server_connection : OCPPClientV201 | None = None
+        proxy_setpoint_update_loop().subscribe(self.periodic_setpoint_update)
+
+    @log_req_response
+    async def periodic_setpoint_update(self, *vargs, **kwargs):
+        next_setpoint = self.server_connection.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
+        result: call_result.ChangeConfiguration = await self.call_payload(
+            call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
 
     async def fsm_task(self):
         while self.fsm.current_state is not None:
@@ -394,7 +402,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         value = var.attributeValue
         result: call_result.ChangeConfiguration = await self.call_payload(
             call.ChangeConfiguration(key=key, value=value))
-        logger.warning(f"get varaibles {key=} {value=} {result=}")
+        logger.info(f"forward set varaible {key=} {value=} {result=}")
         if result.status == v16enums.ConfigurationStatus.accepted:
             response = SetVariableResultType(attribute_status=SetVariableStatusEnumType.accepted,
                                              component=resp_cmpnt,

@@ -170,8 +170,7 @@ class OCPPClientV201(ChargePoint):
         self.cpc : ChargingProfileComponent = ChargingProfileComponent(evse_ids=[1],
                                    evse_hard_limits=limit_descriptor,
                                    report_profiles_call=lambda x: None)
-
-
+    
     async def meter_values_request(self, rq: MeterValuesRequest, tx_id : str | None):
         v201_meter_values = convert_meter_values_to_201(rq)
         if tx_id is not None:

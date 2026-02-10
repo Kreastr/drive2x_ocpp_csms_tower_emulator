@@ -85,3 +85,10 @@ def client_measurand_loop():
     if _client_measurand_loop is None:
         _client_measurand_loop = AIOIntervalTrigger(period=timedelta(seconds=15), name="Measurand Timer")
     return _client_measurand_loop
+
+_proxy_setpoint_update_loop = None
+def proxy_setpoint_update_loop() -> AIOIntervalTrigger:
+    global _proxy_setpoint_update_loop
+    if _proxy_setpoint_update_loop is None:
+        _proxy_setpoint_update_loop = AIOIntervalTrigger(period=timedelta(seconds=15), name="Proxy Setpoint Update Timer")
+    return _proxy_setpoint_update_loop
