@@ -23,12 +23,12 @@ Union nor the granting authority can be held responsible for them.
 """
 from typing import Optional
 
+from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingLimitSourceEnumType
 from pydantic import BaseModel
 
-from ocpp_models.v201.composite_types import ChargingProfileCriterionType
+from ocpp_models.v201.composite_types import ChargingProfileType, ChargingProfileCriterionType
 
 
-class GetChargingProfilesRequest(BaseModel):
-    requestId : int
-    evseId : Optional[int] = None
-    chargingProfile : ChargingProfileCriterionType
+class ClearChargingProfileRequest(BaseModel):
+    chargingProfileId : Optional[int] = None
+    chargingProfileCriteria : ChargingProfileCriterionType

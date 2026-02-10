@@ -1,8 +1,8 @@
-from _pydatetime import datetime
+from datetime import datetime
 from typing import Optional
 
 from ocpp.v201.enums import CostKindEnumType, ChargingRateUnitEnumType, ChargingProfilePurposeEnumType, \
-    ChargingProfileKindEnumType, RecurrencyKindEnumType
+    ChargingProfileKindEnumType, RecurrencyKindEnumType, ChargingLimitSourceEnumType
 from pydantic import BaseModel, Field
 
 from ocpp_models.v201.base_types import CiString32Type, CiString36Type
@@ -51,7 +51,7 @@ class ChargingScheduleType(BaseModel):
     chargingRateUnit : ChargingRateUnitEnumType
     minChargingRate : Optional[float] = None
     chargingSchedulePeriod : list[ChargingSchedulePeriodType]
-    salesTariff : Optional[SalesTariffType ]
+    salesTariff : Optional[SalesTariffType] = None
 
 
 class ChargingProfileType(BaseModel):
@@ -64,3 +64,10 @@ class ChargingProfileType(BaseModel):
     validTo : Optional[datetime] = None
     transactionId : Optional[CiString36Type] = None
     chargingSchedule : list[ChargingScheduleType]
+
+
+class ChargingProfileCriterionType(BaseModel):
+    chargingProfilePurpose : Optional[ChargingProfilePurposeEnumType] = None
+    stackLevel : Optional[int] = None
+    chargingProfileId : Optional[list[int]] = None
+    chargingLimitSource : Optional[list[ChargingLimitSourceEnumType]] = None
