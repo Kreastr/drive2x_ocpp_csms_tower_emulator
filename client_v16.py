@@ -34,6 +34,7 @@ Union nor the granting authority can be held responsible for them.
 import datetime
 from abc import ABC, abstractmethod
 from logging import getLogger
+from typing import Optional
 
 import websockets
 from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
@@ -156,6 +157,7 @@ def convert_meter_values_to_201(rq):
 class OCPPClientV201(ChargePoint):
 
     def __init__(self, client_interface : OCPPServerV16Interface, serial_number, ws, response_timeout=30, _logger=logger):
+        self.cpc : Optional[ChargingProfileComponent] = None
         super().__init__(serial_number, ws, response_timeout=response_timeout, logger=_logger)
         self.client_interface = client_interface
         # ToDo store in redis
@@ -167,7 +169,7 @@ class OCPPClientV201(ChargePoint):
                                               default=1000.0,
                                               minimal_absolute=2000.0,
                                               maximal_absolute=6000.0)
-        self.cpc : ChargingProfileComponent = ChargingProfileComponent(evse_ids=[1],
+        self.cpc  = ChargingProfileComponent(evse_ids=[1],
                                    evse_hard_limits=limit_descriptor,
                                    report_profiles_call=lambda x: None)
     

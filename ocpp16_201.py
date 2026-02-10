@@ -124,6 +124,7 @@ async def connect_as_client(client_interface, uri, serial_number, on_connect):
     fallback = 5
     while True:
         try:
+            logger.info(f"Connecting to {uri=}")
             async with websockets.connect(uri, **ws_args) as ws:
                 cp = OCPPClientV201(client_interface, serial_number, ws)
                 await on_connect(cp)
@@ -188,9 +189,10 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     @log_req_response
     async def periodic_setpoint_update(self, *vargs, **kwargs):
-        next_setpoint = self.server_connection.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
-        result: call_result.ChangeConfiguration = await self.call_payload(
-            call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
+        if self.server_connection.cpc is not None:
+            next_setpoint = self.server_connection.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
+            result: call_result.ChangeConfiguration = await self.call_payload(
+                call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
 
     async def fsm_task(self):
         while self.fsm.current_state is not None:
