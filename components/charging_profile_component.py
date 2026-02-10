@@ -111,6 +111,7 @@ class ChargingProfileComponent:
 
 
     @beartype
+    @snoop
     def _get_power_profile_value(self, evseId : int, moment : datetime.datetime):
         if evseId not in self.evse_ids:
             return None
@@ -135,6 +136,7 @@ class ChargingProfileComponent:
         return stacked_commands[max(stacked_commands)]
 
     @beartype
+    @snoop
     def get_power_setpoint(self, evseId : int, moment : datetime.datetime) -> float:
         limit = self._get_power_profile_value(evseId, moment)
 
@@ -301,6 +303,7 @@ class ChargingProfileComponent:
 
     @staticmethod
     @beartype
+    @snoop
     def _profile_has_schedule_for(moment: datetime.datetime, profile : ChargingProfileType) -> tuple[bool, Optional[ChargingSchedulePeriodType]]:
         """
             Checks if the profile has a valid schedule for a given moment.
@@ -328,8 +331,6 @@ class ChargingProfileComponent:
             if start_schedule is None:
                 logger.warning(f"Cannot determine startSchedule for {moment=} in profile {profile=}")
                 continue
-            
-            start_schedule = start_schedule + datetime.timedelta(seconds=schedule_information.duration)
 
             end_schedule = datetime.datetime(datetime.MAXYEAR,12,31,23,59,59,999999, tzinfo=datetime.UTC)
             if schedule_information.duration is not None:
@@ -347,6 +348,9 @@ class ChargingProfileComponent:
                 if previous is not None:
                     if previous_start <= moment < interval_start:
                         return True, previous
+                else:
+                    if moment < interval_start:
+                        return False, None
                 previous = interval
                 previous_start = interval_start
             return True, previous

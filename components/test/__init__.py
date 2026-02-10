@@ -193,6 +193,54 @@ def test_pulse_charge():
     cpc.on_tx_end(1, "aaa")
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (30, 2000.0), (60, 2000.0), (119, 2000.0)), start)
 
+def test_late_start_schedule():
+    cpc = ChargingProfileComponent(evse_ids=[1, 2],
+                                   evse_hard_limits=get_limit_descriptor(),
+                                   report_profiles_call=lambda x: None)
+    start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (119, 2000.0)), start)
+
+    cpc.on_tx_start(1, "aaa")
+    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),),
+                               valid_from=start, tx_id="aaa")
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
+                                (29, 2000.0), (30, 3000.0), (59, 3000.0),
+                                (60, 4000.0), (119, 4000.0)), start)
+    cpc.on_tx_end(1, "aaa")
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
+                               (29, 2000.0), (30, 2000.0), (29, 2000.0),
+                               (60, 2000.0), (119, 2000.0)), start)
+
+def test_stacked_schedule():
+    cpc = ChargingProfileComponent(evse_ids=[1, 2],
+                                   evse_hard_limits=get_limit_descriptor(),
+                                   report_profiles_call=lambda x: None)
+    start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (119, 2000.0)), start)
+
+    cpc.on_tx_start(1, "aaa")
+    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),), valid_from=start, tx_id="aaa")
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    response = add_one_profile(cpc, limits=((0, 5000.0),),
+                               valid_from=start+datetime.timedelta(seconds=45),
+                               valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1)
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
+                                (29, 2000.0), (30, 3000.0), 
+                                (44, 3000.0), (45, 5000.0), (59, 5000.0),
+                                (60, 5000.0), (74, 5000.0), (75, 4000.0), (119, 4000.0)), start)
+    cpc.on_tx_end(1, "aaa")
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
+                               (29, 2000.0), (30, 2000.0), (29, 2000.0),
+                               (60, 2000.0), (119, 2000.0)), start)
+
 def assert_profile(cpc, points, start):
     for i, check_value in points:
         period = start + datetime.timedelta(seconds=i)
