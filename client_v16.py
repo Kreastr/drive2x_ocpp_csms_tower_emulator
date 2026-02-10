@@ -41,14 +41,18 @@ from ocpp.v201.datatypes import ChargingStationType, TransactionType, MeterValue
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import Action
 
+from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest, MeterValue, SampledValue
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v16.stop_transaction import StopTransactionRequest
+from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
+from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
+from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from ocpp_models.v201.set_variables import SetVariablesRequest
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent
@@ -157,6 +161,17 @@ class OCPPClientV201(ChargePoint):
         # ToDo store in redis
         self.tx_seq_no = 1
 
+        limit_descriptor = dict()
+        limit_descriptor[1] = LimitDescriptor(minimal=-6000.0,
+                                              maximal=6000.0,
+                                              default=1000.0,
+                                              minimal_absolute=2000.0,
+                                              maximal_absolute=6000.0)
+        self.cpc : ChargingProfileComponent = ChargingProfileComponent(evse_ids=[1],
+                                   evse_hard_limits=limit_descriptor,
+                                   report_profiles_call=lambda x: None)
+
+
     async def meter_values_request(self, rq: MeterValuesRequest, tx_id : str | None):
         v201_meter_values = convert_meter_values_to_201(rq)
         if tx_id is not None:
@@ -207,6 +222,7 @@ class OCPPClientV201(ChargePoint):
 
     async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
         self.tx_seq_no = 1
+        self.cpc.on_tx_start(rq.connectorId, tx_id)
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
@@ -216,6 +232,7 @@ class OCPPClientV201(ChargePoint):
 
     async def stop_transaction_request(self, rq : StopTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
         self.tx_seq_no += 1
+        self.cpc.on_tx_end(rq.transactionId, tx_id)
         if rq.reason in STOP_REASON_MAP:
             reason = STOP_REASON_MAP[rq.reason]
         else:
@@ -238,6 +255,26 @@ class OCPPClientV201(ChargePoint):
     async def on_request_start_transaction(self, request : RequestStartTransactionRequest, *vargs, **kwargs):
         return await self.client_interface.on_request_start_transaction(request)
 
+    @on(Action.set_charging_profile)
+    @async_camelize_kwargs
+    @log_req_response
+    @with_request_model(SetChargingProfileRequest)
+    async def on_set_charging_profile(self, rq: SetChargingProfileRequest, **kwargs):
+        return self.cpc.set_profile_request(rq)
+
+    @on(Action.clear_charging_profile)
+    @async_camelize_kwargs
+    @log_req_response
+    @with_request_model(ClearChargingProfileRequest)
+    async def on_clear_charging_profile(self, rq: ClearChargingProfileRequest, **kwargs):
+        return self.cpc.clear_profiles_request(rq)
+
+    @on(Action.get_charging_profiles)
+    @async_camelize_kwargs
+    @log_req_response
+    @with_request_model(GetChargingProfilesRequest)
+    async def on_set_charging_profile(self, rq: GetChargingProfilesRequest, **kwargs):
+        return self.cpc.get_profile_request(rq)
 
     @on(Action.reset)
     @log_req_response

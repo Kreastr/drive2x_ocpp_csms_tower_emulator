@@ -154,7 +154,7 @@ def test_limits():
                                    evse_hard_limits=get_limit_descriptor(),
                                    report_profiles_call=lambda x: None)
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
-    assert add_one_profile(cpc, limits=((0, 8000.0),), valid_from=start)
+    assert add_one_profile(cpc, limits=((0, 10000.0),), valid_from=start)
     assert cpc.get_power_setpoint(1, moment=start) == 8000.0, f"Expected 8000.0 got {cpc.get_power_setpoint(1, moment=start)}"
 
 def test_pulse_charge():
@@ -233,7 +233,7 @@ def test_stacked_schedule():
                                valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
-                                (29, 2000.0), (30, 3000.0), 
+                                (29, 2000.0), (30, 3000.0),
                                 (44, 3000.0), (45, 5000.0), (59, 5000.0),
                                 (60, 5000.0), (74, 5000.0), (75, 4000.0), (119, 4000.0)), start)
     cpc.on_tx_end(1, "aaa")

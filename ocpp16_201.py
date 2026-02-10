@@ -50,15 +50,19 @@ from typing_extensions import TypeVar
 from websockets import Subprotocol, ConnectionClosedOK
 
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
+from components.charging_profile_component import ChargingProfileComponent, LimitDescriptor
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v16.stop_transaction import StopTransactionRequest
+from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
+from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
+from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from ocpp_models.v201.set_variables import SetVariablesRequest, SetVariableDataType
 from proxy.proxy_config import ProxyConfigurator, ProxyConfig
 from proxy.proxy_connection_context import ProxyConnectionContext
@@ -179,7 +183,6 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
         self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
         self.server_connection : OCPPClientV201 | None = None
-
 
     async def fsm_task(self):
         while self.fsm.current_state is not None:
