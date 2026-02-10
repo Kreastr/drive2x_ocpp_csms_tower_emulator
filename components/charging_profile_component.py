@@ -68,9 +68,9 @@ class ChargingProfileComponent:
         self.active_transaction : dict[int, str] = dict()
 
     @beartype
-    def cleanup_tx_profiles(self, evse_id : int, tx_id : str):
+    def cleanup_tx_profiles(self, evse_id : int):
         if evse_id not in self.evse_ids:
-            logger.warning(f"Tried to remove tx profile for {tx_id=} on unknown {evse_id=}")
+            logger.warning(f"Tried to remove tx profiles on unknown {evse_id=}")
             return
         installed = self.installed_profiles[evse_id]
         new_list = []
@@ -79,9 +79,8 @@ class ChargingProfileComponent:
             if profile.chargingProfilePurpose != profile.chargingProfilePurpose.tx_profile:
                 new_list.append(profile)
                 continue
-            if profile.transactionId != tx_id:
-                new_list.append(profile)
-                continue
+
+        self.installed_profiles[evse_id] = new_list
 
 
     @beartype
@@ -91,7 +90,7 @@ class ChargingProfileComponent:
             return
         if evse_id in self.active_transaction:
             logger.warning(f"Starting new transaction over an existing one. old_tx: {self.active_transaction[evse_id]} new_tx: {tx_id}")
-            self.cleanup_tx_profiles(evse_id, self.active_transaction[evse_id])
+            self.cleanup_tx_profiles(evse_id)
         self.active_transaction[evse_id] = tx_id
 
     @beartype
@@ -105,13 +104,12 @@ class ChargingProfileComponent:
         if self.active_transaction[evse_id] != tx_id:
             logger.warning(f"Trying to stop transaction we are not tracking current_tx: {self.active_transaction[evse_id]} stopped_tx: {tx_id} Do nothing")
             return False
-        self.cleanup_tx_profiles(evse_id, self.active_transaction[evse_id])
+        self.cleanup_tx_profiles(evse_id)
         del self.active_transaction[evse_id]
         return True
 
 
     @beartype
-    @snoop
     def _get_power_profile_value(self, evseId : int, moment : datetime.datetime):
         if evseId not in self.evse_ids:
             return None
@@ -136,7 +134,6 @@ class ChargingProfileComponent:
         return stacked_commands[max(stacked_commands)]
 
     @beartype
-    @snoop
     def get_power_setpoint(self, evseId : int, moment : datetime.datetime) -> float:
         limit = self._get_power_profile_value(evseId, moment)
 
@@ -279,7 +276,6 @@ class ChargingProfileComponent:
             skippedIds = [i for i in self.evse_ids if i not in evseIdList]
 
         for _evseId in evseIdList:
-            print(self.installed_profiles)
             for profile in self.installed_profiles[_evseId]:
                 if stackLevel is not None:
                     if profile.stackLevel != stackLevel:
@@ -303,7 +299,6 @@ class ChargingProfileComponent:
 
     @staticmethod
     @beartype
-    @snoop
     def _profile_has_schedule_for(moment: datetime.datetime, profile : ChargingProfileType) -> tuple[bool, Optional[ChargingSchedulePeriodType]]:
         """
             Checks if the profile has a valid schedule for a given moment.
