@@ -77,8 +77,7 @@ def report_profiles(cpc):
 
 def test_set_charging():
     cpc = ChargingProfileComponent(evse_ids=[1],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     add_one_profile(cpc)
     reports, status = report_profiles(cpc)
     assert status == status.accepted, f"{status}"
@@ -100,8 +99,7 @@ def test_set_charging():
 
 def test_duplicate_profiles_not_added():
     cpc = ChargingProfileComponent(evse_ids=[1],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     result1 = add_one_profile(cpc)
     result2 = add_one_profile(cpc)
     assert result1.status == result1.status.accepted, f"Got wrong status: {result1.status } {result1.status_info=}"
@@ -112,8 +110,7 @@ def test_duplicate_profiles_not_added():
 
 def test_nonduplicates_work():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     result1 = add_one_profile(cpc)
     result2 = add_one_profile(cpc, evseId=2)
     result3 = add_one_profile(cpc, stackLevel=1)
@@ -126,17 +123,16 @@ def test_nonduplicates_work():
 
 def test_tx_ops():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
-    assert len(cpc.active_transaction) == 0
+                                   evse_hard_limits=get_limit_descriptor())
+    assert len(cpc.active_transaction_table) == 0
     cpc.on_tx_start(1, "aaa")
-    assert cpc.active_transaction[1] == "aaa"
+    assert cpc.active_transaction_table[1] == "aaa"
     cpc.on_tx_start(1, "bbb")
-    assert cpc.active_transaction[1] == "bbb"
+    assert cpc.active_transaction_table[1] == "bbb"
     assert not cpc.on_tx_end(1, "aaa")
-    assert cpc.active_transaction[1] == "bbb"
+    assert cpc.active_transaction_table[1] == "bbb"
     assert cpc.on_tx_end(1, "bbb")
-    assert len(cpc.active_transaction) == 0
+    assert len(cpc.active_transaction_table) == 0
 
 
 def get_limit_descriptor():
@@ -151,16 +147,14 @@ def get_limit_descriptor():
 
 def test_limits():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
     assert add_one_profile(cpc, limits=((0, 10000.0),), valid_from=start)
     assert cpc.get_power_setpoint(1, moment=start) == 8000.0, f"Expected 8000.0 got {cpc.get_power_setpoint(1, moment=start)}"
 
 def test_pulse_charge():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
     response = add_one_profile(cpc, limits=((0, 499.0),), valid_from=start)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
@@ -172,12 +166,11 @@ def test_pulse_charge():
     cpc.on_tx_start(1, "aaa")
     response = add_one_profile(cpc, limits=((60, 2499.0),), valid_from=start, tx_id="aaa")
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
-    assert_profile(cpc, ((0, 2499.0), (14, 2499.0), (15, 2499.0), (30, 2499.0), (119, 2499.0)), start)
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (44, 2000.0), (45, 0.0), (59, 0.0), (60, 2499.0), (119, 2499.0)), start)
 
-def test_pulse_charge():
+def test_transaction_stop():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
     response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
@@ -195,8 +188,7 @@ def test_pulse_charge():
 
 def test_late_start_schedule():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
     response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
@@ -217,8 +209,7 @@ def test_late_start_schedule():
 
 def test_stacked_schedule():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
-                                   evse_hard_limits=get_limit_descriptor(),
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
     response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
@@ -246,3 +237,37 @@ def assert_profile(cpc, points, start):
         period = start + datetime.timedelta(seconds=i)
         assert cpc.get_power_setpoint(1, moment=period) == check_value, \
             f"At t={i} Expected {check_value=} got {cpc.get_power_setpoint(1, moment=period)}"
+
+def test_db_restore():
+    cpc = ChargingProfileComponent(evse_ids=[1, 2],
+                                   evse_hard_limits=get_limit_descriptor())
+    cpc.restore_from_database()
+    start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    cpc.restore_from_database()
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (119, 2000.0)), start)
+    cpc.restore_from_database()
+
+    cpc.on_tx_start(1, "aaa")
+    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),), valid_from=start, tx_id="aaa")
+
+    cpc.restore_from_database()
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    response = add_one_profile(cpc, limits=((0, 5000.0),),
+                               valid_from=start+datetime.timedelta(seconds=45),
+                               valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1)
+
+    cpc.restore_from_database()
+    assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
+                                (29, 2000.0), (30, 3000.0),
+                                (44, 3000.0), (45, 5000.0), (59, 5000.0),
+                                (60, 5000.0), (74, 5000.0), (75, 4000.0), (119, 4000.0)), start)
+
+    cpc.restore_from_database()
+    cpc.on_tx_end(1, "aaa")
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
+                               (29, 2000.0), (30, 2000.0), (29, 2000.0),
+                               (60, 2000.0), (119, 2000.0)), start)

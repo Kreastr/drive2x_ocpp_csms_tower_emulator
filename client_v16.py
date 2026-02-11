@@ -275,7 +275,8 @@ class OCPPClientV201(ChargePoint):
     @log_req_response
     @with_request_model(GetChargingProfilesRequest)
     async def on_set_charging_profile(self, rq: GetChargingProfilesRequest, **kwargs):
-        return self.cpc.get_profile_request(rq)
+        response, reports = self.cpc.get_profile_request(rq)
+        return response
 
     @on(Action.reset)
     @log_req_response
@@ -283,8 +284,8 @@ class OCPPClientV201(ChargePoint):
     @with_request_model(ResetRequest)
     async def on_reset(self, request : ResetRequest, *vargs, **kwargs) -> call_result.Reset:
         return await self.client_interface.on_reset(request)
-        #  ToDo: return await self.client_interface.on_server_get_variables(request)
-
+    
+    
     @on(Action.get_variables)
     @log_req_response
     @async_camelize_kwargs
