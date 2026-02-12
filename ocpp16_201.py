@@ -88,6 +88,7 @@ import traceback
 
 from camel_converter import dict_to_camel
 
+
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -118,13 +119,13 @@ async def connect_as_client(client_interface, uri, serial_number, on_connect):
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
     ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],
-                                   open_timeout=5)
+                                   open_timeout=15)
     if uri.startswith("wss://"):
         ws_args["ssl"] = ctx
     fallback = 5
     while True:
         try:
-            logger.info(f"Connecting to {uri=}")
+            logger.info(f"Connecting to {uri=} {ws_args=}")
             async with websockets.connect(uri, **ws_args) as ws:
                 cp = OCPPClientV201(client_interface, serial_number, ws)
                 await on_connect(cp)

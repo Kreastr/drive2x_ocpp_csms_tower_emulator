@@ -149,7 +149,7 @@ def convert_meter_values_to_201(rq):
             v201_sampled_values.append(SampledValueType(fv,
                                                         measurand=measurand,
                                                         unit_of_measure=unit))
-        v201_meter_values.append(MeterValueType(timestamp=str(mv.timestamp),
+        v201_meter_values.append(MeterValueType(timestamp=mv.timestamp.isoformat(),
                                                 sampled_value=v201_sampled_values))
     return v201_meter_values
 
