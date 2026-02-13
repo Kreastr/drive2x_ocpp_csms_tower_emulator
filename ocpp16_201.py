@@ -293,7 +293,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         TX_MAP_201_TO_16[tx_id_201] = tx_id_16
 
         await self.server_connection.start_transaction_request(rq, tx_id_201, self.remote_start_id)
-        self remote_start_id = None
+        self.remote_start_id = None
 
         return call_result.StartTransaction(
             transaction_id=tx_id_16,
