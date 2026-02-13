@@ -170,8 +170,7 @@ class OCPPClientV201(ChargePoint):
                                               minimal_absolute=2000.0,
                                               maximal_absolute=6000.0)
         self.cpc  = ChargingProfileComponent(evse_ids=[1],
-                                   evse_hard_limits=limit_descriptor,
-                                   report_profiles_call=lambda x: None)
+                                   evse_hard_limits=limit_descriptor)
     
     async def meter_values_request(self, rq: MeterValuesRequest, tx_id : str | None):
         v201_meter_values = convert_meter_values_to_201(rq)
@@ -221,14 +220,15 @@ class OCPPClientV201(ChargePoint):
         rq.seq_no = self.tx_seq_no
         await self.call_payload(rq)
 
-    async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
+    async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str, remote_start_id : Optional[int] = None) -> call_result.TransactionEvent:
         self.tx_seq_no = 1
         self.cpc.on_tx_start(rq.connectorId, tx_id)
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
                                                              seq_no=self.tx_seq_no,
-                                                             transaction_info=TransactionType(tx_id)))
+                                                             transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id)),
+                                       )
 
 
     async def stop_transaction_request(self, rq : StopTransactionRequest, tx_id : str) -> call_result.TransactionEvent:

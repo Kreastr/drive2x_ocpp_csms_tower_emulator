@@ -182,6 +182,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
+        self.remote_start_id : int | None = None
         self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self), fsm_name=f"OCPPServer16Proxy <{self.id}>")
         self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
         self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
@@ -291,7 +292,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         TX_MAP_16_TO_201[tx_id_16] = tx_id_201
         TX_MAP_201_TO_16[tx_id_201] = tx_id_16
 
-        await self.server_connection.start_transaction_request(rq, tx_id_201)
+        await self.server_connection.start_transaction_request(rq, tx_id_201, self.remote_start_id)
+        self remote_start_id = None
 
         return call_result.StartTransaction(
             transaction_id=tx_id_16,
@@ -445,6 +447,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     async def on_request_start_transaction(self,
                                            request: RequestStartTransactionRequest) -> call_result_201.RequestStartTransaction:
+        self.remote_start_id = request.remoteStartId
         result : call_result.RemoteStartTransaction = await self.call_payload(call.RemoteStartTransaction(
                                                                id_tag=request.idToken.idToken[:20],
                                                                connector_id=request.evseId))
