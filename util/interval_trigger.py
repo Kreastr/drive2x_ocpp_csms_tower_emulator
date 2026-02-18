@@ -46,6 +46,9 @@ class AIOIntervalTrigger:
     def subscribe(self, callback):
         self.events.on("timer", callback)
 
+    def unsubscribe(self, callback):
+        self.events.remove_listener("timer", callback)
+
     def floor_period_towards_last_midnight(self, time : datetime):
         since = (datetime.now() - self.offset).replace(microsecond=0,second=0,hour=0,minute=0)
         raw_s = (time - since).total_seconds()

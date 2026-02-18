@@ -25,4 +25,3 @@ class ProxyConnectionFSMEvent(str, Enum):
     on_heartbeat='on_heartbeat'
     on_serial_response_validated='on_serial_response_validated'
     on_serial_validation_failed='on_serial_validation_failed'
-    on_finalized='on_finalized'

@@ -45,7 +45,7 @@ Connected --> Connected : on heartbeat
 ShuttingDown --> ServerDisconnected : on server disconnect
 ClientDisconnected --> Finalizing : on server disconnect
 ServerDisconnected --> Finalizing : on client disconnect
-Finalizing --> [*] : on finalized
+Finalizing --> [*]
 @enduml
 """
 _fsm = AFSM(uml=proxy_connection_uml, context=ProxyConnectionContext(), se_factory=lambda x: str(x))

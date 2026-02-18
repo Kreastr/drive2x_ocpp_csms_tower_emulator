@@ -42,6 +42,7 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
                          **kwargs)
         
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_new_state_timeout, callback=lambda *vargs, **kwargs: False)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_heartbeat_timeout, callback=lambda *vargs, **kwargs: False)
         self.on(ProxyConnectionFSMState.new.on_enter, self.start_new_timeout_timer)
         
 

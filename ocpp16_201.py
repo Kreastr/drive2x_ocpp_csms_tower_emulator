@@ -32,6 +32,7 @@ from asyncio import CancelledError
 from logging import getLogger
 from time import sleep
 
+from afsm.afsm import FSMContextType
 import ocpp.v16.enums
 from beartype import beartype
 from ocpp.exceptions import TypeConstraintViolationError
@@ -112,7 +113,7 @@ RESET_TYPE_MAP = {ResetEnumType.immediate: ResetType.hard,
 RESET_STATUS_MAP = {ocpp.v16.enums.ResetStatus.accepted : ResetStatusEnumType.accepted,
                     ocpp.v16.enums.ResetStatus.rejected : ResetStatusEnumType.rejected}
 
-async def connect_as_client(client_interface, uri, serial_number, on_connect):
+async def connect_as_client(client_interface, uri, serial_number, on_connect, fsm):
 
     #"wss://emotion-test.eu/ocpp/1"
     #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
@@ -120,23 +121,21 @@ async def connect_as_client(client_interface, uri, serial_number, on_connect):
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
     ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],
                                    open_timeout=15)
+
     if uri.startswith("wss://"):
         ws_args["ssl"] = ctx
-    fallback = 5
-    while True:
-        try:
-            logger.info(f"Connecting to {uri=} {ws_args=}")
-            async with websockets.connect(uri, **ws_args) as ws:
-                cp = OCPPClientV201(client_interface, serial_number, ws)
-                await on_connect(cp)
+    try:
+        logger.info(f"Connecting to {uri=} {ws_args=}")
+        async with websockets.connect(uri, **ws_args) as ws:
+            cp = OCPPClientV201(client_interface, serial_number, ws)
+            await on_connect(cp)
 
 
-        except asyncio.exceptions.CancelledError:
-            raise
-        except:
-            logger.error(traceback.format_exc())
-            await asyncio.sleep(fallback)
-            fallback *= 1.5
+    except asyncio.exceptions.CancelledError:
+        raise
+    except:
+        logger.error(traceback.format_exc())
+        fsm.handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
 
 def find_value_from_v16_response(result, v16key):
@@ -183,7 +182,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
         self.remote_start_id : int | None = None
-        self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self), fsm_name=f"OCPPServer16Proxy <{self.id}>")
+        self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self), fsm_name=f"OCPPServer16Proxy <{self.id} {datetime.now(tz=UTC).isoformat()}>")
         self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
         self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
         self.server_connection : OCPPClientV201 | None = None
@@ -191,15 +190,17 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     @log_req_response
     async def periodic_setpoint_update(self, *vargs, **kwargs):
-        if self.server_connection.cpc is not None:
+        
+        if self.server_connection is not None and self.server_connection.cpc is not None:
             next_setpoint = self.server_connection.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
             result: call_result.ChangeConfiguration = await self.call_payload(
                 call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
 
     async def fsm_task(self):
-        while self.fsm.current_state is not None:
+        while self.fsm.current_state != ProxyConnectionFSMState.finalizing:
             await self.fsm.loop()
             await asyncio.sleep(1)
+        proxy_setpoint_update_loop().unsubscribe(self.periodic_setpoint_update)
 
     async def server_connection_task(self, cp : OCPPClientV201):
         self.server_connection = cp
@@ -211,17 +212,22 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             logger.warning("self.start before")
             await self.start()
             logger.warning("self.start after")
-        except Exception:
+        except Exception as e   :
+            logger.warning(f"Exception in server_task start: {e} {traceback.format_exc()}")
+
+        try:
             await server_task
-            raise
-        await server_task
+        except Exception as e:
+            logger.warning(f"Exception in server_task: {e}")
+        await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
         await fsm_task
 
     async def run(self):
         await connect_as_client(client_interface=self,
                                 uri=ProxyConfigurator.get_global_config().upstream_uri,
                                 serial_number=self.id,
-                                on_connect=self.server_connection_task)
+                                on_connect=self.server_connection_task,
+                                fsm=self.fsm)
 
     @log_req_response
     async def call_payload(
@@ -250,7 +256,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             if rq.chargePointSerialNumber is None:
                 rq.chargePointSerialNumber = self.id
             result = await self.server_connection.boot_notification_request(rq)
-            if result.status == RegistrationStatusEnumType.accepted:
+            if result is not None and result.status == RegistrationStatusEnumType.accepted:
                 await self.fsm.handle(ProxyConnectionFSMEvent.on_client_boot_notification_forwarded)
                 return call_result.BootNotification(
                     current_time=datetime.now(UTC_TZ).isoformat(),
@@ -323,7 +329,16 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     @on(Action.heartbeat)
     @log_req_response
     async def on_heartbeat(self, **data):
-        response : call_result_201.Heartbeat = await self.server_connection.heartbeat_request()
+        if self.server_connection is None:
+            return None
+
+        response = await self.server_connection.heartbeat_request()
+        if response is None:
+            await self.fsm.handle(ProxyConnectionFSMEvent.on_server_disconnect)
+            return call_result.Heartbeat(
+                current_time=datetime.now(tz=UTC).isoformat()
+            )
+            
         return call_result.Heartbeat(
             current_time=response.current_time
         )
@@ -438,9 +453,11 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     async def close_server_connection(self, *vargs):
         await self.server_connection.close_connection()
+        await self.fsm.handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
     async def close_client_connection(self, *vargs):
         await self._connection.close()
+        await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
 
     def get_state_machine(self) -> ProxyConnectionFSM:
         return self.fsm
