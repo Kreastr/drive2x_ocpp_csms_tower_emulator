@@ -42,7 +42,8 @@ from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, Remo
 from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v16 import enums as v16enums
 from ocpp.v201 import call_result as call_result_201
-from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType, SetVariableResultType, EVSEType
+from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType, SetVariableResultType, EVSEType, \
+    StatusInfoType
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType, \
     ResetEnumType, ResetStatusEnumType, RegistrationStatusEnumType
 from pydantic import BaseModel
@@ -481,8 +482,21 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     @log_req_response
     async def on_request_stop_transaction(self,
-                                           request: RequestStopTransactionRequest) -> call_result_201.RequestStopTransaction:
+                                          request: RequestStopTransactionRequest) -> call_result_201.RequestStopTransaction:
+        if request.transactionId not in TX_MAP_201_TO_16:
+            return call_result_201.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected,
+                                                          status_info=StatusInfoType(reason_code="UNKNOWN_TX", additional_info=f"Transaction {request.transactionId} not found in transaction mapping."))
+        tx_id_16 = TX_MAP_201_TO_16[request.transactionId]
+        result : call_result.RemoteStopTransaction = await self.call_payload(call.RemoteStopTransaction(transaction_id=tx_id_16))
+        if result is None:
+            return call_result_201.RequestStopTransaction(status=RequestStartStopStatusEnumType.rejected,
+                                                          status_info=StatusInfoType(reason_code="CS_CONNECTION_FAILED",
+                                                                                     additional_info=f"Not possible to send stop transaction request due to connection problem."))
 
+        if result.status in AUTH_STATUS_MAP:
+            req_result = AUTH_STATUS_MAP[result.status]
+        else:
+            req_result = RequestStartStopStatusEnumType.rejected
         return call_result_201.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
 
 
