@@ -150,8 +150,11 @@ class TxFSMServer(TxManagerFSMType):
 
     async def send_deauth_to_cp(self, *vargs):
         self.context : TxManagerContext
-        if self.context.cp_interface is not None:
+        if self.context.cp_interface is None:
+                logger.warning(f"Cannot send deauth to cp as cp_interface is None")
+        else:
             if self.context.tx_id is None:
+                logger.warning(f"Cannot send deauth to cp as tx_id is None in context")
                 await self.handle(TxManagerFSMEvent.on_end_tx_event)
                 return
 

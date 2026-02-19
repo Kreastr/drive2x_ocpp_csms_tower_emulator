@@ -62,6 +62,7 @@ from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
 from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
+from ocpp_models.v201.request_stop_transaction import RequestStopTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from ocpp_models.v201.set_variables import SetVariablesRequest, SetVariableDataType
@@ -433,6 +434,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
                                              variable=resp_var)
         return response
 
+    @log_req_response
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
         logger.warning(f"{self.id=}")
         #if self.has_icl_latiniki_hack:
@@ -462,6 +464,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     def get_state_machine(self) -> ProxyConnectionFSM:
         return self.fsm
 
+    @log_req_response
     async def on_request_start_transaction(self,
                                            request: RequestStartTransactionRequest) -> call_result_201.RequestStartTransaction:
         self.remote_start_id = request.remoteStartId
@@ -475,6 +478,12 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         else:
             req_result = RequestStartStopStatusEnumType.rejected
         return call_result_201.RequestStartTransaction(status=req_result)
+
+    @log_req_response
+    async def on_request_stop_transaction(self,
+                                           request: RequestStopTransactionRequest) -> call_result_201.RequestStopTransaction:
+
+        return call_result_201.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
 
 
     async def on_server_get_variables(self, request: GetVariablesRequest) -> call_result_201.GetVariables:

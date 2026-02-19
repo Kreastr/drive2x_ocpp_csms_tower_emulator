@@ -316,7 +316,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             tx_fsm.context.evse.evse_id = conn_status.evse_id
             tx_fsm.context.evse.connector_id = conn_status.connector_id
 
-            await tx_fsm.try_restore_fsm(self.get_charge_point_id()+"-"+str(tx_fsm.context.evse.evse_id))
+            #await tx_fsm.try_restore_fsm(self.get_charge_point_id()+"-"+str(tx_fsm.context.evse.evse_id))
 
             logger.warning(" tx_fsm.loop")
             await tx_fsm.loop()
@@ -384,27 +384,41 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.log_event(("transaction_event", (data)))
         logger.warning(f"id={self.fsm.context.id} on_transaction_event {data=}")
 
-        if any_of(lambda: self.fsm.current_state not in [ChargePointFSMState.booted, ChargePointFSMState.running_transaction],
-                  lambda: "event_type" not in data,
+        if any_of(lambda: "event_type" not in data,
                   lambda: "transaction_info" not in data,
-                  lambda: "transaction_id" not in data["transaction_info"],
-                  lambda: "evse" not in data,
-                  lambda: "id" not in data["evse"]):
+                  lambda: "transaction_id" not in data["transaction_info"]
+                  ):
             return call_result.TransactionEvent()
 
-        evse_id = EVSEId(data["evse"]["id"])
+        reported_tx_id = TransactionId(data["transaction_info"]["transaction_id"])
+
+        if any_of(lambda: "evse" not in data,
+                  lambda: "id" not in data["evse"]):
+            logger.info("EVSE ID not in event details. Looking up from tx_fsms.")
+            evse_id = None
+            for evse_id_fsm, tx_fsm in self.fsm.context.transaction_fsms.items():
+                logger.info(f"Candidate {evse_id_fsm=} {tx_fsm.context=} {tx_fsm.fsm_name=} {id(tx_fsm.context)=}")
+                if tx_fsm.context.tx_id == reported_tx_id:
+                    logger.info(f"EVSE ID matches {evse_id_fsm}.")
+                    evse_id = evse_id_fsm
+                    break
+            if evse_id is None:
+                logger.error(f"EVSE ID match not found for {reported_tx_id=} .")
+                return call_result.TransactionEvent()
+        else: 
+            evse_id = EVSEId(data["evse"]["id"])
 
         tx_fsm = self.fsm.context.transaction_fsms[evse_id]
 
         event_type = data["event_type"]
 
-        reported_tx_id = TransactionId(data["transaction_info"]["transaction_id"])
 
-        logger.warning(f"{event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
+
+        logger.info(f" TX EVENT {event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 
         tx_fsm.context : TxManagerContext
 
-        if reported_tx_id != tx_fsm.context.tx_id:
+        if 0: #reported_tx_id != tx_fsm.context.tx_id:
             await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
             tx_fsm.context.tx_id = reported_tx_id
             self.fsm.context.transaction_fsms[evse_id].context.tx_id = reported_tx_id
@@ -412,14 +426,23 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
             
         if event_type == "Started":
-            await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
-
-        if event_type == "Updated" and tx_fsm.current_state in [TxManagerFSMState.occupied]:
+            tx_fsm.context.tx_id = reported_tx_id
+            tx_fsm.fsm_name = f"EVSE <{self.id}:{evse_id}@{reported_tx_id}>"
+            # await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
+            logger.info(f" TX START {reported_tx_id=} {tx_fsm.context.tx_id=} {tx_fsm.fsm_name=} {tx_fsm.context=} {id(tx_fsm.context)=}")
             await tx_fsm.handle(TxManagerFSMEvent.on_tx_update_event)
 
-        if event_type == "Ended" and tx_fsm.context.tx_id is not None:
-            await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
-            tx_fsm.context.tx_id = None
+        if event_type == "Updated":
+            logger.info(f" TX UPDATE {reported_tx_id=} {tx_fsm.context.tx_id=}")
+            await tx_fsm.handle(TxManagerFSMEvent.on_tx_update_event)
+
+        if event_type == "Ended": 
+            if tx_fsm.context.tx_id is None:
+                logger.warning(f" TX END but we have no transaction.")
+            else:
+                logger.info(f" TX END {reported_tx_id=} {tx_fsm.context.tx_id=}")
+                tx_fsm.context.tx_id = None
+                await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
 
         response = dict()
         if "id_token_info" in data:

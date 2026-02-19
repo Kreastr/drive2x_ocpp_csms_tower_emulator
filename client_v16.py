@@ -38,7 +38,7 @@ from typing import Optional
 
 import websockets
 from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
-from ocpp.v201.datatypes import ChargingStationType, TransactionType, MeterValueType, SampledValueType
+from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
 from ocpp.v201.enums import Action
 
@@ -52,6 +52,7 @@ from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
 from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
+from ocpp_models.v201.request_stop_transaction import RequestStopTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from ocpp_models.v201.set_variables import SetVariablesRequest
@@ -227,7 +228,8 @@ class OCPPClientV201(ChargePoint):
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
                                                              seq_no=self.tx_seq_no,
-                                                             transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id)),
+                                                             transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id),
+                                                             evse=EVSEType(id=rq.connectorId, connector_id=1)),
                                        )
 
 
@@ -255,6 +257,13 @@ class OCPPClientV201(ChargePoint):
     @with_request_model(RequestStartTransactionRequest)
     async def on_request_start_transaction(self, request : RequestStartTransactionRequest, *vargs, **kwargs):
         return await self.client_interface.on_request_start_transaction(request)
+
+    @on(Action.request_stop_transaction)
+    @log_req_response
+    @async_camelize_kwargs
+    @with_request_model(RequestStopTransactionRequest)
+    async def on_request_stop_transaction(self, request : RequestStopTransactionRequest, *vargs, **kwargs):
+        return await self.client_interface.on_request_stop_transaction(request)
 
     @on(Action.set_charging_profile)
     @async_camelize_kwargs

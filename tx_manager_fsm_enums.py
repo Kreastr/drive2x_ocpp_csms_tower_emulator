@@ -9,10 +9,10 @@ class TxManagerFSMState(StateBase, str, Enum):
     authorized='authorized'
     upkeep='upkeep'
     ready='ready'
+    terminating='terminating'
     transition_triggered='transition_triggered'
     charging='charging'
     discharging='discharging'
-    terminating='terminating'
     fault='fault'
 
 class TxManagerFSMCondition(str, Enum):

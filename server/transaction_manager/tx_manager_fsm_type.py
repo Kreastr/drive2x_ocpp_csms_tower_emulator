@@ -41,6 +41,7 @@ Occupied --> Upkeep : on tx update event
 Occupied --> Upkeep : on soc info updated event
 Upkeep --> Upkeep : on setpoint refresh mark
 Upkeep --> Ready : on authorized by app
+Upkeep --> Terminating : on deauthorized
 Authorized --> Ready : if occupied
 Authorized --> Unknown : on deauthorized
 Upkeep --> Available : if available
