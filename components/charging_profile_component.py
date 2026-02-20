@@ -87,7 +87,6 @@ class ChargingProfileComponent:
                     del self.profile_table[self._make_profile_hash(evse_id, profile)]
                     continue
                 self.installed_profiles[evse_id].append(profile)
-                return SetChargingProfile(status=ChargingProfileStatusEnumType.accepted)
             except Exception as e:
                 logger.warning(f"Failed to load profile from database: {e}")
 
@@ -203,6 +202,7 @@ class ChargingProfileComponent:
         else:
             return SetChargingProfile(status=ChargingProfileStatusEnumType.accepted)
 
+    @snoop
     def install_profile_if_possible(self, profile, request_evse_id):
         result = self._check_if_profile_can_be_accepted(profile, request_evse_id)
         if result is None:
