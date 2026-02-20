@@ -287,7 +287,7 @@ class OCPPClientV201(ChargePoint):
     @async_camelize_kwargs
     @log_req_response
     @with_request_model(GetChargingProfilesRequest)
-    async def on_set_charging_profile(self, rq: GetChargingProfilesRequest, **kwargs):
+    async def on_get_charging_profile(self, rq: GetChargingProfilesRequest, **kwargs):
         response, reports = self.cpc.get_profile_request(rq)
         return response
 
