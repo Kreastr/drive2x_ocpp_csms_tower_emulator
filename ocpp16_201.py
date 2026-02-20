@@ -240,6 +240,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     ):
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
+        except asyncio.TimeoutError:
+            await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
         except websockets.exceptions.ConnectionClosedOK:
             await self.fsm.handle(ProxyConnectionFSMEvent.on_client_disconnect)
             return
@@ -305,7 +307,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         
         self.server_connection.cpc.on_tx_start(rq.connectorId, tx_id_201)
 
-        if self.remote_start_id is not None:
+        if (self.remote_start_id is not None and 
+            self.remote_start_id in self.pending_tx_profiles):
             profile : ChargingProfileType = self.pending_tx_profiles[self.remote_start_id]
             profile.transactionId = tx_id_201
             install_result = self.server_connection.cpc.install_profile_if_possible(profile, rq.connectorId)
@@ -316,7 +319,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         
         rsid = self.remote_start_id
         self.remote_start_id = None
-        del self.pending_tx_profiles[rsid]
+        if rsid is not None and rsid in self.pending_tx_profiles:
+            del self.pending_tx_profiles[rsid]
 
         return call_result.StartTransaction(
             transaction_id=tx_id_16,
@@ -496,9 +500,14 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def on_request_start_transaction(self,
                                            request: RequestStartTransactionRequest) -> call_result_201.RequestStartTransaction:
         self.remote_start_id = request.remoteStartId
-        result : call_result.RemoteStartTransaction = await self.call_payload(call.RemoteStartTransaction(
-                                                               id_tag=request.idToken.idToken[:20],
-                                                               connector_id=request.evseId))
+        try:
+            result : call_result.RemoteStartTransaction = await self.call_payload(call.RemoteStartTransaction(
+                                                                   id_tag=request.idToken.idToken[:20],
+                                                                   connector_id=request.evseId))
+        except asyncio.TimeoutError:
+            return call_result_201.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected)
+
+
         id_tag_status : RemoteStartStopStatus = result.status
 
         if id_tag_status in AUTH_STATUS_MAP:

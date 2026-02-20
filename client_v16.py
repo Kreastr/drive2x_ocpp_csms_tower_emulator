@@ -45,6 +45,7 @@ from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, Transac
 from ocpp.v201.enums import Action
 
 from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
+from ocpp_models.v16 import meter_values
 from ocpp_models.v16.authorize import AuthorizeRequest
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest, MeterValue, SampledValue
@@ -108,6 +109,7 @@ MEASURAND_MAPPING = {Measurand.soc : enums201.MeasurandEnumType.soc,
 STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.available,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
               ChargePointStatus.unavailable: ConnectorStatusEnumType.unavailable,
+              ChargePointStatus.finishing: ConnectorStatusEnumType.unavailable,
               ChargePointStatus.suspended_evse: ConnectorStatusEnumType.occupied,
               ChargePointStatus.suspended_ev: ConnectorStatusEnumType.occupied,
               ChargePointStatus.charging: ConnectorStatusEnumType.occupied}
@@ -185,7 +187,7 @@ class OCPPClientV201(ChargePoint):
                                                               timestamp=rq.meterValue[0].timestamp.isoformat(),
                                                               trigger_reason=TriggerReasonEnumType.meter_value_periodic,
                                                               seq_no=self.tx_seq_no,
-                                                              transaction_info=TransactionType(tx_id)))
+                                                              transaction_info=TransactionType(tx_id), meter_value=v201_meter_values))
         await self.call_payload(call.MeterValues(evse_id=rq.connectorId, meter_value=v201_meter_values))
 
 
@@ -232,7 +234,7 @@ class OCPPClientV201(ChargePoint):
                                                              seq_no=self.tx_seq_no,
                                                              transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id),
                                                              evse=EVSEType(id=rq.connectorId, connector_id=1),
-                                                             id_token=IdTokenType(idToken=rq.idTag, type=IdTokenEnumType.central if remote_start_id is not None else IdTokenEnumType.iso14443)),
+                                                             id_token=IdTokenType(id_token=rq.idTag, type=IdTokenEnumType.central if remote_start_id is not None else IdTokenEnumType.iso14443)),
                                        )
 
 
@@ -319,6 +321,8 @@ class OCPPClientV201(ChargePoint):
 
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
+        except asyncio.TimeoutError:
+            self.close_connection()
         except websockets.exceptions.ConnectionClosedOK:
             await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
         except websockets.exceptions.ConnectionClosedError:
