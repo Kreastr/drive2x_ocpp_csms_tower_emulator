@@ -202,7 +202,6 @@ class ChargingProfileComponent:
         else:
             return SetChargingProfile(status=ChargingProfileStatusEnumType.accepted)
 
-    @snoop
     def install_profile_if_possible(self, profile, request_evse_id):
         result = self._check_if_profile_can_be_accepted(profile, request_evse_id)
         if result is None:
