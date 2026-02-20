@@ -44,6 +44,7 @@ from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, Transac
 from ocpp.v201.enums import Action
 
 from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
+from ocpp_models.v16.authorize import AuthorizeRequest
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest, MeterValue, SampledValue
 from ocpp_models.v16.start_transaction import StartTransactionRequest
@@ -325,3 +326,6 @@ class OCPPClientV201(ChargePoint):
     async def close_connection(self):
         await self._connection.close()
         await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
+
+    async def on_authorize_request(self, request : AuthorizeRequest) -> call_result.Authorize:
+        return await self.call_payload(call.Authorize(id_token=IdTokenType(idToken=request.idTag, type=IdTokenEnumType.iso14443)))

@@ -53,6 +53,7 @@ from websockets import Subprotocol, ConnectionClosedOK
 
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
 from components.charging_profile_component import ChargingProfileComponent, LimitDescriptor
+from ocpp_models.v16.authorize import AuthorizeRequest
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
@@ -380,8 +381,18 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
     @on(Action.authorize)
     @log_req_response
-    async def on_authorize(self, **data):
-        return call_result.Authorize(id_tag_info=IdTagInfo(status=AuthorizationStatus.accepted))
+    @async_camelize_kwargs
+    @with_request_model(AuthorizeRequest)
+    async def on_authorize(self, request: AuthorizeRequest, **data):
+        if self.server_connection is None:
+            return call_result.Authorize(id_tag_info=IdTagInfo(status=AuthorizationStatus.invalid))
+            
+        result : call_result_201.Authorize = await self.server_connection.on_authorize_request(request)
+        if result.id_token_info.status == result.id_token_info.status.accepted:
+            return call_result.Authorize(id_tag_info=IdTagInfo( status=AuthorizationStatus.accepted))
+        
+        return call_result.Authorize(id_tag_info=IdTagInfo(status=AuthorizationStatus.invalid))
+        
 
     @on(Action.security_event_notification)
     @log_req_response
