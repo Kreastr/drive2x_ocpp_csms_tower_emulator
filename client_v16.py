@@ -39,7 +39,8 @@ from typing import Optional
 import websockets
 from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
 from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType
-from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, TriggerReasonEnumType
+from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, \
+    TriggerReasonEnumType, IdTokenEnumType
 from ocpp.v201.enums import Action
 
 from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
@@ -51,7 +52,7 @@ from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
 from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
-from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
+from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest, IdTokenType
 from ocpp_models.v201.request_stop_transaction import RequestStopTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
@@ -225,10 +226,11 @@ class OCPPClientV201(ChargePoint):
         self.tx_seq_no = 1
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                                              timestamp=rq.timestamp.isoformat(),
-                                                             trigger_reason=TriggerReasonEnumType.remote_start,
+                                                             trigger_reason=TriggerReasonEnumType.remote_start if remote_start_id is not None else TriggerReasonEnumType.authorized,
                                                              seq_no=self.tx_seq_no,
                                                              transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id),
-                                                             evse=EVSEType(id=rq.connectorId, connector_id=1)),
+                                                             evse=EVSEType(id=rq.connectorId, connector_id=1),
+                                                             id_token=IdTokenType(idToken=rq.idTag, type=IdTokenEnumType.central if remote_start_id is not None else IdTokenEnumType.iso14443)),
                                        )
 
 
