@@ -43,9 +43,9 @@ from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v16 import enums as v16enums
 from ocpp.v201 import call_result as call_result_201
 from ocpp.v201.datatypes import GetVariableResultType, VariableType, ComponentType, SetVariableResultType, EVSEType, \
-    StatusInfoType
+    StatusInfoType, IdTokenInfoType
 from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType, RequestStartStopStatusEnumType, \
-    ResetEnumType, ResetStatusEnumType, RegistrationStatusEnumType
+    ResetEnumType, ResetStatusEnumType, RegistrationStatusEnumType, AuthorizationStatusEnumType
 from pydantic import BaseModel
 from redis_dict import RedisDict
 from typing_extensions import TypeVar
@@ -386,13 +386,14 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     async def on_authorize(self, request: AuthorizeRequest, **data):
         if self.server_connection is None:
             return call_result.Authorize(id_tag_info=IdTagInfo(status=AuthorizationStatus.invalid))
-            
+
         result : call_result_201.Authorize = await self.server_connection.on_authorize_request(request)
-        if result.id_token_info.status == result.id_token_info.status.accepted:
+        logger.info(f"Server responded to auth request {result.id_token_info=}")
+        if result.id_token_info["status"] == AuthorizationStatusEnumType.accepted:
             return call_result.Authorize(id_tag_info=IdTagInfo( status=AuthorizationStatus.accepted))
-        
+
         return call_result.Authorize(id_tag_info=IdTagInfo(status=AuthorizationStatus.invalid))
-        
+
 
     @on(Action.security_event_notification)
     @log_req_response
