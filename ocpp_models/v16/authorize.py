@@ -29,8 +29,5 @@ from pydantic import BaseModel, StringConstraints
 
 from ocpp_models.v16.base_types import CiString25Type, CiString20Type, CiString50Type
 
-class IdToken(CiString20Type):
-    pass
-
 class AuthorizeRequest(BaseModel):
-    idTag : IdToken
+    idTag : CiString20Type
