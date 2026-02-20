@@ -377,7 +377,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     async def on_authorize(self, **data):
         self.log_event(("authorize", (data)))
         logger.warning(f"id={self.fsm.context.id} on_authorize {data=}")
-        return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.invalid))
+        return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted))
 
     @on(Action.transaction_event)
     async def on_transaction_event(self, **data):
