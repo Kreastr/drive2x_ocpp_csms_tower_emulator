@@ -38,7 +38,8 @@ from typing import Optional
 
 import websockets
 from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
-from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType
+from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType, \
+    IdTokenType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, \
     TriggerReasonEnumType, IdTokenEnumType
 from ocpp.v201.enums import Action
@@ -53,7 +54,7 @@ from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
 from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest
-from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest, IdTokenType
+from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
 from ocpp_models.v201.request_stop_transaction import RequestStopTransactionRequest
 from ocpp_models.v201.reset import ResetRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
@@ -328,4 +329,4 @@ class OCPPClientV201(ChargePoint):
         await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
     async def on_authorize_request(self, request : AuthorizeRequest) -> call_result.Authorize:
-        return await self.call_payload(call.Authorize(id_token=IdTokenType(idToken=request.idTag, type=IdTokenEnumType.iso14443)))
+        return await self.call_payload(call.Authorize(id_token=IdTokenType(id_token=request.idTag, type=IdTokenEnumType.iso14443)))
