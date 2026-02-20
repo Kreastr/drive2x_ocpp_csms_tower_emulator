@@ -29,6 +29,8 @@ from ocpp.v201.enums import AttributeEnumType, IdTokenEnumType
 from pydantic import BaseModel
 
 from ocpp_models.v201.base_types import CiString50Type, CiString36Type
+from ocpp_models.v201.composite_types import ChargingProfileType
+
 
 class AdditionalInfoType(BaseModel):
     additionalIdToken : CiString36Type
@@ -43,3 +45,4 @@ class RequestStartTransactionRequest(BaseModel):
     evseId : Optional[int] = None
     remoteStartId : int
     idToken : IdTokenType
+    chargingProfile : Optional[ChargingProfileType] = None

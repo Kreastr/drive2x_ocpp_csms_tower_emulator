@@ -196,12 +196,20 @@ class ChargingProfileComponent:
     def set_profile_request(self, request : SetChargingProfileRequest) -> SetChargingProfile:
         profile = request.chargingProfile
         request_evse_id = request.evseId
-        result = self._check_if_profile_can_be_accepted(profile, request_evse_id)
+        result = self.install_profile_if_possible(profile, request_evse_id)
+
         if result is not None:
             return result
-        self.installed_profiles[request_evse_id].append(profile)
-        self.profile_table[self._make_profile_hash(request_evse_id, profile)] = json.dumps([request_evse_id, profile.model_dump_json()])
-        return SetChargingProfile(status=ChargingProfileStatusEnumType.accepted)
+        else:
+            return SetChargingProfile(status=ChargingProfileStatusEnumType.accepted)
+
+    def install_profile_if_possible(self, profile, request_evse_id):
+        result = self._check_if_profile_can_be_accepted(profile, request_evse_id)
+        if result is None:
+            self.installed_profiles[request_evse_id].append(profile)
+            self.profile_table[self._make_profile_hash(request_evse_id, profile)] = json.dumps(
+                [request_evse_id, profile.model_dump_json()])
+        return result
 
     @beartype
     def _check_if_profile_can_be_accepted(self, profile : ChargingProfileType, request_evse_id : int) -> Optional[SetChargingProfile]:

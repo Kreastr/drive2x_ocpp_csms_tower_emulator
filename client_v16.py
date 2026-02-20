@@ -223,7 +223,6 @@ class OCPPClientV201(ChargePoint):
 
     async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str, remote_start_id : Optional[int] = None) -> call_result.TransactionEvent:
         self.tx_seq_no = 1
-        self.cpc.on_tx_start(rq.connectorId, tx_id)
         return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                                              timestamp=rq.timestamp.isoformat(),
                                                              trigger_reason=TriggerReasonEnumType.remote_start,
@@ -235,7 +234,6 @@ class OCPPClientV201(ChargePoint):
 
     async def stop_transaction_request(self, rq : StopTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
         self.tx_seq_no += 1
-        self.cpc.on_tx_end(rq.transactionId, tx_id)
         if rq.reason in STOP_REASON_MAP:
             reason = STOP_REASON_MAP[rq.reason]
         else:

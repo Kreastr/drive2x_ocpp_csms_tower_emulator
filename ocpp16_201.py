@@ -60,6 +60,7 @@ from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
 from ocpp_models.v16.stop_transaction import StopTransactionRequest
 from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
+from ocpp_models.v201.composite_types import ChargingProfileType
 from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.get_variables import GetVariablesRequest, GetVariableDataType
 from ocpp_models.v201.request_start_transaction import RequestStartTransactionRequest
@@ -184,6 +185,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
         self.remote_start_id : int | None = None
+        self.pending_tx_profiles = dict()
         self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self), fsm_name=f"OCPPServer16Proxy <{self.id} {datetime.now(tz=UTC).isoformat()}>")
         self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
         self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
@@ -299,9 +301,21 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         tx_id_201 = str(uuid.uuid4())
         TX_MAP_16_TO_201[tx_id_16] = tx_id_201
         TX_MAP_201_TO_16[tx_id_201] = tx_id_16
+        
+        self.server_connection.cpc.on_tx_start(tx_id_201)
 
+        if self.remote_start_id is not None:
+            profile : ChargingProfileType = self.pending_tx_profiles[self.remote_start_id]
+            profile.transactionId = tx_id_201
+            install_result = self.server_connection.cpc.install_profile_if_possible(profile, rq.connectorId)
+            if install_result is not None:
+                logger.error(f"Failed installing pending Tx Profile: {profile} Reason: {install_result} for {tx_id_201=}/{tx_id_16=}")
+            
         await self.server_connection.start_transaction_request(rq, tx_id_201, self.remote_start_id)
+        
+        rsid = self.remote_start_id
         self.remote_start_id = None
+        del self.pending_tx_profiles[rsid]
 
         return call_result.StartTransaction(
             transaction_id=tx_id_16,
@@ -322,6 +336,8 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
         if rq.transactionId in TX_MAP_16_TO_201:
             tx_id_201 = TX_MAP_16_TO_201[rq.transactionId]
+
+            self.server_connection.cpc.on_tx_end(tx_id_201)
             await self.server_connection.stop_transaction_request(rq, tx_id_201)
         else:
             logger.warning(f"Unknown transaction has ended {rq.transactionId=}. Cannot notify CSMS. {rq=}")
@@ -478,6 +494,11 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
             req_result = AUTH_STATUS_MAP[id_tag_status]
         else:
             req_result = RequestStartStopStatusEnumType.rejected
+
+        if req_result == req_result.accepted:
+            if request.chargingProfile is not None:
+                self.pending_tx_profiles[request.remoteStartId] = request.chargingProfile
+
         return call_result_201.RequestStartTransaction(status=req_result)
 
     @log_req_response
