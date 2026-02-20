@@ -303,7 +303,7 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
         TX_MAP_16_TO_201[tx_id_16] = tx_id_201
         TX_MAP_201_TO_16[tx_id_201] = tx_id_16
         
-        self.server_connection.cpc.on_tx_start(tx_id_201)
+        self.server_connection.cpc.on_tx_start(rq.connectorId, tx_id_201)
 
         if self.remote_start_id is not None:
             profile : ChargingProfileType = self.pending_tx_profiles[self.remote_start_id]
@@ -337,7 +337,6 @@ class OCPPServer16Proxy(ChargePoint, CallableInterface, OCPPServerV16Interface):
 
         if rq.transactionId in TX_MAP_16_TO_201:
             tx_id_201 = TX_MAP_16_TO_201[rq.transactionId]
-
             self.server_connection.cpc.on_tx_end(tx_id_201)
             await self.server_connection.stop_transaction_request(rq, tx_id_201)
         else:

@@ -129,9 +129,9 @@ def test_tx_ops():
     assert cpc.active_transaction_table[1] == "aaa"
     cpc.on_tx_start(1, "bbb")
     assert cpc.active_transaction_table[1] == "bbb"
-    assert not cpc.on_tx_end(1, "aaa")
+    assert not cpc.on_tx_end("aaa")
     assert cpc.active_transaction_table[1] == "bbb"
-    assert cpc.on_tx_end(1, "bbb")
+    assert cpc.on_tx_end("bbb")
     assert len(cpc.active_transaction_table) == 0
 
 
@@ -183,7 +183,7 @@ def test_transaction_stop():
     response = add_one_profile(cpc, limits=((0, 2000.0), (60, 3000.0),), valid_from=start, tx_id="aaa")
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (30, 2000.0), (60, 3000.0), (119, 3000.0)), start)
-    cpc.on_tx_end(1, "aaa")
+    cpc.on_tx_end("aaa")
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (30, 2000.0), (60, 2000.0), (119, 2000.0)), start)
 
 def test_late_start_schedule():
@@ -202,7 +202,7 @@ def test_late_start_schedule():
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
                                 (29, 2000.0), (30, 3000.0), (59, 3000.0),
                                 (60, 4000.0), (119, 4000.0)), start)
-    cpc.on_tx_end(1, "aaa")
+    cpc.on_tx_end("aaa")
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
                                (29, 2000.0), (30, 2000.0), (29, 2000.0),
                                (60, 2000.0), (119, 2000.0)), start)
@@ -227,7 +227,7 @@ def test_stacked_schedule():
                                 (29, 2000.0), (30, 3000.0),
                                 (44, 3000.0), (45, 5000.0), (59, 5000.0),
                                 (60, 5000.0), (74, 5000.0), (75, 4000.0), (119, 4000.0)), start)
-    cpc.on_tx_end(1, "aaa")
+    cpc.on_tx_end("aaa")
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
                                (29, 2000.0), (30, 2000.0), (29, 2000.0),
                                (60, 2000.0), (119, 2000.0)), start)
@@ -267,7 +267,7 @@ def test_db_restore():
                                 (60, 5000.0), (74, 5000.0), (75, 4000.0), (119, 4000.0)), start)
 
     cpc.restore_from_database()
-    cpc.on_tx_end(1, "aaa")
+    cpc.on_tx_end("aaa")
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
                                (29, 2000.0), (30, 2000.0), (29, 2000.0),
                                (60, 2000.0), (119, 2000.0)), start)

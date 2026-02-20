@@ -123,19 +123,14 @@ class ChargingProfileComponent:
         self.active_transaction_table[evse_id] = tx_id
 
     @beartype
-    def on_tx_end(self, evse_id : int, tx_id: str):
-        if evse_id not in self.evse_ids:
-            logger.warning(f"Tried to stop tx: {tx_id} on unknown {evse_id=}")
-            return False
-        if evse_id not in self.active_transaction_table:
-            logger.warning(f"Trying to stop transaction we are not tracking stopped_tx: {tx_id} on {evse_id=}")
-            return False
-        if self.active_transaction_table[evse_id] != tx_id:
-            logger.warning(f"Trying to stop transaction we are not tracking current_tx: {self.active_transaction_table[evse_id]} stopped_tx: {tx_id} Do nothing")
-            return False
-        self.cleanup_tx_profiles(evse_id)
-        del self.active_transaction_table[evse_id]
-        return True
+    def on_tx_end(self, tx_id: str):
+        for evse_id in self.active_transaction_table:
+            if self.active_transaction_table[evse_id] == tx_id:
+                self.cleanup_tx_profiles(evse_id)
+                del self.active_transaction_table[evse_id]
+                return True
+        logger.warning(f"Trying to stop transaction we are not tracking current_tx: {list(self.active_transaction_table)} stopped_tx: {tx_id} Do nothing")
+        return False
 
 
     @beartype
