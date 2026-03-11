@@ -100,8 +100,8 @@ def test_set_charging():
 def test_duplicate_profiles_not_added():
     cpc = ChargingProfileComponent(evse_ids=[1],
                                    evse_hard_limits=get_limit_descriptor())
-    result1 = add_one_profile(cpc)
-    result2 = add_one_profile(cpc)
+    result1 = add_one_profile(cpc, profile_id=1)
+    result2 = add_one_profile(cpc, profile_id=2)
     assert result1.status == result1.status.accepted, f"Got wrong status: {result1.status } {result1.status_info=}"
     assert result2.status == result2.status.rejected, f"Got wrong status: {result2.status } {result2.status_info=}"
     reports, status = report_profiles(cpc)
@@ -111,9 +111,9 @@ def test_duplicate_profiles_not_added():
 def test_nonduplicates_work():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
                                    evse_hard_limits=get_limit_descriptor())
-    result1 = add_one_profile(cpc)
-    result2 = add_one_profile(cpc, evseId=2)
-    result3 = add_one_profile(cpc, stackLevel=1)
+    result1 = add_one_profile(cpc, profile_id=1)
+    result2 = add_one_profile(cpc, evseId=2, profile_id=2)
+    result3 = add_one_profile(cpc, stackLevel=1, profile_id=3)
     assert result1.status == result1.status.accepted, f"Got wrong status: {result1.status }"
     assert result2.status == result2.status.accepted, f"Got wrong status: {result2.status }"
     assert result3.status == result3.status.accepted, f"Got wrong status: {result3.status }"
@@ -121,6 +121,19 @@ def test_nonduplicates_work():
     assert status == status.accepted
     assert len(reports) == 3
 
+def test_same_id_is_replaced_but_not_rejected():
+    cpc = ChargingProfileComponent(evse_ids=[1, 2],
+                                   evse_hard_limits=get_limit_descriptor())
+    result1 = add_one_profile(cpc, profile_id=1)
+    result2 = add_one_profile(cpc, evseId=2, profile_id=1)
+    result3 = add_one_profile(cpc, stackLevel=1, profile_id=1)
+    assert result1.status == result1.status.accepted, f"Got wrong status: {result1.status }"
+    assert result2.status == result2.status.accepted, f"Got wrong status: {result2.status }"
+    assert result3.status == result3.status.accepted, f"Got wrong status: {result3.status }"
+    reports, status = report_profiles(cpc)
+    assert status == status.accepted
+    assert len(reports) == 1
+    
 def test_tx_ops():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
                                    evse_hard_limits=get_limit_descriptor())
@@ -144,6 +157,13 @@ def get_limit_descriptor():
                                 maximal_absolute=8000.0)
     return result
 
+def test_idle():
+    cpc = ChargingProfileComponent(evse_ids=[1, 2],
+                                   evse_hard_limits=get_limit_descriptor())
+    start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
+    assert add_one_profile(cpc, limits=((0, 0.0),), valid_from=start)
+    assert_profile(cpc, ((0, 0.0), (60, 0.0), (600, 0.0)), start)
+
 
 def test_limits():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
@@ -156,31 +176,31 @@ def test_pulse_charge():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
                                    evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
-    response = add_one_profile(cpc, limits=((0, 499.0),), valid_from=start)
+    response = add_one_profile(cpc, limits=((0, 499.0),), valid_from=start, profile_id=1)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 0.0), (119, 0.0)), start)
 
-    response = add_one_profile(cpc, limits=((0, 2400.0),), valid_from=start, tx_id="bbb")
+    response = add_one_profile(cpc, limits=((0, 2400.0),), valid_from=start, tx_id="bbb", profile_id=2)
     assert response.status == response.status.rejected, f"Got wrong status: {response.status }"
     cpc.on_tx_start(1, "aaa")
-    response = add_one_profile(cpc, limits=((60, 2499.0),), valid_from=start, tx_id="aaa")
+    response = add_one_profile(cpc, limits=((0, 499.0), (60, 2499.0),), valid_from=start, tx_id="aaa", profile_id=3)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
-    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (44, 2000.0), (45, 0.0), (59, 0.0), (60, 2499.0), (119, 2499.0)), start)
+    assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 0.0), (30, 0.0), (45, 0.0), (59, 0.0), (60, 2499.0), (119, 2499.0)), start)
 
 def test_transaction_stop():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
                                    evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
-    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start, profile_id=1)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (119, 2000.0)), start)
 
-    response = add_one_profile(cpc, limits=((0, 3000.0),), valid_from=start, tx_id="bbb")
+    response = add_one_profile(cpc, limits=((0, 3000.0),), valid_from=start, tx_id="bbb", profile_id=2)
     assert response.status == response.status.rejected, f"Got wrong status: {response.status }"
     cpc.on_tx_start(1, "aaa")
-    response = add_one_profile(cpc, limits=((0, 2000.0), (60, 3000.0),), valid_from=start, tx_id="aaa")
+    response = add_one_profile(cpc, limits=((0, 2000.0), (60, 3000.0),), valid_from=start, tx_id="aaa", profile_id=3)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (30, 2000.0), (60, 3000.0), (119, 3000.0)), start)
     cpc.on_tx_end("aaa")
@@ -190,14 +210,14 @@ def test_late_start_schedule():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
                                    evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
-    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start, profile_id=1)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (119, 2000.0)), start)
 
     cpc.on_tx_start(1, "aaa")
     response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),),
-                               valid_from=start, tx_id="aaa")
+                               valid_from=start, tx_id="aaa", profile_id=2)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
                                 (29, 2000.0), (30, 3000.0), (59, 3000.0),
@@ -211,17 +231,17 @@ def test_stacked_schedule():
     cpc = ChargingProfileComponent(evse_ids=[1, 2],
                                    evse_hard_limits=get_limit_descriptor())
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
-    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start, profile_id=1)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0), (119, 2000.0)), start)
 
     cpc.on_tx_start(1, "aaa")
-    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),), valid_from=start, tx_id="aaa")
+    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),), valid_from=start, tx_id="aaa", profile_id=2)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     response = add_one_profile(cpc, limits=((0, 5000.0),),
                                valid_from=start+datetime.timedelta(seconds=45),
-                               valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1)
+                               valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1, profile_id=3)
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert_profile(cpc, ((0, 2000.0), (14, 2000.0), (15, 2000.0),
                                 (29, 2000.0), (30, 3000.0),
@@ -243,7 +263,7 @@ def test_db_restore():
                                    evse_hard_limits=get_limit_descriptor())
     cpc.restore_from_database()
     start = datetime.datetime(2026,3,1,0,0,0, tzinfo=datetime.UTC)
-    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start)
+    response = add_one_profile(cpc, limits=((0, 2000.0),), valid_from=start, profile_id=1)
     cpc.restore_from_database()
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     assert cpc.get_power_setpoint(1, moment=start) == 2000.0, f"Expected 2000.0 got {cpc.get_power_setpoint(1, moment=start)}"
@@ -251,13 +271,13 @@ def test_db_restore():
     cpc.restore_from_database()
 
     cpc.on_tx_start(1, "aaa")
-    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),), valid_from=start, tx_id="aaa")
+    response = add_one_profile(cpc, limits=((30, 3000.0), (60, 4000.0),), valid_from=start, tx_id="aaa", profile_id=2)
 
     cpc.restore_from_database()
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"
     response = add_one_profile(cpc, limits=((0, 5000.0),),
                                valid_from=start+datetime.timedelta(seconds=45),
-                               valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1)
+                               valid_to=start+datetime.timedelta(seconds=75), tx_id="aaa", stackLevel=1, profile_id=3)
 
     cpc.restore_from_database()
     assert response.status == response.status.accepted, f"Got wrong status: {response.status }"

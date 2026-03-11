@@ -86,10 +86,24 @@ class ChargingProfileComponent:
                     logger.warning(f"Failed to accept profile from database: {profile=} {result=}")
                     del self.profile_table[self._make_profile_hash(evse_id, profile)]
                     continue
-                self.installed_profiles[evse_id].append(profile)
+                self._install_profile(evse_id, profile)
             except Exception as e:
                 logger.warning(f"Failed to load profile from database: {e}")
 
+    @beartype()
+    def _install_profile(self, evse_id : int, profile : ChargingProfileType):
+        # Replace profile with the same id if present in any evse_id
+        for installed_evse_id in self.installed_profiles:
+            new_installed_list = []
+            x : ChargingProfileType
+            for x in self.installed_profiles[installed_evse_id]:
+                if x.id != profile.id:
+                    new_installed_list.append(x)
+                else:
+                    logger.info(f"Replacing old profile by id {x}")
+            self.installed_profiles[installed_evse_id] = new_installed_list
+
+        self.installed_profiles[evse_id].append(profile)
 
     @staticmethod
     def _make_profile_hash(evse_id : int, profile : ChargingProfileType):
@@ -134,6 +148,7 @@ class ChargingProfileComponent:
 
 
     @beartype
+    @snoop
     def _get_power_profile_value(self, evse_id : int, moment : datetime.datetime):
         if evse_id not in self.evse_ids:
             return None
@@ -158,6 +173,7 @@ class ChargingProfileComponent:
         return stacked_commands[max(stacked_commands)]
 
     @beartype
+    @snoop
     def get_power_setpoint(self, evse_id : int, moment : datetime.datetime) -> float:
         limit = self._get_power_profile_value(evse_id, moment)
 
@@ -177,7 +193,12 @@ class ChargingProfileComponent:
             limit = self.evse_hard_limits[evse_id].minimal
         if abs(limit) < self.evse_hard_limits[evse_id].minimal_absolute:
             cycle_second = moment.second
-            if cycle_second < 15*(int(limit*4/self.evse_hard_limits[evse_id].minimal_absolute) + 1):
+            cycle_switch_off_time = abs(int(limit * 60 / self.evse_hard_limits[evse_id].minimal_absolute))
+            if limit == 0.0:
+                limit = 0.0  
+            elif cycle_second < 15:
+                limit = sign(limit) * self.evse_hard_limits[evse_id].minimal_absolute
+            elif cycle_second < cycle_switch_off_time:
                 limit = sign(limit) * self.evse_hard_limits[evse_id].minimal_absolute
             else:
                 limit = 0.0
@@ -200,7 +221,7 @@ class ChargingProfileComponent:
     def install_profile_if_possible(self, profile, request_evse_id):
         result = self._check_if_profile_can_be_accepted(profile, request_evse_id)
         if result is None:
-            self.installed_profiles[request_evse_id].append(profile)
+            self._install_profile(request_evse_id, profile)
             self.profile_table[self._make_profile_hash(request_evse_id, profile)] = json.dumps(
                 [request_evse_id, profile.model_dump_json()])
         return result
@@ -210,22 +231,22 @@ class ChargingProfileComponent:
 
         if profile.chargingProfilePurpose == profile.chargingProfilePurpose.charging_station_max_profile:
             return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_PROFILE_PURPOSE",
+                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_PURPOSE",
                                                                    additional_info="Charging station max profiles are not supported yet."))
 
         if profile.chargingProfilePurpose == profile.chargingProfilePurpose.charging_station_external_constraints:
             return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_PROFILE_PURPOSE",
+                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_PURPOSE",
                                                                    additional_info="Charging station external constraints are not supported yet."))
 
         if profile.chargingProfileKind == ChargingProfileKindEnumType.recurring:
             return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_PROFILE_KIND",
+                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_KIND",
                                                                    additional_info="Recurring profiles are not supported yet."))
 
         if profile.chargingProfileKind == ChargingProfileKindEnumType.relative:
             return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_PROFILE_KIND",
+                                        status_info=StatusInfoType(reason_code="UNSUPPORTED_KIND",
                                                                    additional_info="Relative profiles are not supported yet."))
 
         if profile.chargingProfileKind == ChargingProfileKindEnumType.absolute:
@@ -233,13 +254,13 @@ class ChargingProfileComponent:
             for schedule in profile.chargingSchedule:
                 if schedule.startSchedule is None:
                     return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                                status_info=StatusInfoType(reason_code="UNSUPPORTED_PROFILE_KIND",
+                                                status_info=StatusInfoType(reason_code="UNSUPPORTED_KIND",
                                                                            additional_info="Start Schedule is missing from one of the schedules. "
                                                                                            "Profiles with Absolute kind must have startSchedule set for "
                                                                                            "all schedules."))
                 if schedule.chargingRateUnit != schedule.chargingRateUnit.watts:
                     return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                                status_info=StatusInfoType(reason_code="UNSUPPORTED_CHARGING_UNIT",
+                                                status_info=StatusInfoType(reason_code="UNSUPPORTED_UNIT",
                                                                            additional_info="Start Schedule uses unit other than Watts. "
                                                                                            "Current CS only support watts."))
 
@@ -258,8 +279,21 @@ class ChargingProfileComponent:
             if request_evse_id not in self.active_transaction_table or profile.transactionId != self.active_transaction_table[
                 request_evse_id]:
                 return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
-                                            status_info=StatusInfoType(reason_code="INVALID_TRANSACTION_ID",
+                                            status_info=StatusInfoType(reason_code="INVALID_TX_ID",
                                                                        additional_info=f"Profile with TxProfile must specify an ongoing charging transaction."))
+        existing = self._profile_by_id(profile.id)
+
+        if profile.chargingProfilePurpose != ChargingProfilePurposeEnumType.charging_station_external_constraints:
+
+            if existing is not None:
+                return None
+        else:
+            if existing is not None:
+                return SetChargingProfile(status=ChargingProfileStatusEnumType.rejected,
+                                          status_info=StatusInfoType(reason_code="DUPLICATE_PROFILE",
+                                                                     additional_info=f"Already have charging profile with this id "
+                                                                                     f"and purpose charging_station_external_constraints."
+                                                                                     f"Violation of K01.FR.05"))
 
         for evse_id, existing in self._query_profile(request_evse_id, profile.stackLevel,
                                                      profile.chargingProfilePurpose):
@@ -306,6 +340,15 @@ class ChargingProfileComponent:
 
         self.installed_profiles = remaining_profiles_final
         return ClearChargingProfile(status=ClearChargingProfileStatusEnumType.accepted)
+
+    @beartype
+    def _profile_by_id(self, profile_id : int) -> Optional[tuple[int, ChargingProfileType]]:
+        for evse_id in self.installed_profiles:
+            profile : ChargingProfileType
+            for profile in self.installed_profiles[evse_id]:
+                if profile.id == profile_id:
+                    return evse_id, profile
+        return None
 
     @beartype
     def _query_profile(self, evseId=None, stackLevel=None, chargingProfilePurpose=None, inverse_selection=False) -> list[tuple[int, ChargingProfileType]]:
