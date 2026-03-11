@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "d2x_ocpp_suite"
+version = "0.1.0"
+description = "D2X OCPP project"
+requires-python = ">=3.12"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "client*",
+    "components*",
+    "ocpp_models*",
+    "proxy*",
+    "server*",
+    "util*",
+]
+exclude = [
+    "mutants*",
+    "static*",
+    "__pycache__*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["components/test"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-ra"
+
+[tool.mutmut]
+paths_to_mutate = [
+    "components/",
+    "util/",
+]
+pytest_add_cli_args_test_selection = [
+    "components/test/__init__.py",
+]
+also_copy = [
+    "pyproject.toml",
+]

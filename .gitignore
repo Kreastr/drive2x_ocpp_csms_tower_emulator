@@ -5,3 +5,6 @@
 /atfsm/parsetab.py
 /atfsm/parser.out
 __pycache__
+/mutants/
+*.meta
+*.egg-info
