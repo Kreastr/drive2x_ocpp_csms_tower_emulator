@@ -31,7 +31,12 @@ import server.ocpp_server_handler
 from afsm import AFSM
 from server.data import UIManagerContext
 
-from snoop import snoop
+import sys
+if "--trace" in sys.argv: 
+    from snoop import snoop
+else:
+    snoop = lambda x: x
+    
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
 import math

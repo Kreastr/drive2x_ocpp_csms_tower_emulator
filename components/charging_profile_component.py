@@ -25,7 +25,12 @@ from typing import Callable, Optional, Any
 
 from beartype import beartype
 from ocpp.v201.datatypes import StatusInfoType
-from snoop import snoop
+
+import sys
+if "--trace" in sys.argv: 
+    from snoop import snoop
+else:
+    snoop = lambda x: x
 
 from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
 from ocpp_models.v201.composite_types import ChargingProfileType, ChargingScheduleType, ChargingSchedulePeriodType

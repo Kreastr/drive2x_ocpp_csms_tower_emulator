@@ -27,7 +27,11 @@ from _pydatetime import datetime
 
 from lorem_text import lorem
 from nicegui import ui
-from snoop import snoop
+import sys
+if "--trace" in sys.argv: 
+    from snoop import snoop
+else:
+    snoop = lambda x: x
 
 from server.ocpp_server_handler import OCPPServerHandler
 from server.ui.ui_manager import UIManagerFSMType

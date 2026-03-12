@@ -25,7 +25,7 @@ import sys
 import traceback
 
 from redis import Redis
-from snoop import snoop
+
 from . import get_app_args
 
 def get_default_redis(arg_provider=get_app_args):
