@@ -29,6 +29,7 @@ from typing import Any
 from ocpp.v201 import ChargePoint
 from pydantic import BaseModel, Field
 
+from components.charging_profile_component import ChargingProfileComponent
 from util.types import TransactionId, ConnectorId, EVSEId
 
 
@@ -52,6 +53,7 @@ class EvseModel(BaseModel):
 @dataclass
 class TxFSMContext:
     evse : EvseModel
+    cpc : ChargingProfileComponent
     auth_status : Any = None
     remote_start_id : int = -1
     cp_interface : ChargePoint | None = None

@@ -63,8 +63,14 @@ from redis import Redis
 
 from client.data import EvseModel, TxFSMContext
 from client.transaction_model import TxFSMType, transaction_uml
+from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
+from ocpp_models.v201.clear_charging_profile import ClearChargingProfileRequest
+from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
+from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
-from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call, get_virtual_cp_args
+from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call, get_virtual_cp_args, \
+    async_camelize_kwargs, log_req_response, with_request_model
+from util.db import get_default_redis
 from util.interval_trigger import client_measurand_loop
 
 from redis_dict import RedisDict
@@ -135,6 +141,7 @@ class TxFSM(TxFSMType):
                                               ))
 
     async def inform_on_remote_start(self, *vargs):
+        self.context.cp_interface.cpc.on_tx_start(self.tx_id.value)
         await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                               timestamp=get_time_str(),
                                               trigger_reason=TriggerReasonEnumType.remote_start,
@@ -147,6 +154,7 @@ class TxFSM(TxFSMType):
                                               ))
 
     async def inform_on_first_plugged_in(self, *vargs):
+        self.context.cp_interface.cpc.on_tx_start(self.tx_id.value)
         await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                               timestamp=get_time_str(),
                                               trigger_reason=TriggerReasonEnumType.cable_plugged_in,
@@ -180,7 +188,9 @@ class OCPPClient(ChargePoint):
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
-        self.task_contexts  = dict((i + 1, TxFSMContext(self.get_evse_data(i+1))) for i in range(3))
+        self._init_charge_point_controller()
+        
+        self.task_contexts  = dict((i + 1, TxFSMContext(self.get_evse_data(i+1), self.cpc)) for i in range(3))
 
         self.running = True
 
@@ -200,11 +210,29 @@ class OCPPClient(ChargePoint):
         for i in self.st_tasks:
             self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{i}"] = 0.0
         self.datasaver_task = asyncio.create_task(self.data_saver_task())
+
         
+
         for evse_id, context in self.task_contexts.items():
             
             client_measurand_loop().subscribe(self.get_post_measurands(context.evse, self.tx_fsms[evse_id]))
-    
+
+    def _init_charge_point_controller(self):
+        limit_descriptor = dict()
+        limit_descriptor[1] = LimitDescriptor(minimal=-8000.0,
+                                              maximal=8000.0,
+                                              default=1000.0,
+                                              minimal_absolute=2000.0,
+                                              maximal_absolute=8000.0)
+        self.cpc = ChargingProfileComponent(evse_ids=[1],
+                                            evse_hard_limits=limit_descriptor,
+                                            profile_table=RedisDict(f"{self.id}:profile:", redis=get_default_redis(
+                                                arg_provider=get_virtual_cp_args)),
+                                            active_transaction_table=RedisDict(f"{self.id}:active_transaction:",
+                                                                               redis=get_default_redis(
+                                                                                   arg_provider=get_virtual_cp_args)))
+        self.cpc.restore_from_database()
+
     def get_post_measurands(self, evse : EvseModel, fsm : TxFSMType):
         async def post_measurands():
             if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
@@ -329,8 +357,30 @@ class OCPPClient(ChargePoint):
         result = await self.call(status_notification)
         logger.warning(f"{status_notification=} {result=}")
 
+    @on(Action.set_charging_profile)
+    @async_camelize_kwargs
+    @log_async_call(logger.info)
+    @with_request_model(SetChargingProfileRequest)
+    async def on_set_charging_profile(self, rq: SetChargingProfileRequest, **kwargs):
+        return self.cpc.set_profile_request(rq)
+
+    @on(Action.clear_charging_profile)
+    @async_camelize_kwargs
+    @log_async_call(logger.info)
+    @with_request_model(ClearChargingProfileRequest)
+    async def on_clear_charging_profile(self, rq: ClearChargingProfileRequest, **kwargs):
+        return self.cpc.clear_profiles_request(rq)
+
+    @on(Action.get_charging_profiles)
+    @async_camelize_kwargs
+    @log_async_call(logger.info)
+    @with_request_model(GetChargingProfilesRequest)
+    async def on_get_charging_profile(self, rq: GetChargingProfilesRequest, **kwargs):
+        response, reports = self.cpc.get_profile_request(rq)
+        return response
+
     @on(Action.request_stop_transaction)
-    @log_async_call(logger.warning)
+    @log_async_call(logger.info)
     async def request_stop_transaction(self, **data):
         
         tx_found = False
@@ -357,6 +407,7 @@ class OCPPClient(ChargePoint):
         ctxt.auth_status = None
         
         await fsm.handle(TxFSMEvent.on_deauthorized)
+        self.cpc.on_tx_end(request_tx_id)
 
         return call_result.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
 
