@@ -33,7 +33,7 @@ import ssl
 import sys
 from argparse import ArgumentParser
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import uuid4
 
 import certifi
@@ -189,7 +189,7 @@ class OCPPClient(ChargePoint):
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
         self._init_charge_point_controller()
-        
+
         self.task_contexts  = dict((i + 1, TxFSMContext(self.get_evse_data(i+1), self.cpc)) for i in range(3))
 
         self.running = True
@@ -211,7 +211,7 @@ class OCPPClient(ChargePoint):
             self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{i}"] = 0.0
         self.datasaver_task = asyncio.create_task(self.data_saver_task())
 
-        
+
 
         for evse_id, context in self.task_contexts.items():
             
@@ -313,6 +313,7 @@ class OCPPClient(ChargePoint):
         try:
             prev_status = evse.cable_connected
             await self.post_status_notification(evse)
+
             while self.running:
                 await asyncio.sleep(1)
 
@@ -322,15 +323,14 @@ class OCPPClient(ChargePoint):
                 #logger.warning(f"{evse}")
                 #logger.warning(f'{self.settings["V2XChargingCtrlr"]["Setpoint"]} {fsm.current_state} {evse.cable_connected}')
 
+
                 if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
-                    prev_wh = evse.soc_wh
-                    setpoint = float(self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{evse.id}"])
+
+                    setpoint = self._get_charge_setpoint(evse)
                     evse.setpoint = setpoint
-                    evse.soc_wh += setpoint / 3600.0
-                    if evse.soc_wh > evse.usable_capacity:
-                        evse.soc_wh = evse.usable_capacity
-                    if evse.soc_wh < 0:
-                        evse.soc_wh = 0
+                    prev_wh = evse.soc_wh
+
+                    self._apply_ev_charge_model(evse, setpoint, delta_t_s = 1)
                     change = evse.soc_wh - prev_wh
                     evse.metered_power += change
                     if change > 0:
@@ -340,14 +340,26 @@ class OCPPClient(ChargePoint):
                     #await self.post_measurands(evse, fsm)
 
                 if not evse.cable_connected:
+                    # Driving energy use model
                     if evse.soc_wh > 2:
-                        evse.soc_wh -= 5000/3600
+                        evse.soc_wh -= 5000 / 3600
                         evse.km_driven += 25/3600
         except asyncio.exceptions.CancelledError:
             raise
         except:
             logger.error(traceback.format_exc())
 
+    def _apply_ev_charge_model(self, evse, setpoint, delta_t_s):
+        evse.soc_wh += setpoint * delta_t_s / 3600.0
+        ev_max_battery_wh = evse.usable_capacity
+        if evse.soc_wh > ev_max_battery_wh:
+            evse.soc_wh = ev_max_battery_wh
+        if evse.soc_wh < 0:
+            evse.soc_wh = 0
+        return evse.soc_wh
+
+    def _get_charge_setpoint(self, evse):
+        return self.cpc.get_power_setpoint(evse.id, datetime.now(UTC))
 
     async def post_status_notification(self, evse : EvseModel):
         status_notification = StatusNotification(timestamp=datetime.now().isoformat(),
