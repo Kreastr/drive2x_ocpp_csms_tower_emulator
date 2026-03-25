@@ -207,8 +207,8 @@ class OCPPClient(ChargePoint):
             x[0], asyncio.create_task(self.status_task(x[1].evse,
                                       self.tx_fsms[x[0]]))),
                                       self.task_contexts.items()))
-        for i in self.st_tasks:
-            self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{i}"] = 0.0
+        #for i in self.st_tasks:
+        #    self.settings["V2XChargingCtrlr"]["Setpoint"][f"instance-1-evse-{i}"] = 0.0
         self.datasaver_task = asyncio.create_task(self.data_saver_task())
 
 
