@@ -328,9 +328,10 @@ class OCPPClient(ChargePoint):
                 if evse.cable_connected and fsm.current_state == TxFSMState.transaction:
 
                     setpoint = self._get_charge_setpoint(evse)
+                    if setpoint != evse.setpoint:
+                        logger.info(f"Set charging power to {setpoint=} on {evse.id=}")
                     evse.setpoint = setpoint
                     prev_wh = evse.soc_wh
-
                     self._apply_ev_charge_model(evse, setpoint, delta_t_s = 1)
                     change = evse.soc_wh - prev_wh
                     evse.metered_power += change
