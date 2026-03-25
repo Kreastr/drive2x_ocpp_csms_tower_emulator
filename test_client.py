@@ -288,6 +288,7 @@ class OCPPClient(ChargePoint):
     async def transaction_task(self, context : TxFSMContext, fsm : TxFSMType):
         try:
             fsm.context.cp_interface = self
+            fsm.context.cpc = self.cpc
 
             while self.running:
                 await asyncio.sleep(1)

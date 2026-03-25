@@ -53,7 +53,7 @@ class EvseModel(BaseModel):
 @dataclass
 class TxFSMContext:
     evse : EvseModel
-    cpc : ChargingProfileComponent
+    cpc : ChargingProfileComponent | None = None
     auth_status : Any = None
     remote_start_id : int = -1
     cp_interface : ChargePoint | None = None
