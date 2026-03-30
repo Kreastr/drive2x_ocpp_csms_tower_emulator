@@ -97,8 +97,9 @@ class TxFSMServer(TxManagerFSMType):
             fsm_context_cache[self.my_fsm_id] = copy_context.model_dump_json()
 
     async def enter_upkeep(self, *vargs):
-        self.context.evse.next_setpoint = get_app_args().upkeep_power
-        await self.handle(TxManagerFSMEvent.on_setpoint_apply_mark)
+        # self.context.evse.next_setpoint = get_app_args().upkeep_power
+        # ToDo send upkeep power profile as stack 0
+        pass
 
     async def send_deauth_to_cp(self, *vargs):
         self.context : TxManagerContext
