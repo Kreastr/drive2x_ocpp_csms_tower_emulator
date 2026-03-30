@@ -28,8 +28,10 @@ from uuid import uuid4
 
 from cachetools import cached
 from ocpp.v201 import call
-from ocpp.v201.datatypes import IdTokenType, SetVariableDataType, ComponentType, EVSEType, VariableType
-from ocpp.v201.enums import IdTokenEnumType
+from ocpp.v201.datatypes import IdTokenType, SetVariableDataType, ComponentType, EVSEType, VariableType, \
+    ChargingScheduleType, ChargingSchedulePeriodType, ChargingProfileType
+from ocpp.v201.enums import IdTokenEnumType, ChargingRateUnitEnumType, ChargingProfilePurposeEnumType, \
+    ChargingProfileKindEnumType
 from pydantic import BaseModel
 from redis_dict import RedisDict
 from typing_extensions import deprecated
@@ -97,9 +99,24 @@ class TxFSMServer(TxManagerFSMType):
             fsm_context_cache[self.my_fsm_id] = copy_context.model_dump_json()
 
     async def enter_upkeep(self, *vargs):
-        # self.context.evse.next_setpoint = get_app_args().upkeep_power
-        # ToDo send upkeep power profile as stack 0
-        pass
+        # Send upkeep power profile as stack 0
+        profile_stack_id = 0
+        evse_id = self.context.evse.evse_id
+        cp_id = self.context.cp_interface.get_charge_point_id()
+        schedule = ChargingScheduleType(id=profile_stack_id,
+                                        charging_rate_unit=ChargingRateUnitEnumType.watts,
+                                        charging_schedule_period=[ChargingSchedulePeriodType(start_period=0,
+                                                                                             limit=get_app_args().upkeep_power)])
+
+        profile_to_set = ChargingProfileType(id=profile_stack_id,
+                                             stack_level=profile_stack_id,
+                                             charging_profile_purpose=ChargingProfilePurposeEnumType.tx_default_profile,
+                                             charging_profile_kind=ChargingProfileKindEnumType.absolute,
+                                             charging_schedule=[schedule])
+        logger.info(f"Will set upkeep charging profile on {cp_id=} {evse_id=} {profile_stack_id=} {profile_to_set=}")
+        result = await self.context.cp_interface.do_set_charging_profile(evse_id,
+                                                  charging_profile=profile_to_set)
+        logger.info(result)
 
     async def send_deauth_to_cp(self, *vargs):
         self.context : TxManagerContext
