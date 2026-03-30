@@ -219,7 +219,7 @@ class OCPPClient(ChargePoint):
 
     def _init_charge_point_controller(self):
         limit_descriptor = dict()
-        evse_ids = list(range(len(self.tx_fsms)))
+        evse_ids = list(self.task_contexts)
         for i in evse_ids:
             limit_descriptor[i] = LimitDescriptor(minimal=-8000.0,
                                                   maximal=8000.0,
