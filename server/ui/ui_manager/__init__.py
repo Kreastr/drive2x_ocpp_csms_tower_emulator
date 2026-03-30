@@ -32,11 +32,11 @@ from afsm import AFSM
 from server.data import UIManagerContext
 
 import sys
-if "--trace" in sys.argv: 
+if "--trace" in sys.argv:
     from snoop import snoop
 else:
     snoop = lambda x: x
-    
+
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
 import math
@@ -167,7 +167,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         from server.ocpp_server_handler import OCPPServerHandler
         ctxt : UIManagerContext = self.context
         #self.charge_point.do_remote_start(evse_id=ctxt.evse.evse_id)
-        if self.tx_fsm.current_state in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]:
+        if self.tx_fsm.current_state in [TxManagerFSMState.ready]:
             self.handle_as_deferred(UIManagerFSMEvent.on_ready_status)
         else:
             await self.tx_fsm.handle(TxManagerFSMEvent.on_authorized_by_app)
@@ -223,8 +223,8 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         return self.context.timeout_time < datetime.now()
 
     def if_session_ready(self, *vargs):
-        return self.tx_fsm.current_state in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging, TxManagerFSMState.transition_triggered]
+        return self.tx_fsm.current_state in [TxManagerFSMState.ready]
 
     def if_session_fault(self, *vargs):
-        return self.tx_fsm.current_state not in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging, TxManagerFSMState.transition_triggered]
+        return self.tx_fsm.current_state not in [TxManagerFSMState.ready]
 

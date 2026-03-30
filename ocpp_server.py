@@ -330,7 +330,7 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
 
         if cp.fsm.context.online:
             for evse_id, evse_fsm in cp.fsm.context.transaction_fsms.items():
-                if evse_fsm.current_state not in [TxManagerFSMState.ready, TxManagerFSMState.charging, TxManagerFSMState.discharging]:
+                if evse_fsm.current_state not in [TxManagerFSMState.ready]:
                     logger.info(f"Bad state {cp_id=} {tag=} {evse_fsm.current_state=}")
                     continue
                 evse_fsm : TxManagerFSMType
