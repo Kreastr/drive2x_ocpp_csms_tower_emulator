@@ -36,7 +36,7 @@ from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
     IdTokenInfoType, ChargingProfileType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
-    ReportBaseEnumType, ResetEnumType, ResetStatusEnumType
+    ReportBaseEnumType, ResetEnumType, ResetStatusEnumType, ChargingProfileStatusEnumType
 from redis_dict import RedisDict
 from typing_extensions import deprecated
 from websockets import ConnectionClosedOK
@@ -478,10 +478,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
 
     async def do_set_charging_profile(self, evse_id: EVSEId, charging_profile : ChargingProfileType) -> bool:
-        result_raw = await self.call_payload(call.SetChargingProfile(evse_id=evse_id,
+        result : call_result.SetChargingProfile = await self.call_payload(call.SetChargingProfile(evse_id=evse_id,
                                                                      charging_profile=charging_profile))
-        result = call_result.SetChargingProfile(**result_raw)
-        return result.status == result.status.accepted
+        return result.status == ChargingProfileStatusEnumType.accepted
 
     async def do_remote_stop(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_deauthorized)
