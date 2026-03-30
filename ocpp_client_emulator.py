@@ -154,7 +154,7 @@ class TxFSM(TxFSMType):
                                               ))
 
     async def inform_on_first_plugged_in(self, *vargs):
-        self.context.cp_interface.cpc.on_tx_start(self.tx_id.value)
+        self.context.cp_interface.cpc.on_tx_start(evse_id=self.context.evse.id, tx_id=self.tx_id.value)
         await self.call(call.TransactionEvent(event_type=TransactionEventEnumType.started,
                                               timestamp=get_time_str(),
                                               trigger_reason=TriggerReasonEnumType.cable_plugged_in,
