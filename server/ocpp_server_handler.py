@@ -478,8 +478,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
 
     async def do_set_charging_profile(self, evse_id: EVSEId, charging_profile : ChargingProfileType) -> bool:
-        result : call_result.SetChargingProfile = await self.call_payload(call.SetChargingProfile(evse_id=evse_id,
-                                                                                            charging_profile=charging_profile))
+        result_raw = await self.call_payload(call.SetChargingProfile(evse_id=evse_id,
+                                                                     charging_profile=charging_profile))
+        result = call_result.SetChargingProfile(**result_raw)
         return result.status == result.status.accepted
 
     async def do_remote_stop(self, evse_id : EVSEId):
