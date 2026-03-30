@@ -350,7 +350,14 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                             evse.last_report_time = datetime.now()
                             await self.fsm.context.transaction_fsms[evse_id].handle_as_deferred(TxManagerFSMEvent.on_soc_info_updated_event)
                         if sv["measurand"] == "Power.Active.Import":
-                            evse.last_reported_power = sv["value"]/1000.0
+                            power_unit = sv["unitOfMeasure"]["unit"]
+                            if power_unit == "W":
+                                evse.last_reported_power = sv["value"]/1000.0
+                            elif power_unit == "kW":
+                                evse.last_reported_power = sv["value"]
+                            else:
+                                logger.warning(f"Unexpected unit of Power.Active.Import measurand {power_unit=}")
+                                evse.last_reported_power = None
                     logger.error(f"post meter values {evse=} {sv=}")
         except:
             logger.error(f"{traceback.format_exc()=}")
