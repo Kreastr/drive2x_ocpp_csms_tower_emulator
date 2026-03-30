@@ -350,7 +350,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                             evse.last_report_time = datetime.now()
                             await self.fsm.context.transaction_fsms[evse_id].handle_as_deferred(TxManagerFSMEvent.on_soc_info_updated_event)
                         if sv["measurand"] == "Power.Active.Import":
-                            power_unit = sv["unitOfMeasure"]["unit"]
+                            power_unit = sv["unit_of_measure"]["unit"]
                             if power_unit == "W":
                                 evse.last_reported_power = sv["value"]/1000.0
                             elif power_unit == "kW":
