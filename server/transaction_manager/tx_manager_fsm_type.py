@@ -39,33 +39,16 @@ Authorizing --> Unknown : on deauthorized
 Occupied --> Upkeep : on authorize accept
 Occupied --> Upkeep : on tx update event
 Occupied --> Upkeep : on soc info updated event
-Upkeep --> Upkeep : on setpoint refresh mark
 Upkeep --> Ready : on authorized by app
 Upkeep --> Terminating : on deauthorized
 Authorized --> Ready : if occupied
 Authorized --> Unknown : on deauthorized
 Upkeep --> Available : if available
-Ready --> TransitionTriggered : on setpoint apply mark
-Charging --> TransitionTriggered : on setpoint apply mark
-Discharging --> TransitionTriggered : on setpoint apply mark
-TransitionTriggered --> Charging : if charge setpoint
-TransitionTriggered --> Discharging : if discharge setpoint
-TransitionTriggered --> Ready : if idle setpoint
-Ready --> Ready : on setpoint refresh mark
-Discharging --> Discharging : on setpoint refresh mark
-Charging --> Charging : on setpoint refresh mark
-Charging --> Terminating : on deauthorized
-Discharging --> Terminating : on deauthorized
 Ready --> Terminating : on deauthorized
-TransitionTriggered --> Terminating : on deauthorized
 Ready --> Unknown : on end tx event
 Ready --> Terminating : on termination fault
-Charging --> Terminating : on termination fault
-Discharging --> Terminating : on termination fault
-TransitionTriggered --> Terminating : on termination fault
 Terminating --> Fault : on termination fault
 Terminating --> Unknown : on end tx event
-TransitionTriggered --> Unknown : on end tx event
 Fault --> Unknown : on clear fault
 @enduml
 """

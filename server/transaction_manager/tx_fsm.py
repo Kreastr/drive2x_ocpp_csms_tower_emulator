@@ -32,6 +32,7 @@ from ocpp.v201.datatypes import IdTokenType, SetVariableDataType, ComponentType,
 from ocpp.v201.enums import IdTokenEnumType
 from pydantic import BaseModel
 from redis_dict import RedisDict
+from typing_extensions import deprecated
 
 from server.data.tx_manager_context import TxManagerContext
 from util.db import get_default_redis
@@ -59,19 +60,11 @@ class TxFSMServer(TxManagerFSMType):
                          context=TxManagerContext())
         self.apply_to_all_conditions(TxManagerFSMCondition.if_available, self.if_available)
         self.apply_to_all_conditions(TxManagerFSMCondition.if_occupied, self.if_occupied)
-        self.apply_to_all_conditions(TxManagerFSMCondition.if_charge_setpoint, self.if_charge_setpoint)
-        self.apply_to_all_conditions(TxManagerFSMCondition.if_idle_setpoint, self.if_idle_setpoint)
-        self.apply_to_all_conditions(TxManagerFSMCondition.if_discharge_setpoint, self.if_discharge_setpoint)
 
         self.on(TxManagerFSMState.authorizing.on_enter, self.send_auth_to_cp)
         self.on(TxManagerFSMState.occupied.on_enter, self.send_auth_to_cp)
         self.on(TxManagerFSMState.upkeep.on_enter, self.enter_upkeep)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
-
-        self.on(TxManagerFSMState.transition_triggered.on_exit, self.send_new_setpoint)
-        self.on(TxManagerFSMState.ready.on_loop, self.update_baseline_via_ocpp)
-        self.on(TxManagerFSMState.charging.on_loop, self.update_baseline_via_ocpp)
-        self.on(TxManagerFSMState.discharging.on_loop, self.update_baseline_via_ocpp)
 
         self.on("on_state_changed", self.save_fsm_state)
 
@@ -103,50 +96,9 @@ class TxFSMServer(TxManagerFSMType):
             copy_context.cp_interface = None
             fsm_context_cache[self.my_fsm_id] = copy_context.model_dump_json()
 
-    @staticmethod
-    def if_charge_setpoint(context : TxManagerContext, other):
-        return context.evse.setpoint > 0
-
-    @staticmethod
-    def if_idle_setpoint(context : TxManagerContext, other):
-        return context.evse.setpoint == 0.0
-
-    @staticmethod
-    def if_discharge_setpoint(context : TxManagerContext, other):
-        return context.evse.setpoint < 0
-
     async def enter_upkeep(self, *vargs):
         self.context.evse.next_setpoint = get_app_args().upkeep_power
         await self.handle(TxManagerFSMEvent.on_setpoint_apply_mark)
-        await self.update_baseline_via_ocpp()
-
-    async def send_new_setpoint(self, *vargs):
-        from ..ocpp_server_handler import clamp_setpoint
-        self.context: TxManagerContext
-        setpoint = int(self.context.evse.next_setpoint)
-        if self.context.cp_interface is not None:
-            self.context.evse.setpoint = setpoint
-            self.context.evse.next_setpoint = 0
-            clamp_setpoint(self.context.evse)
-            logger.warning(f"send_new_setpoint {setpoint=}")
-
-    async def update_baseline_via_ocpp(self, *vargs, **kwargs):
-        setpoint = self.context.evse.setpoint
-        if self.context.cp_interface is None:
-            logger.warning(f"update_baseline_via_ocpp cannot send setpoint because CP interface is not set")
-            return
-        result = await self.context.cp_interface.call_payload(
-            call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(setpoint),
-                                                                     component=ComponentType(
-                                                                         name="V2XChargingCtrlr", instance="1",
-                                                                         evse=EVSEType(id=self.context.evse.evse_id)),
-                                                                     variable=VariableType(name="Setpoint"))]))
-        logger.warning(f"update_baseline_via_ocpp {setpoint=} {result=}")
-        for v in result.set_variable_result:
-            status = v["attribute_status"]
-            logger.warning(status)
-            # if status == AttributeStatusType()
-            pass
 
     async def send_deauth_to_cp(self, *vargs):
         self.context : TxManagerContext
