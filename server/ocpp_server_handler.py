@@ -499,7 +499,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         else:
             self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint += 200
         
-        clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Increased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint}")
 
     async def do_decrease_setpoint(self, evse_id : EVSEId):
@@ -509,7 +508,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         else:
             self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint -= 200
         
-        clamp_setpoint(self.fsm.context.transaction_fsms[evse_id].context.evse)
         logger.warning(f"Decreased setpoint to {self.fsm.context.transaction_fsms[evse_id].context.evse.next_setpoint}")
 
     async def force_setpoint_update(self, evse_id : EVSEId):
