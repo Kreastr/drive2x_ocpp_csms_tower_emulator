@@ -36,7 +36,7 @@ import websockets
 from ocpp.v201 import call
 from ocpp.v201 import call_result
 from ocpp.v201.datatypes import ComponentType, VariableType, \
-    SetVariableDataType, EVSEType
+    SetVariableDataType, EVSEType, ChargingProfileType
 
 from nicegui import ui, app, background_tasks
 
@@ -211,6 +211,13 @@ async def remote_stop(cp_id : ChargePointId, evse_id : EVSEId):
         return {"status": "error"}
     else:
         return {"result": await charge_points[cp_id].do_remote_stop(evse_id)}
+
+@app.post("/cp/{cp_id}/set_charging_profile")
+async def evse_set_charging_profile(cp_id: ChargePointId, evse_id: EVSEId, charging_profile : ChargingProfileType):
+    if cp_id not in charge_points:
+        return {"status": "error"}
+    else:
+        return {"result": await charge_points[cp_id].do_set_charging_profile(evse_id, charging_profile)}
 
 @app.get("/cp/{cp_id}/report_full")
 async def report_full(cp_id : ChargePointId):

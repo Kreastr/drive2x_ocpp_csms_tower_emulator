@@ -35,7 +35,7 @@ from cachetools import cached
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
-    IdTokenInfoType, MeterValueType
+    IdTokenInfoType, MeterValueType, ChargingProfileType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
     ReportBaseEnumType, ResetEnumType, ResetStatusEnumType
 from redis_dict import RedisDict
@@ -43,6 +43,7 @@ from snoop.pp_module import traceback
 from websockets import ConnectionClosedOK
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
+from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from server.transaction_manager.tx_fsm import TxFSMServer
 
 from util.db import get_default_redis
@@ -498,7 +499,12 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     async def do_clear_fault(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
-    
+
+    async def do_set_charging_profile(self, evse_id: EVSEId, charging_profile : ChargingProfileType) -> bool:
+        result : call_result.SetChargingProfile = await self.call_payload(call.SetChargingProfile(evse_id=evse_id,
+                                                                                            charging_profile=charging_profile))
+        return result.status == result.status.accepted
+
     async def do_remote_stop(self, evse_id : EVSEId):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_deauthorized)
     
