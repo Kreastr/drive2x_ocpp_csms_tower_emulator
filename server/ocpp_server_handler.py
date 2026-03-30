@@ -76,7 +76,7 @@ def get_redis_caches_cp():
 
     return session_pins, boot_notification_cache, status_notification_cache
 
-@deprecated
+@deprecated("Does nothing. Setpoint clamping is now handled by clients")
 def clamp_setpoint(evse: EvseStatus):
     pass
 
