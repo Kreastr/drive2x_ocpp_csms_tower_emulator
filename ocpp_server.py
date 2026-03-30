@@ -36,9 +36,10 @@ import websockets
 from ocpp.v201 import call
 from ocpp.v201 import call_result
 from ocpp.v201.datatypes import ComponentType, VariableType, \
-    SetVariableDataType, EVSEType, ChargingProfileType
+    SetVariableDataType, EVSEType, ChargingProfileType, ChargingScheduleType, ChargingSchedulePeriodType
 
 from nicegui import ui, app, background_tasks
+from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingProfileKindEnumType, ChargingRateUnitEnumType
 
 from server.data.car_db import SessionInfo, CAR_DB, CarDetails
 from server.data.tx_manager_context import TxManagerContext
@@ -80,7 +81,6 @@ from server.callable_interface import CallableInterface
 
 from pytz import timezone
 
-from pydantic import BaseModel, Field
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
@@ -235,17 +235,7 @@ async def read_report(cp_id : ChargePointId):
 
 @app.get("/cp/{cp_id}/setpoint/{value}")
 async def setpoint(cp_id : ChargePointId, value : int):
-    if cp_id not in charge_points:
-        return {"status": "error"}
-    else:
-        if value > 8000:
-            value = 8000
-        if value < -8000:
-            value = -8000
-        return {"result": await charge_points[cp_id].call_payload(
-            call.SetVariables(set_variable_data=[SetVariableDataType(attribute_value=str(value),
-                                                                     component=ComponentType(name="V2XChargingCtrlr", instance="1", evse=EVSEType(id=1)),
-                                                                     variable=VariableType(name="Setpoint"))]))}
+    return {"status": "retired"}
 
 EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "D2X_DEMO_": "d2x_ga3_demo",
@@ -280,11 +270,28 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
                     continue
     
                 cp : OCPPServerHandler = charge_points[cp_id]
-                if evse_id in cp.fsm.context.transaction_fsms:
-                    evse = cp.fsm.context.transaction_fsms[evse_id].context.evse
-                    evse.next_setpoint = value
-                    clamp_setpoint(evse)
-                    confirmed.values[iid] = evse.next_setpoint
+                profile_stack_id = evse_id*10000+100*setpoints.expected_slot_start_time.hour+setpoints.expected_slot_start_time.minute
+
+                schedule = ChargingScheduleType(id=profile_stack_id,
+                                                charging_rate_unit=ChargingRateUnitEnumType.watts,
+                                                charging_schedule_period=[ChargingSchedulePeriodType(start_period=0,
+                                                                                                     limit=value)],
+                                                duration=get_slot_duration())
+
+                profile_to_set = ChargingProfileType(id=profile_stack_id,
+                                                     stack_level=profile_stack_id,
+                                                     charging_profile_purpose=ChargingProfilePurposeEnumType.tx_default_profile,
+                                                     charging_profile_kind=ChargingProfileKindEnumType.absolute,
+                                                     charging_schedule=[schedule],
+                                                     valid_from=setpoints.expected_slot_start_time.isoformat(),
+                                                     valid_to=(setpoints.expected_slot_start_time+datetime.timedelta(seconds=get_slot_duration())).isoformat())
+                logger.info(f"Will set charging profile on {cp_id=} {evse_id=} {profile_stack_id=} {profile_to_set=}")
+                result = await cp.do_set_charging_profile(evse_id,
+                                           charging_profile=profile_to_set)
+
+                if result:
+                    logger.info(f"Profile confirmed {cp_id=} {evse_id=} {profile_stack_id=}")
+                    confirmed.values[iid] = value
         return confirmed
     except Exception as e:
         return GenericErrorResponse(error_message=traceback.format_exc())

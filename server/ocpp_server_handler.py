@@ -29,29 +29,26 @@ import logging
 from datetime import datetime, timedelta
 from logging import getLogger
 
-import dateutil.parser
 from beartype import beartype
 from cachetools import cached
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
-    IdTokenInfoType, MeterValueType, ChargingProfileType
+    IdTokenInfoType, ChargingProfileType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
     ReportBaseEnumType, ResetEnumType, ResetStatusEnumType
 from redis_dict import RedisDict
-from snoop.pp_module import traceback
+from typing_extensions import deprecated
 from websockets import ConnectionClosedOK
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
-from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from server.transaction_manager.tx_fsm import TxFSMServer
 
 from util.db import get_default_redis
 from server.charge_point_model import get_charge_point_fsm
 from server.data import ChargePointContext, EvseStatus
 from server.data.tx_manager_context import TxManagerContext
-from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
-from tx_manager_fsm_enums import TxManagerFSMEvent, TxManagerFSMState
+from tx_manager_fsm_enums import TxManagerFSMEvent
 from util import get_time_str, any_of, time_based_id, broadcast_to, log_async_call, get_app_args
 
 from server.ui.nicegui import gui_info
@@ -79,21 +76,9 @@ def get_redis_caches_cp():
 
     return session_pins, boot_notification_cache, status_notification_cache
 
+@deprecated
 def clamp_setpoint(evse: EvseStatus):
-    if evse.next_setpoint > 8000:
-        evse.next_setpoint = 8000
-    if evse.next_setpoint < -8000:
-        evse.next_setpoint = -8000
-
-    upkeep_power = get_app_args().upkeep_power
-    logger.warning(f"{upkeep_power=}")
-    # Minimal charge/discharge for connection stability
-    if evse.next_setpoint < 0:
-        if evse.next_setpoint > -upkeep_power:
-            evse.next_setpoint = -upkeep_power
-    else:
-        if evse.next_setpoint < upkeep_power:
-            evse.next_setpoint = upkeep_power
+    pass
 
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
@@ -357,7 +342,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 for sv in  v["sampled_value"]:
                     evse : EvseStatus = self.fsm.context.transaction_fsms[evse_id].context.evse
                     self.fsm.context.transaction_fsms[evse_id].fsm_name = f"EVSE <{self.id}:{evse_id}>"
-                    evse.evse_id = evse_id
+                    evse.evse_id = EVSEId(evse_id)
                     if "measurand" in sv:
                         if sv["measurand"] == "SoC":
                             evse.connector_status = "Occupied"
@@ -367,7 +352,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                         if sv["measurand"] == "Power.Active.Import":
                             evse.last_reported_power = sv["value"]/1000.0
                     logger.error(f"post meter values {evse=} {sv=}")
-                        
         except:
             logger.error(f"{traceback.format_exc()=}")
         finally:
@@ -418,13 +402,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         logger.info(f" TX EVENT {event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 
         tx_fsm.context : TxManagerContext
-
-        if 0: #reported_tx_id != tx_fsm.context.tx_id:
-            await tx_fsm.handle(TxManagerFSMEvent.on_end_tx_event)
-            tx_fsm.context.tx_id = reported_tx_id
-            self.fsm.context.transaction_fsms[evse_id].context.tx_id = reported_tx_id
-            self.fsm.context.transaction_fsms[evse_id].fsm_name = f"EVSE <{self.id}:{evse_id}>"
-            await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
             
         if event_type == "Started":
             tx_fsm.context.tx_id = reported_tx_id
