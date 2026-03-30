@@ -188,9 +188,12 @@ class OCPPClient(ChargePoint):
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
+        self.evse_id_count = 3
+        self.evse_ids = [i+1 for i in range(self.evse_id_count)]
+        
         self._init_charge_point_controller()
 
-        self.task_contexts  = dict((i + 1, TxFSMContext(self.get_evse_data(i+1), self.cpc)) for i in range(3))
+        self.task_contexts  = dict((i, TxFSMContext(self.get_evse_data(i), self.cpc)) for i in self.evse_ids)
 
         self.running = True
 
@@ -219,14 +222,13 @@ class OCPPClient(ChargePoint):
 
     def _init_charge_point_controller(self):
         limit_descriptor = dict()
-        evse_ids = list(self.task_contexts)
-        for i in evse_ids:
+        for i in self.evse_ids:
             limit_descriptor[i] = LimitDescriptor(minimal=-8000.0,
                                                   maximal=8000.0,
                                                   default=1000.0,
                                                   minimal_absolute=2000.0,
                                                   maximal_absolute=8000.0)
-        self.cpc = ChargingProfileComponent(evse_ids=evse_ids,
+        self.cpc = ChargingProfileComponent(evse_ids=self.evse_ids,
                                             evse_hard_limits=limit_descriptor,
                                             profile_table=RedisDict(f"{self.id}:profile:", redis=get_default_redis(
                                                 arg_provider=get_virtual_cp_args)),
