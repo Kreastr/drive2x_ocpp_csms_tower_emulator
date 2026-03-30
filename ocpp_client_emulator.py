@@ -219,12 +219,14 @@ class OCPPClient(ChargePoint):
 
     def _init_charge_point_controller(self):
         limit_descriptor = dict()
-        limit_descriptor[1] = LimitDescriptor(minimal=-8000.0,
-                                              maximal=8000.0,
-                                              default=1000.0,
-                                              minimal_absolute=2000.0,
-                                              maximal_absolute=8000.0)
-        self.cpc = ChargingProfileComponent(evse_ids=[1],
+        evse_ids = list(range(len(self.tx_fsms)))
+        for i in evse_ids:
+            limit_descriptor[i] = LimitDescriptor(minimal=-8000.0,
+                                                  maximal=8000.0,
+                                                  default=1000.0,
+                                                  minimal_absolute=2000.0,
+                                                  maximal_absolute=8000.0)
+        self.cpc = ChargingProfileComponent(evse_ids=evse_ids,
                                             evse_hard_limits=limit_descriptor,
                                             profile_table=RedisDict(f"{self.id}:profile:", redis=get_default_redis(
                                                 arg_provider=get_virtual_cp_args)),
