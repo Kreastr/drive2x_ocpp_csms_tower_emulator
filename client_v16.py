@@ -174,11 +174,11 @@ class OCPPClientV201(ChargePoint):
         self.tx_seq_no = 1
 
         limit_descriptor = dict()
-        limit_descriptor[1] = LimitDescriptor(minimal=-6000.0,
-                                              maximal=6000.0,
+        limit_descriptor[1] = LimitDescriptor(minimal=-11000.0,
+                                              maximal=11000.0,
                                               default=1000.0,
                                               minimal_absolute=2000.0,
-                                              maximal_absolute=6000.0)
+                                              maximal_absolute=11000.0)
         self.cpc  = ChargingProfileComponent(evse_ids=[1],
                                    evse_hard_limits=limit_descriptor, 
                                              profile_table=RedisDict(f"{serial_number}:profile:", redis=get_default_redis(arg_provider=get_proxy_app_args)),
