@@ -27,8 +27,6 @@ import asyncio
 import datetime
 import logging
 import traceback
-from argparse import ArgumentParser
-from datetime import timezone
 
 import dateutil.parser
 import pytz
@@ -36,16 +34,15 @@ import websockets
 from ocpp.v201 import call
 from ocpp.v201 import call_result
 from ocpp.v201.datatypes import ComponentType, VariableType, \
-    SetVariableDataType, EVSEType, ChargingProfileType, ChargingScheduleType, ChargingSchedulePeriodType
+    SetVariableDataType, ChargingProfileType, ChargingScheduleType, ChargingSchedulePeriodType
 
 from nicegui import ui, app, background_tasks
 from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingProfileKindEnumType, ChargingRateUnitEnumType
 
 from server.data.car_db import SessionInfo, CAR_DB, CarDetails
-from server.data.tx_manager_context import TxManagerContext
-from server.transaction_manager.tx_fsm import TxFSMServer
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.nicegui import gui_info
+from server.ui.renderer_singletone import figma_renderer
 from tx_manager_fsm_enums import TxManagerFSMState
 
 from drive2x_sca_interfaces import SCADataEVs, SCADatum, SetpointRequestResponse, ConnectedEVId, GenericErrorResponse
@@ -66,11 +63,13 @@ gui_info._background_tasks = background_tasks
 
 from websockets import Subprotocol
 
-from charge_point_fsm_enums import ChargePointFSMEvent, ChargePointFSMState
-from server.ocpp_server_handler import OCPPServerHandler, charge_points, clamp_setpoint, get_redis_caches_cp
+from charge_point_fsm_enums import ChargePointFSMEvent
+from server.ocpp_server_handler import OCPPServerHandler, charge_points, get_redis_caches_cp
 from server.ui import CPCard
 from server.ui.ui_screens import gdpraccepted_screen, new_session_screen, edit_booking_screen, session_confirmed_screen, \
-    car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, session_end_summary_screen, session_first_start_screen
+    car_not_connected_screen, car_connected_screen, normal_session_screen, session_unlock_screen, \
+    session_end_summary_screen, session_first_start_screen, map_click_action, porto_login_code_screen, \
+    porto_login_code_screen_correct, porto_login_code_screen_incorrect
 from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
 from util import setup_logging, get_slot_start, get_slot_duration, get_app_args
 from util.fair_semaphore_redis import FairSemaphoreRedis
@@ -90,8 +89,6 @@ cp_card_container : ui.grid | None = None
 logging.getLogger("websockets.server").setLevel(logging.WARNING)
 #logging.getLogger("ocpp").setLevel(logging.WARNING)
 logging.getLogger("websockets.client").setLevel(logging.WARNING)
-
-
 
 
 async def on_connect(websocket):
@@ -155,6 +152,8 @@ async def main():
     logging.warning("main server ready")
     await server.serve_forever()
     logging.warning("main exit")
+
+app.add_static_files('/d2x_ui/static', 'static')
 
 @app.get("/cp")
 async def cp_list():
@@ -373,37 +372,40 @@ async def index():
 
 @ui.page("/d2x_ui/{cp_id}")
 async def d2x_ui_landing(cp_id : ChargePointId):
+    figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}')
 
-    await standard_header_footer(cp_id)
-    await styling()
+    if cp_id not in charge_points:
+        error_screen("ERROR",
+                     title=f"Charge Point with this ID is not active",
+                     text="Please try later.",
+                     cp_id=cp_id)
+        ui.timer(30.0, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"), once=True)
 
-    with (ui.card().classes('fixed-center').style("min-width: 18rem;")):
-        if cp_id not in charge_points:
-            with ui.row(align_items="center"):
-                ui.icon("warning", color='red').classes('text-5xl')
-                ui.label(f"Charge Point with this ID is not active. Please try later.")
-                ui.timer(30.0, lambda : ui.navigate.to(f"/d2x_ui/{cp_id}"), once=True)
+    else:
+        root, screen_data = figma_renderer.render_screen("standby_available")
+        tap_to_continue_area: ui.element = root
+        tap_to_continue_area.classes('cursor-pointer')
+        tap_to_continue_area.on('click', lambda : ui.navigate.to(f"/d2x_ui/{cp_id}/1"))
+        """
+        with ui.column(align_items="center"):
+            evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
 
-        else:
+            filtered_evse_ids = [x for x in evse_ids if x > 0]
+            if len(filtered_evse_ids) > 1:
+                ui.label("Please pick an EV charging outlet to proceed.")
             with ui.column(align_items="center"):
-                evse_ids = list(charge_points[cp_id].fsm.context.transaction_fsms)
-
-                filtered_evse_ids = [x for x in evse_ids if x > 0]
-                if len(filtered_evse_ids) > 1:
-                    ui.label("Please pick an EV charging outlet to proceed.")
-                with ui.column(align_items="center"):
-                    for evse_id in filtered_evse_ids:
-                        with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
-                            with ui.card():
-                                with ui.row(align_items="center"):
-                                    if len(filtered_evse_ids) > 1:
-                                        ui.icon('outlet', color='primary').classes('text-5xl')
-                                        ui.label(f"Outlet {evse_id}").classes('text-4xl text-primary')
-                                    else:
-                                        ui.label(f"START HERE").classes('text-4xl text-primary')
-
+                for evse_id in filtered_evse_ids:
+                    with ui.link(target=f"/d2x_ui/{cp_id}/{evse_id}").style("text-decoration: none; color: primary;"):
+                        with ui.card():
+                            with ui.row(align_items="center"):
+                                if len(filtered_evse_ids) > 1:
+                                    ui.icon('outlet', color='primary').classes('text-5xl')
+                                    ui.label(f"Outlet {evse_id}").classes('text-4xl text-primary')
+                                else:
+                                    ui.label(f"START HERE").classes('text-4xl text-primary')
+        """
 
 
 async def standard_header_footer(cp_id):
@@ -429,6 +431,9 @@ def timenow():
 
 STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.gdpraccepted: gdpraccepted_screen,
+                    UIManagerFSMState.enter_booking_pin : porto_login_code_screen,
+                    UIManagerFSMState.booking_pincorrect: porto_login_code_screen_correct,
+                    UIManagerFSMState.booking_pinincorrect: porto_login_code_screen_incorrect,
                     UIManagerFSMState.edit_booking: edit_booking_screen,
                     UIManagerFSMState.evseselect_page: lambda cp_id, *vargs: ui.navigate.to(f"/d2x_ui/{cp_id}"),
                     UIManagerFSMState.session_confirmed: session_confirmed_screen,
@@ -455,25 +460,16 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
     if fsm.current_state in STATE_SCREEN_MAP:
         STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp)
 
-
+@ui.page("/d2x_ui/test/{screen}")
+async def d2x_ui_test(screen : str):
+    figma_renderer.render_header()
+    figma_renderer.render_screen(screen)
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}")
 async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
-    ui.add_head_html('''<script>
-    function onResize() {
-      emitEvent('body_size', 
-      {w: window.innerWidth,
-       h: window.innerHeight});
-    }
-    window.onload = onResize;
-    window.onresize = onResize;
-    </script>''')
-
-    ui.on('body_size', refresh_on_resize)
+    figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
-    await standard_header_footer(cp_id)
-    await styling()
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=get_default_redis(), session_timeout=5)
     semaphore.acquire()
     await screen_size_refreshable_block(cp_id, evse_id, semaphore)
@@ -509,6 +505,26 @@ def refresh_on_resize(event):
 
 
 async def pend_semaphore_screen_block(semaphore, cp_id):
+
+    error_heading, error_title, error_message = await error_screen(heading="Please wait",
+                                                                   title="",
+                                                                   text="",
+                                                                   cp_id=cp_id)
+
+    if error_message is not None:
+        error_message.text = format_queue_position(semaphore.rank)
+        error_message.bind_text_from(semaphore,
+                                     "rank",
+                                     backward=format_queue_position)
+    """≈
+    figma_renderer.find_element(screen_data, filter=lambda x: any(map(lambda y: x.name.startswith(y),
+                                                                      ['ACTION_CHILD_',
+                                                                       'ACTION_SELF_',
+                                                                       'INPUT_',
+                                                                       'TEXT_AREA_',
+                                                                       'ERROR',
+                                                                       'INFO_'
+                                                                       ])))
     with ui.column(align_items="center"):
         with ui.row(align_items="center"):
             ui.icon("clock", color='warning').classes('text-5xl mr-3')
@@ -518,20 +534,48 @@ async def pend_semaphore_screen_block(semaphore, cp_id):
         ui.separator()
         with ui.row().classes('items-center justify-around'):
             ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
+    """
 
+
+async def error_screen(heading, title, text, cp_id : ChargePointId):
+    root, screen_data = figma_renderer.render_screen("error_page")
+
+    error_heading = figma_renderer.maybe_find_one_label_child_of(screen_data, "ERROR")
+    if error_heading is not None:
+        error_heading.text = heading
+
+    error_title = figma_renderer.maybe_find_one_label_child_of(screen_data, "ERROR_TITLE")
+    if error_title is not None:
+        error_title.text = title
+
+    error_message = figma_renderer.maybe_find_one_label_child_of(screen_data, "ERROR_MESSAGE")
+    if error_message is not None:
+        error_message.text = text
+
+    button_exit = figma_renderer.find_exactly_one(screen_data, "ACTION_SELF_EXIT")
+    if button_exit is not None:
+        button_exit : ui.element = button_exit.ui_element
+        button_exit.classes('cursor-pointer')
+        button_exit.on('click', lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
+
+    return error_heading, error_title, error_message
 
 async def main_screen_block(cp_id, evse_id):
     session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
     if cp_id not in charge_points:
-        with ui.row(align_items="center"):
-            ui.icon("warning", color='red').classes('text-5xl')
-            ui.label(f"Charge Point with this ID is not active. Please try later.")
-            ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
+        error_heading, error_title, error_message = await error_screen(heading="ERROR",
+                                                                       title="Unregistered device",
+                                                                       text=f"Charge Point with ID {cp_id} is not active. Please try later.",
+                                                                       cp_id=cp_id)
+
+        ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
     elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
-        with ui.row(align_items="center"):
-            ui.icon("warning", color='red').classes('text-5xl mr-3')
-            ui.label(f"EV charging equipment with this ID is not active. Please try later.")
-            ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
+        error_heading, error_title, error_message = await error_screen(heading="ERROR",
+                                                                       title="Inactive equipment",
+                                                                       text=f"EV charging equipment with ID {evse_id} is not active on device {cp_id}. Please try later.",
+                                                                       cp_id=cp_id)
+
+        ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
 
     else:
         fsm = UIManagerFSMType(uml=ui_manager_uml,
@@ -546,13 +590,12 @@ async def main_screen_block(cp_id, evse_id):
         fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
         fsm.load_from_redis()
         cp = charge_points[cp_id]
-        with ui.column(align_items="center"):
-            state_dependent_frame(cp_id, evse_id, fsm, cp)
-            fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
-            ui.timer(1, fsm.loop)
-            ui.separator()
-            with ui.row(align_items="center").classes('items-center justify-around'):
-                ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
+        state_dependent_frame(cp_id, evse_id, fsm, cp)
+        fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
+        ui.timer(1, fsm.loop)
+        #ui.separator()
+        #with ui.row(align_items="center").classes('items-center justify-around'):
+        #    ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
 
 async def styling():

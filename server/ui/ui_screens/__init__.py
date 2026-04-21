@@ -28,7 +28,10 @@ from _pydatetime import datetime
 from lorem_text import lorem
 from nicegui import ui
 import sys
-if "--trace" in sys.argv: 
+
+from server.ui.renderer_singletone import figma_renderer
+
+if "--trace" in sys.argv:
     from snoop import snoop
 else:
     snoop = lambda x: x
@@ -36,7 +39,7 @@ else:
 from server.ocpp_server_handler import OCPPServerHandler
 from server.ui.ui_manager import UIManagerFSMType
 from uimanager_fsm_enums import UIManagerFSMEvent
-from util import async_l, if_valid
+from util import async_l, if_valid, logger
 from util.dispatch import dispatch
 from util.types import ChargePointId, EVSEId
 
@@ -50,16 +53,94 @@ def gdpraccepted_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManager
 
 
 def new_session_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    root, screen_data = figma_renderer.render_screen("data_message")
+    user_agreement = figma_renderer.maybe_find_one_label_child_of(screen_data, "TEXT_AREA_LEGAL")
+    if user_agreement is not None:
+        user_agreement.style("overflow: scroll;")
 
-    with ui.column(align_items="stretch"):
-        ui.label("Welcome to the Drive2X Project demo. ")
-        ui.label("Here is how we process your data. ")
-        with ui.scroll_area().classes('w-800 h-400 border'):
-            ui.label(lorem.paragraphs(5).split("\n"))
-        ui.button("Yes, I have read the policies and consent to handling of my data",
-                  on_click=dispatch(fsm, UIManagerFSMEvent.on_gdpr_accept))
-        ui.button("No, I do not consent and cannot use this service.",
-                  on_click=dispatch(fsm, UIManagerFSMEvent.on_exit))
+    map_click_action("ACTION_SELF_ACCEPT", UIManagerFSMEvent.on_gdpr_accept, fsm, screen_data)
+    map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_exit, fsm, screen_data)
+
+def add_to_code(state, new_value):
+    current = state["code"]
+    new_code_l = list(current)
+    if int(new_value) < 0 or int(new_value) > 9:
+        return
+    for i, x in enumerate(new_code_l):
+        if x == "X":
+            new_code_l[i] = str(new_value)[0]
+            break
+    state["code"] = "".join(new_code_l)
+
+def delete_last_in_code(state):
+    current = state["code"]
+    new_code_l = list(current)
+    for i, x in list(enumerate(new_code_l))[::-1]:
+        if x != "X":
+            new_code_l[i] = "X"
+            break
+    state["code"] = "".join(new_code_l)
+
+def porto_login_code_screen_correct(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    root, screen_data = figma_renderer.render_screen("login_code_correct")
+
+def porto_login_code_screen_incorrect(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    root, screen_data = figma_renderer.render_screen("login_code_incorrect")
+
+def porto_login_code_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+    root, screen_data = figma_renderer.render_screen("login_code")
+    input_pad = figma_renderer.find_exactly_one(screen_data, "INPUT_KEYPAD")
+    code_display_parent = figma_renderer.find_exactly_one(screen_data, "CHILD_INPUT_PARKING_CODE")
+
+    state = {"code": "XXXXXXXX"}
+
+    if code_display_parent is not None:
+        if code_display_parent.children:
+            code_text : ui.label = code_display_parent.children[0].ui_element
+            code_text.text = f"ANA - {state['code']}"
+            code_text.bind_text_from(state, "code", backward=lambda x: f"ANA - {x}")
+
+    if input_pad is not None:
+        pad_element : ui.element = input_pad.ui_element
+        pad_element.clear()
+        with pad_element:
+            common_style = ("height: 140px; font-size: 72px; line-height: 85px; "
+                            "color: black; background-color: #F2F2F2; "
+                            "border: 5px solid #2FAC66;  display: flex; "
+                            "justify-content: center; "
+                            "align-items: center; ")
+            button_style = "width: 140px; " + common_style
+            arrow_style = "width: 316px; " + common_style
+            with ui.column():
+                with ui.row().style("gap: 36px; font-family: Raleway; font-weight: 300; font-variation: light; "):
+                    for i in range(1, 7):
+                        ui.label(f"{i}").style(button_style).on('click',
+                                                                lambda val=i: add_to_code(state, val))
+                with ui.row().style("gap: 36px; font-family: Raleway; font-weight: 300; font-variation: light; "):
+                    for i in range(7, 11):
+                        ui.label(f"{i % 10}").style(button_style).on('click',
+                                                                lambda val=i: add_to_code(state, val % 10))
+                    ui.label().bind_visibility_from (state,
+                                                    "code",
+                                                    backward=lambda x: x == "XXXXXXXX").style(arrow_style + " opacity: 20%; ")
+                    bcksp = ui.label().bind_visibility_from(state,
+                                                           "code",
+                                                           backward=lambda x: x != "XXXXXXXX").style(arrow_style)
+                    bcksp.on('click',
+                             lambda: delete_last_in_code(state))
+                    with bcksp:
+                        ui.image("static/images/CorrectArrow.svg").style("height: 45px; width: 77px; ")
+
+
+   # map_click_action("ACTION_SELF_ACCEPT", UIManagerFSMEvent.on_gdpr_accept, fsm, screen_data)
+   # map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_exit, fsm, screen_data)
+
+def map_click_action(anchor_id, event, fsm, screen_data):
+    button_accept = figma_renderer.find_exactly_one(screen_data, anchor_id)
+    if button_accept is not None:
+        button_accept: ui.element = button_accept.ui_element
+        button_accept.classes('cursor-pointer')
+        button_accept.on('click', dispatch(fsm, event))
 
 
 def edit_booking_screen(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):

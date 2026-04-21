@@ -214,7 +214,7 @@ class FigmaNode(BaseModel, NodeMixin):
     exportSettings: Optional[list] = None
     complexStrokeProperties : Optional[dict] = None
 
-    _ui_element : Optional[Any] = None
+    ui_element : Optional[Any] = None
 
     def __init__(self, *vargs, **kwargs):
         super(FigmaNode, self).__init__(*vargs, **kwargs)

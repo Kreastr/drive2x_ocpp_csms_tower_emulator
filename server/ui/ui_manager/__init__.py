@@ -58,7 +58,11 @@ EVSEPage --> SessionUnlock : if session is active
 EVSEPage --> NewSession : if session is not active
 SeesionUnlock --> EVSESelectPage : on exit
 NewSession --> EVSESelectPage : on exit
-NewSession --> EditBooking : on gdpr accept
+NewSession --> EnterBookingPIN : on gdpr accept
+EnterBookingPIN --> EVSESelectPage : on exit
+EnterBookingPIN --> BookingPINCorrect : on correct pin
+EnterBookingPIN --> BookingPINIncorrect : on incorrect pin
+BookingPINIncorrect --> EnterBookingPIN : on exit
 GDPRAccepted --> EVSESelectPage : on exit
 GDPRAccepted --> UserHasBooking : on have booking
 GDPRAccepted --> EditBooking : if booking not supported

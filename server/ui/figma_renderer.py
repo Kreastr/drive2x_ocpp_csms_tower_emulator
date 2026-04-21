@@ -1,18 +1,19 @@
 from pathlib import Path
+from typing import Optional
 
 import yaml
 from anytree import findall
 from nicegui import ui, context
 from slugify import slugify
 
-from models.document import FigmaNode, NodeType, Color, LayoutMode, Constraint, StyleInfo, TextCase
+from models.figma_document_model import FigmaNode, NodeType, Color, LayoutMode, Constraint, StyleInfo, TextCase
 
 
 class FigmaRenderer():
     
-    def __init__(self):
+    def __init__(self, project_file : Path = Path("project.yaml")):
         self.all_screens = dict()
-        with open("project.yaml") as f:
+        with open(project_file) as f:
             d = yaml.load(f, Loader=yaml.SafeLoader)
             dd=FigmaNode.model_validate(d)
             dd.update_parents(forced_svg={"Livello_1", "D2X_LOGO_darkBG_COMPACT 1", "Vector", "PAVIMENTO", "Livello 2"})
@@ -30,7 +31,7 @@ class FigmaRenderer():
         <style>
         @font-face{
             font-family: "Raleway";
-            src: url('/fonts/Raleway-VariableFont_wght.ttf ') format('truetype');
+            src: url('/d2x_ui/static/fonts/Raleway-VariableFont_wght.ttf ') format('truetype');
             font-weight: normal;
             font-style: normal;
         }
@@ -40,6 +41,11 @@ class FigmaRenderer():
         function emitSize() {
             const scale = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
             document.querySelector(".nicegui-content").style.setProperty("--scale", scale);
+            let offset = 0;
+            if (window.innerWidth > (scale*1080)) {
+                offset = (window.innerWidth - (scale*1080));
+            }
+            document.querySelector(".nicegui-content").style.setProperty("--offset", ""+offset+"px");
         }
         window.onload = emitSize;
         window.onresize = emitSize;
@@ -153,7 +159,7 @@ class FigmaRenderer():
                     style += f"{k}: {v}; "
 
             print("span", FigmaRenderer.add_newline_breaks(d['text']), style)
-            ui.html(FigmaRenderer.add_newline_breaks(d['text']), tag="span", sanitize=False).style(style)
+            ui.html(FigmaRenderer.add_newline_breaks(d['text']), tag="span").style(style) # , sanitize=False
 
 
     @staticmethod
@@ -337,16 +343,42 @@ class FigmaRenderer():
 
             print("final style", current_node.name, style)
             current_element.style(style)
-            current_node._ui_element = current_element
+            current_node.ui_element = current_element
             return current_element
 
+    @staticmethod
+    def find_element(screen_data, filter) -> list[FigmaNode]:
+        return findall(screen_data, filter_=filter)
+
+    @staticmethod
+    def find_exactly_one(screen_data, name : str) -> Optional[FigmaNode]:
+        elements = findall(screen_data, filter_=lambda x: x.name == name)
+        if elements:
+            return elements[0]
+        return None
+
+    @staticmethod
+    def maybe_find_one_label_child_of(screen_data, name : str) -> Optional[ui.label]:
+        elements = findall(screen_data, filter_=lambda x: x.name == name)
+        if elements:
+            assert (type(elements[0].children[0].ui_element) == ui.label)
+            return elements[0].children[0].ui_element
+        return None
+
+    @staticmethod
+    def find_all_starting_with(screen_data, name : str) -> list[FigmaNode]:
+        return findall(screen_data, filter_=lambda x: x.name.startswith(name))
+
+
     def render_screen(self, page_name: str):
+        if page_name not in self.all_screens:
+            return
         screen_data = self.all_screens[page_name]
         ui.query('body').style(f'background-color: black; line-height: 1; ')
         context.client.content.classes('p-0').style(
             "min-height: 1936px;"
             "transform-origin: left top; "
-            "transform: scale(var(--scale, 1));")
+            "transform: scale(var(--scale, 1)) translate(var(--offset, 0px), 0px);")
         footers = findall(screen_data, filter_=lambda x: x.name == "Footer")
         if len(footers) < 1:
             raise Exception("Failed to find Footer element")
@@ -360,5 +392,6 @@ class FigmaRenderer():
                    "border: 3px solid;"
                    "overflow: hidden; "
                    "border-color: white;")
-        if footer._ui_element is not None:
-            footer._ui_element.style("position: fixed; left: 0; bottom: 0; width: 1080px; ")
+        if footer.ui_element is not None:
+            footer.ui_element.style("position: fixed; left: 0; bottom: 0; width: 1080px; ")
+        return root, screen_data
