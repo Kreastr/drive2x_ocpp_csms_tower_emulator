@@ -54,50 +54,43 @@ from tx_fsm_enums import TxFSMState
 
 ui_manager_uml="""@startuml
 [*] --> EVSEPage
-EVSEPage --> SessionUnlock : if session is active
-EVSEPage --> NewSession : if session is not active
-SeesionUnlock --> EVSESelectPage : on exit
+EVSEPage --> EnterBookingPIN : if session is ready
+EVSEPage --> NewSession : if session is not ready
+
 NewSession --> EVSESelectPage : on exit
 NewSession --> EnterBookingPIN : on gdpr accept
 EnterBookingPIN --> EVSESelectPage : on exit
 EnterBookingPIN --> BookingPINCorrect : on correct pin
+BookingPINCorrect --> BookingDetails : if session is not ready
+BookingPINCorrect --> NormalSession : if session is ready
 EnterBookingPIN --> BookingPINIncorrect : on incorrect pin
-BookingPINIncorrect --> EnterBookingPIN : on exit
-GDPRAccepted --> EVSESelectPage : on exit
-GDPRAccepted --> UserHasBooking : on have booking
-GDPRAccepted --> EditBooking : if booking not supported
-UserHasBooking --> GDPRAccepted : on back
-UserHasBooking --> SessionConfirmed : on confirm session
-SessionConfirmed --> GDPRAccepted : on back
-UserHasBooking --> EditBooking : on edit booking
-EditBooking --> NewSession : on back
-GDPRAccepted --> EditBooking : on continue without booking
-EditBooking --> SessionConfirmed : on confirm session
-SessionConfirmed --> CarNotConnected : on start session
+BookingPINIncorrect --> EnterBookingPIN : on back
+
+BookingDetails --> CarNotConnected : on confirm session 
+BookingDetails --> EVSESelectPage : on exit
+
 CarNotConnected --> EVSESelectPage : on exit
 CarNotConnected --> CarConnected : if car present
 CarConnected --> CarNotConnected : if car not present
-CarConnected --> CanLock : if has locking
 CarConnected --> EVSESelectPage : on exit
-CanLock --> CarNotConnected : if car not present
-CanLock --> CarLockedSession : on lock and start
-CanLock --> EVSESelectPage : on exit
-CarLockedSession --> EVSESelectPage : on exit
-SessionUnlock --> Unlocking : on session pin correct
-SeesionUnlock --> SessionEndSummary : on session expired
-Unlocking --> CarLockedSession : if has locking
-Unlocking --> NormalSession : if has no locking
-CarLockedSession --> SessionEndSummary : on early stop and unlock
-CarLockedSession --> SessionEndSummary : if session fault
-CarConnected --> SessionFirstStart : on start
-CarConnected --> NormalSession : if session ready
-SessionFirstStart --> NormalSession : if session ready
-SessionFirstStart --> CarConnected : if timeout
-SessionFirstStart --> NormalSession : on ready status
+
+CarConnected --> NormalSession : if session is ready
 NormalSession --> EVSESelectPage : on exit
+NormalSession --> SessionEndSummary : if car not present
+NormalSession --> SessionEndSummary : if session is not ready
 NormalSession --> SessionEndSummary : on early stop
 NormalSession --> SessionEndSummary : if session fault
 SessionEndSummary --> EVSESelectPage : on exit
+
+NewSession --> CarConnectedTooSoon : if car present
+EnterBookingPIN --> CarConnectedTooSoon : if car present
+BookingPINCorrect --> CarConnectedTooSoon : if car present
+BookingPINIncorrect --> CarConnectedTooSoon : if car present
+BookingDetails --> CarConnectedTooSoon : if car present
+BookingDetails --> CarConnectedTooSoon : if car present
+
+CarConnectedTooSoon --> EVSEPage : if car not present
+
 @enduml
 """
 _fsm = AFSM(uml=ui_manager_uml, context=UIManagerContext(), se_factory=lambda x: str(x))
@@ -113,20 +106,15 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
 
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_active, self.if_session_is_active)
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_not_active, self.if_session_is_not_active)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_car_present, self.if_car_present)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_car_not_present, self.if_car_not_present)
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_has_locking, self.if_has_locking)
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_has_no_locking, self.if_has_no_locking)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_timeout, self.if_timeout)
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_ready, self.if_session_ready)
-        self.apply_to_all_conditions(UIManagerFSMCondition.if_booking_not_supported, self.if_booking_not_supported)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_ready, self.if_session_is_ready)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_not_ready, self.if_session_is_not_ready)
 
-        self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
-        self.on(UIManagerFSMState.session_first_start.on_enter, self.save_booking)
-        self.on(UIManagerFSMState.session_first_start.on_enter, self.trigger_remote_start)
+        #self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
+        #self.on(UIManagerFSMState.session_first_start.on_enter, self.save_booking)
+        self.on(UIManagerFSMState.car_connected.on_enter, self.trigger_remote_start)
         self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
         self.on(UIManagerFSMState.normal_session.on_exit, self.trigger_remote_stop)
 
@@ -198,13 +186,6 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 1)
         ctxt.session_pin = -1
 
-    def if_session_is_active(self, *vargs):
-        ctxt : UIManagerContext = self.context
-        return ctxt.evse.connector_status == "Occupied" and ctxt.session_pin > 0
-
-    def if_session_is_not_active(self, *vargs):
-        return not self.if_session_is_active(*vargs)
-
     def if_car_present(self, *vargs):
         ctxt : UIManagerContext = self.context
         return ctxt.evse.connector_status == "Occupied"
@@ -215,20 +196,17 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     @staticmethod
     def if_booking_not_supported(*vargs):
         return True
-    
-    @staticmethod
-    def if_has_locking(*vargs):
-        return False
 
-    def if_has_no_locking(self, *vargs):
-        return not self.if_has_locking(*vargs)
 
     def if_timeout(self, *vargs):
         return self.context.timeout_time < datetime.now()
 
-    def if_session_ready(self, *vargs):
+    def if_session_is_not_ready(self, *vargs):
+        return self.tx_fsm.current_state not in [TxManagerFSMState.ready]
+
+    def if_session_is_ready(self, *vargs):
         return self.tx_fsm.current_state in [TxManagerFSMState.ready]
 
     def if_session_fault(self, *vargs):
-        return self.tx_fsm.current_state not in [TxManagerFSMState.ready]
+        return self.tx_fsm.current_state in [TxManagerFSMState.fault]
 

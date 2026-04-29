@@ -6,7 +6,7 @@ from anytree import findall
 from nicegui import ui, context
 from slugify import slugify
 
-from models.figma_document_model import FigmaNode, NodeType, Color, LayoutMode, Constraint, StyleInfo, TextCase
+from .models.figma_document_model import FigmaNode, NodeType, Color, LayoutMode, Constraint, StyleInfo, TextCase
 
 
 class FigmaRenderer():
@@ -16,7 +16,12 @@ class FigmaRenderer():
         with open(project_file) as f:
             d = yaml.load(f, Loader=yaml.SafeLoader)
             dd=FigmaNode.model_validate(d)
-            dd.update_parents(forced_svg={"Livello_1", "D2X_LOGO_darkBG_COMPACT 1", "Vector", "PAVIMENTO", "Livello 2"})
+            dd.update_parents(forced_svg={"Livello_1",
+                                          "D2X_LOGO_darkBG_COMPACT 1",
+                                          "Vector",
+                                          "PAVIMENTO",
+                                          "Livello 2",
+                                          "GRAPHIC_CAR_CHARGING"})
             #for pre, _, node in RenderTree(dd):
             #    print(f"{pre}{node.name} <{node.type}>")
 
@@ -126,7 +131,9 @@ class FigmaRenderer():
 
     @staticmethod
     def add_newline_breaks(text):
-        return "<br/>".join(text.split("\n"))
+        for separator in ["\n", "\u2028"]:
+            text = "<br/>".join(text.split(separator))
+        return text
 
     @staticmethod
     def font_style_map(d):
@@ -223,8 +230,8 @@ class FigmaRenderer():
 
         elif current_node.type in [NodeType.Svg]:
             for candidate in [".svg", ".png"]:
-                if Path("images/"+current_node.name+candidate).exists():
-                    current_element = ui.image("images/"+current_node.name+candidate)
+                if Path("static/images/"+current_node.name+candidate).exists():
+                    current_element = ui.image("static/images/"+current_node.name+candidate)
                     break
         else:
             raise NotImplementedError(f"Missing handling for node type {current_node.type}")
@@ -358,11 +365,13 @@ class FigmaRenderer():
         return None
 
     @staticmethod
-    def maybe_find_one_label_child_of(screen_data, name : str) -> Optional[ui.label]:
+    def maybe_find_one_label_child_of(screen_data, name : str, index=0) -> Optional[ui.label]:
         elements = findall(screen_data, filter_=lambda x: x.name == name)
         if elements:
-            assert (type(elements[0].children[0].ui_element) == ui.label)
-            return elements[0].children[0].ui_element
+            if elements[0].children:
+                if len(elements[0].children) > index:
+                    assert (type(elements[0].children[index].ui_element) == ui.label)
+                    return elements[0].children[index].ui_element
         return None
 
     @staticmethod
