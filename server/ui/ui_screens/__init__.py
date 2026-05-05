@@ -261,6 +261,16 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     txfsm = cp.fsm.context.transaction_fsms[evse_id]
     evse = txfsm.context.evse
+    state = {"countdown": 60}
+
+    async def on_countdown():
+        state.update({"countdown": state["countdown"] - 1})
+        if state["countdown"] < 1:
+            state["countdown"] = 1
+            await fsm.handle(UIManagerFSMEvent.on_exit)
+
+
+    ui.timer(1, on_countdown)
     
     root, screen_data = figma_renderer.render_screen("charging_mode")
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_early_stop, fsm, screen_data)
@@ -269,6 +279,11 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
         live_power.bind_text_from(evse,
                                   "last_reported_power", 
                                   backward= lambda x: f"{x:.1f} kW")
+    #timeout_notice = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_TIMEOUT_NOTICE")
+    #if timeout_notice is not None:
+    #    timeout_notice.bind_text_from(state, "countdown", backward=lambda x: f"You can now leave the car, this screen will automatically close in {x} second{'s' if x > 1 else ''}...")
+
+    
     return
 
     with ui.column(align_items="center"):
