@@ -82,12 +82,12 @@ NormalSession --> SessionEndSummary : on early stop
 NormalSession --> SessionEndSummary : if session fault
 SessionEndSummary --> EVSESelectPage : on exit
 
-NewSession --> CarConnectedTooSoon : if car present
-EnterBookingPIN --> CarConnectedTooSoon : if car present
-BookingPINCorrect --> CarConnectedTooSoon : if car present
-BookingPINIncorrect --> CarConnectedTooSoon : if car present
-BookingDetails --> CarConnectedTooSoon : if car present
-BookingDetails --> CarConnectedTooSoon : if car present
+NewSession --> CarConnectedTooSoon : if car present but session is not running
+EnterBookingPIN --> CarConnectedTooSoon : if car present but session is not running
+BookingPINCorrect --> CarConnectedTooSoon : if car present but session is not running
+BookingPINIncorrect --> CarConnectedTooSoon : if car present but session is not running
+BookingDetails --> CarConnectedTooSoon : if car present but session is not running
+BookingDetails --> CarConnectedTooSoon : if car present but session is not running
 
 CarConnectedTooSoon --> EVSEPage : if car not present
 
@@ -111,6 +111,8 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_fault, self.if_session_fault)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_ready, self.if_session_is_ready)
         self.apply_to_all_conditions(UIManagerFSMCondition.if_session_is_not_ready, self.if_session_is_not_ready)
+        self.apply_to_all_conditions(UIManagerFSMCondition.if_car_present_but_session_is_not_running, 
+                                     self.if_car_present_but_session_is_not_running)
 
         #self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
         #self.on(UIManagerFSMState.session_first_start.on_enter, self.save_booking)
@@ -210,3 +212,5 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     def if_session_fault(self, *vargs):
         return self.tx_fsm.current_state in [TxManagerFSMState.fault]
 
+    def if_car_present_but_session_is_not_running(self, *vargs):
+        return self.if_car_present(*vargs) and self.if_session_is_not_ready(*vargs)

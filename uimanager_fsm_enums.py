@@ -18,9 +18,10 @@ class UIManagerFSMState(StateBase, str, Enum):
 class UIManagerFSMCondition(str, Enum):
     if_session_is_ready='if_session_is_ready'
     if_session_is_not_ready='if_session_is_not_ready'
-    if_car_present='if_car_present'
+    if_car_present_but_session_is_not_running='if_car_present_but_session_is_not_running'
     if_car_not_present='if_car_not_present'
     if_session_fault='if_session_fault'
+    if_car_present='if_car_present'
 
 
 class UIManagerFSMEvent(str, Enum):
