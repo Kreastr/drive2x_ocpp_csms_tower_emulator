@@ -48,6 +48,7 @@ from uimanager_fsm_enums import UIManagerFSMEvent
 from util import async_l, if_valid, setup_logging
 from util.dispatch import dispatch
 from util.types import ChargePointId, EVSEId
+from zoneinfo import ZoneInfo
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
@@ -98,7 +99,7 @@ async def delete_last_in_code(state):
     state["code"] = "".join(new_code_l)
 
 def format_datetime(x : datetime.datetime):
-    return x.astimezone(datetime.timezone("Portugal")).strftime("%d %b %Y - %H:%M")
+    return x.astimezone(ZoneInfo("Portugal")).strftime("%d %b %Y - %H:%M")
 
 def format_session_duration(td: timedelta) -> str:
     total_hours = int(td.total_seconds() / 3600 + 0.5)
