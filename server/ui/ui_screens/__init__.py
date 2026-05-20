@@ -190,7 +190,11 @@ def test_pin(pin, context : UIManagerContext):
 
     if pin in booking_details:
         context.session_pin = pin
-        context.session_info = booking_details[pin]
+        if context.tx_fsm.context.session_info is not None:
+            context.session_info = context.tx_fsm.context.session_info
+        else:
+            context.session_info = booking_details[pin]
+            context.tx_fsm.context.session_info = booking_details[pin]
         return "CORRECT"
 
     return "INCORRECT"
