@@ -279,6 +279,7 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
                                                 charging_rate_unit=ChargingRateUnitEnumType.watts,
                                                 charging_schedule_period=[ChargingSchedulePeriodType(start_period=0,
                                                                                                      limit=value)],
+                                                start_schedule=setpoints.expected_slot_start_time.isoformat(),
                                                 duration=get_slot_duration())
 
                 profile_to_set = ChargingProfileType(id=profile_stack_id,
