@@ -21,17 +21,17 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
-
-
+import logging
 import random
 from typing import TYPE_CHECKING
 
 
 import server.ocpp_server_handler
 from afsm import AFSM
-from server.data import UIManagerContext
+from server.data import UIManagerContext, BookingDetails
 
 import sys
+
 if "--trace" in sys.argv:
     from snoop import snoop
 else:
@@ -117,10 +117,12 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         #self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
         #self.on(UIManagerFSMState.session_first_start.on_enter, self.save_booking)
         self.on(UIManagerFSMState.car_connected.on_enter, self.trigger_remote_start)
-        self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
-        self.on(UIManagerFSMState.normal_session.on_exit, self.trigger_remote_stop)
+        #self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
+        self.on(UIManagerFSMState.session_end_summary.on_enter, self.trigger_remote_stop)
 
         self.tx_fsm.on(TxFSMState.transaction.on_enter, self.on_start_transaction)
+        
+        self.on(UIManagerFSMState.car_not_connected.on_enter, self.update_booking_to_tx_fsm)
 
     async def on_start_transaction(self):
         self.handle(UIManagerFSMEvent.on_ready_status)
@@ -170,17 +172,20 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         #ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
 
+    async def update_booking_to_tx_fsm(self, *vargs, **kwargs):
+        ctxt: UIManagerContext = self.context
+        ctxt.tx_fsm.context.session_info = ctxt.session_info
     
     async def set_new_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
-        ctxt.session_pin = random.randint(100000,999999)
+        ctxt.session_pin = str(random.randint(100000,999999))
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         redis = get_default_redis()
         redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), self.get_session_remaining_duration())
 
     async def save_booking(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
-        self.tx_fsm.context.session_info.update(ctxt.session_info)
+        self.tx_fsm.context.session_info = BookingDetails.model_validate(ctxt.session_info.model_dump())
         
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
@@ -204,13 +209,17 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         return self.context.timeout_time < datetime.now()
 
     def if_session_is_not_ready(self, *vargs):
+        logging.debug(f"if_session_is_not_ready check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.tx_fsm.current_state not in [TxManagerFSMState.ready]
 
     def if_session_is_ready(self, *vargs):
+        logging.debug(f"if_session_is_ready check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.tx_fsm.current_state in [TxManagerFSMState.ready]
 
     def if_session_fault(self, *vargs):
+        logging.debug(f"if_session_fault check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.tx_fsm.current_state in [TxManagerFSMState.fault]
 
     def if_car_present_but_session_is_not_running(self, *vargs):
+        logging.debug(f"if_car_present_but_session_is_not_running check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.if_car_present(*vargs) and self.if_session_is_not_ready(*vargs)

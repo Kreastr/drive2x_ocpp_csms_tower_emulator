@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -6,8 +7,12 @@ from anytree import findall
 from nicegui import ui, context
 from slugify import slugify
 
+from util import setup_logging
 from .models.figma_document_model import FigmaNode, NodeType, Color, LayoutMode, Constraint, StyleInfo, TextCase
 
+
+logger = setup_logging(__name__)
+logger.setLevel(logging.WARNING)
 
 class FigmaRenderer():
     
@@ -43,12 +48,14 @@ class FigmaRenderer():
         </style>
         <meta name="viewport" content= "width=device-width, user-scalable=no"/>
         <script>
+        let resolution_w = 1080;
+        let resolution_h = 1920;
         function emitSize() {
-            const scale = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+            const scale = Math.min(window.innerWidth / resolution_w, window.innerHeight / resolution_h);
             document.querySelector(".nicegui-content").style.setProperty("--scale", scale);
             let offset = 0;
-            if (window.innerWidth > (scale*1080)) {
-                offset = (window.innerWidth - (scale*1080));
+            if (window.innerWidth > (scale*resolution_w)) {
+                offset = (window.innerWidth - (scale*resolution_w));
             }
             document.querySelector(".nicegui-content").style.setProperty("--offset", ""+offset+"px");
         }
@@ -80,7 +87,7 @@ class FigmaRenderer():
         for s in screens:
 
             name, names = FigmaRenderer.get_unique_name(slugify(s.name, separator="_"), names)
-            print(s.name, name, s.id)
+            logger.info(f"export_screens_to_yaml {s.name=}, {name=}, {s.id=}")
             with open(f"{name}.yaml", "w") as fr:
                 yaml.dump(s.model_dump(exclude_none=True), fr)
 
@@ -92,7 +99,7 @@ class FigmaRenderer():
 
             name, names = FigmaRenderer.get_unique_name(slugify(s.name, separator="_"), names)
             export[name] = s
-            print(name)
+            logger.info(f"export_screens_to_dict {name=}")
         return export
 
 
@@ -155,7 +162,7 @@ class FigmaRenderer():
         return k2, v2
 
     @staticmethod
-    def format_spans(raw_text, styleOverrideTable):
+    def format_spans(raw_text, styleOverrideTable, parent_node : FigmaNode):
         for d in raw_text:
             style=""
             style_data = {}
@@ -165,8 +172,10 @@ class FigmaRenderer():
                 for k, v in map(FigmaRenderer.font_style_map, style_data.items()):
                     style += f"{k}: {v}; "
 
-            print("span", FigmaRenderer.add_newline_breaks(d['text']), style)
-            ui.html(FigmaRenderer.add_newline_breaks(d['text']), tag="span").style(style) # , sanitize=False
+            logger.debug(f"span {FigmaRenderer.add_newline_breaks(d['text']), style}")
+            element = ui.html(FigmaRenderer.add_newline_breaks(d['text']), tag="span").style(style) # , sanitize=False
+            parent_node.all_spans.append(element)
+            
 
 
     @staticmethod
@@ -197,8 +206,8 @@ class FigmaRenderer():
             else:
                 current_element = ui.element()
                 with current_element:
-                        FigmaRenderer.format_spans(raw_text, current_node.styleOverrideTable)
-            print("TEXT", current_node.name, current_node)
+                        FigmaRenderer.format_spans(raw_text, current_node.styleOverrideTable, current_node)
+            logger.debug(f"TEXT {current_node.name=} {current_node=}")
         elif current_node.type in [NodeType.Frame, NodeType.Group, NodeType.Instance]:
 
             kwargs = {}
@@ -294,7 +303,7 @@ class FigmaRenderer():
                 else:
                     raise NotImplementedError(f"Unsupported count of fills {len(current_node.fills)}")
             if current_node.style is not None:
-                print(current_node.name, current_node.style)
+                logger.debug(f"{current_node.name=}, {current_node.style=}")
                 text_style = ""
                 current_node.style : StyleInfo
                 if current_node.style.fontSize is not None:
@@ -328,7 +337,7 @@ class FigmaRenderer():
 
             if current_node.strokes:
                 for s in current_node.strokes:
-                    print("stroke", current_node.name, current_node.characters, s.color)
+                    logger.debug(f"stroke {current_node.name=}, {current_node.characters=}, {s.color=}")
                     border_color = FigmaRenderer.rgb_color(s.color)
                 if current_node.individualStrokeWeights is None and current_node.strokeWeight:
                     style += f"border: {current_node.strokeWeight}px solid {border_color}; "
@@ -348,7 +357,7 @@ class FigmaRenderer():
                 if value is not None:
                     style += f"{css_key}: {value}px; "
 
-            print("final style", current_node.name, style)
+            logger.info(f"final style {current_node.name=} {style=}")
             current_element.style(style)
             current_node.ui_element = current_element
             return current_element

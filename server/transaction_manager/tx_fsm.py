@@ -22,6 +22,7 @@ only and do not necessarily reflect those of the European Union, CINEA or UKRI. 
 Union nor the granting authority can be held responsible for them.
 """
 import copy
+import datetime
 import json
 from typing import Any
 from uuid import uuid4
@@ -105,6 +106,7 @@ class TxFSMServer(TxManagerFSMType):
         cp_id = self.context.cp_interface.get_charge_point_id()
         schedule = ChargingScheduleType(id=profile_stack_id,
                                         charging_rate_unit=ChargingRateUnitEnumType.watts,
+                                        start_schedule=datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo=datetime.UTC).isoformat(),
                                         charging_schedule_period=[ChargingSchedulePeriodType(start_period=0,
                                                                                              limit=get_app_args().upkeep_power)])
 
@@ -133,9 +135,10 @@ class TxFSMServer(TxManagerFSMType):
             result = await self.context.cp_interface.call_payload(
                 stop_request)
             logger.warning(f"send_deauth_to_cp {stop_request=} {result=}")
-            if result.status == "Accepted":
-                await self.handle(TxManagerFSMEvent.on_end_tx_event)
-                return
+            if result is not None:
+                if result == "Accepted":
+                    await self.handle(TxManagerFSMEvent.on_end_tx_event)
+                    return
 
         await self.handle(TxManagerFSMEvent.on_termination_fault)
 

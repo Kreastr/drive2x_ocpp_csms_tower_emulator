@@ -137,7 +137,7 @@ class ChargingProfileComponent:
             return
         if evse_id in self.active_transaction_table:
             logger.warning(f"Starting new transaction over an existing one. old_tx: {self.active_transaction_table[evse_id]} new_tx: {tx_id}")
-            self.cleanup_tx_profiles(evse_id)
+            self.cleanup_tx_profiles(int(evse_id))
 
         self.active_transaction_table[evse_id] = tx_id
 
@@ -145,7 +145,7 @@ class ChargingProfileComponent:
     def on_tx_end(self, tx_id: str):
         for evse_id in self.active_transaction_table:
             if self.active_transaction_table[evse_id] == tx_id:
-                self.cleanup_tx_profiles(evse_id)
+                self.cleanup_tx_profiles(int(evse_id))
                 del self.active_transaction_table[evse_id]
                 return True
         logger.warning(f"Trying to stop transaction we are not tracking current_tx: {list(self.active_transaction_table)} stopped_tx: {tx_id} Do nothing")

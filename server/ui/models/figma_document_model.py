@@ -215,6 +215,11 @@ class FigmaNode(BaseModel, NodeMixin):
     complexStrokeProperties : Optional[dict] = None
 
     ui_element : Optional[Any] = None
+    all_spans : list = Field(default_factory=list)
+
+    @property
+    def get_spans(self):
+        return tuple(self.all_spans)
 
     def __init__(self, *vargs, **kwargs):
         super(FigmaNode, self).__init__(*vargs, **kwargs)

@@ -50,6 +50,7 @@ Ready --> Terminating : on termination fault
 Terminating --> Fault : on termination fault
 Terminating --> Unknown : on end tx event
 Fault --> Unknown : on clear fault
+Fault --> Available : if available
 @enduml
 """
 _fsm = AFSM(uml=transaction_manager_uml, context=TxManagerContext(), se_factory=lambda x: str(x))

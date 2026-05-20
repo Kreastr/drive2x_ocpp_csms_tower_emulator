@@ -34,6 +34,7 @@ import sys
 from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime, UTC
+from time import sleep
 from uuid import uuid4
 
 import certifi
@@ -77,9 +78,16 @@ from redis_dict import RedisDict
 
 from util.types import EVSEId, TransactionId
 
+print("Pre-start delay to let server refresh reliably")
+sleep(30)
+print("Pre-start delay done")
+
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
 
+logging.getLogger("websockets.server").setLevel(logging.WARNING)
+#logging.getLogger("ocpp").setLevel(logging.WARNING)
+logging.getLogger("websockets.client").setLevel(logging.WARNING)
 
 @beartype
 class TxFSM(TxFSMType):

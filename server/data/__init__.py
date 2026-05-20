@@ -23,7 +23,7 @@ Union nor the granting authority can be held responsible for them.
 """
 
 
-from _pydatetime import datetime
+from _pydatetime import datetime, datetime as dt
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
@@ -31,6 +31,7 @@ from typing import Any
 from server.callable_interface import CallableInterface
 from pydantic import BaseModel, Field
 
+from server.data.booking_details import BookingDetails
 from server.data.evse_status import EvseStatus
 from server.transaction_manager.tx_fsm import TxFSMServer
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
@@ -68,7 +69,8 @@ class UIManagerContext:
     charge_point : CallableInterface | None = None
     evse : EvseStatus | None = None
     tx_fsm : TxManagerFSMType | None = None
-    session_pin : int = -1
+    session_pin : str = ""
     session_pins : RedisDict | None = None
-    session_info : dict[str, Any] = field(default_factory=dict)
+    session_info : BookingDetails | None = None
     timeout_time : datetime = field(default_factory=datetime.now)
+

@@ -27,6 +27,7 @@ import asyncio
 import datetime
 import logging
 import traceback
+from typing import Optional
 
 import dateutil.parser
 import pytz
@@ -39,6 +40,7 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
 from nicegui import ui, app, background_tasks
 from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingProfileKindEnumType, ChargingRateUnitEnumType
 
+from server.data import BookingDetails
 from server.data.car_db import SessionInfo, CAR_DB, CarDetails
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.figma_renderer import FigmaRenderer
@@ -348,16 +350,17 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
                     csoc = rsoc
                 ctime = get_slot_start(rtime)
                 pred_soc = csoc + (rsoc-csoc) / (rtime - ctime).total_seconds() * get_slot_duration()
-                sinfo = SessionInfo.model_validate(evse_fsm.context.session_info)
+                sinfo : Optional[BookingDetails] = evse_fsm.context.session_info
 
                 site_tz : pytz.timezone = SITE_TIMEZONES.get(tag, pytz.utc)
 
-                dept = site_tz.localize(dateutil.parser.parse(sinfo.departure_date + " " + sinfo.departure_time)).astimezone(datetime.timezone.utc)
-                car : CarDetails = CAR_DB[sinfo.car_make][sinfo.car_model]
-                evid = ConnectedEVId.model_validate({"charge_point_id": cp_id, "evse_id": evse_id})
-                response.values[evid] = SCADatum.model_validate({"soc": pred_soc,
-                                                                 "tdep": get_slot_start(dept),
-                                                                 "usable_battery_capacity_kwh": car.usable_battery_capacity_kwh})
+                if sinfo is not None:
+                    dept = sinfo.departure_time.astimezone(datetime.UTC)
+                    #car : CarDetails = CAR_DB[sinfo.car_make][sinfo.car_model]
+                    evid = ConnectedEVId.model_validate({"charge_point_id": cp_id, "evse_id": evse_id})
+                    response.values[evid] = SCADatum.model_validate({"soc": pred_soc,
+                                                                     "tdep": get_slot_start(dept),
+                                                                     "usable_battery_capacity_kwh": 70})
     return response
 
 

@@ -21,28 +21,38 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
-
-from _pydatetime import datetime
+import logging
+from datetime import datetime as dt
+from datetime import timedelta
+import datetime
+from typing import Optional
 
 from beartype import beartype
-from lorem_text import lorem
 from nicegui import ui
 import sys
 
+from numpy import ceil
+
+from server.data import BookingDetails, UIManagerContext
+from server.ui.models.figma_document_model import FigmaNode
 from server.ui.renderer_singletone import figma_renderer
 
 if "--trace" in sys.argv:
-    from snoop import snoop
+    pass
 else:
     snoop = lambda x: x
 
 from server.ocpp_server_handler import OCPPServerHandler
 from server.ui.ui_manager import UIManagerFSMType
 from uimanager_fsm_enums import UIManagerFSMEvent
-from util import async_l, if_valid, logger
+from util import async_l, if_valid, setup_logging
 from util.dispatch import dispatch
 from util.types import ChargePointId, EVSEId
 
+logger = setup_logging(__name__)
+logger.setLevel(logging.DEBUG)
+
+booking_details : dict[str, BookingDetails] = dict()
 
 def gdpraccepted_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     ui.label("Do you have a pre-booked session?")
@@ -87,11 +97,70 @@ async def delete_last_in_code(state):
             break
     state["code"] = "".join(new_code_l)
 
+def format_datetime(x : datetime.datetime):
+    return x.strftime("%d %b %Y - %H:%M")
+
+def format_session_duration(td: timedelta) -> str:
+    total_hours = int(td.total_seconds() / 3600 + 0.5)
+
+    days, hours = divmod(total_hours, 24)
+    return f"{days}d" if days > 0 else "" + f"{hours}h"
 
 def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     root, screen_data = figma_renderer.render_screen("session_details")
     map_click_action("ACTION_SELF_CONFIRM", UIManagerFSMEvent.on_confirm_session, fsm, screen_data)
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_exit, fsm, screen_data)
+
+    update_generic_fields(screen_data, state=dict())
+
+    anchor = "TIME SET"
+    time_of_connection = _lookup_span_in_child_of_anchor(anchor, child_index=0, span_index=1, screen_data=screen_data)
+    time_of_disconnection = _lookup_span_in_child_of_anchor(anchor, child_index=1, span_index=1, screen_data=screen_data)
+    session_duration = _lookup_span_in_child_of_anchor(anchor, child_index=2, span_index=1, screen_data=screen_data)
+    logger.debug(f"booking_details_screen {time_of_connection=}")
+    if time_of_connection is not None:
+        time_of_connection.content = ""
+        time_of_connection.bind_content_from(fsm.context.session_info,
+                                          "arrival_time",
+                                          backward=format_datetime)
+    if time_of_disconnection is not None:
+        time_of_disconnection.content = ""
+        time_of_disconnection.bind_content_from(fsm.context.session_info,
+                                              "departure_time",
+                                              backward=format_datetime)
+    if session_duration is not None:
+        session_duration.content = ""
+        session_duration.bind_content_from(fsm.context.session_info,
+                                           "session_duration",
+                                            backward=format_session_duration)
+
+
+def update_generic_fields(screen_data, state):
+    date_time_now_element = figma_renderer.maybe_find_one_label_child_of(screen_data, "BOOKING_DATE_TIME")
+    if date_time_now_element is None:
+        date_time_now = figma_renderer.find_exactly_one(screen_data, "BOOKING_DATE_TIME")
+        date_time_now_element = date_time_now.ui_element
+
+    if date_time_now_element is not None:
+        assert type(date_time_now_element) is ui.label
+        date_time_now_element.bind_text_from(state, "current_time", backward=format_datetime)
+        ui.timer(5, lambda: state.update(dict(current_time=dt.now(tz=datetime.UTC))))
+
+
+
+def _lookup_span_in_child_of_anchor(anchor, child_index, span_index, screen_data) -> Optional[ui.html]:
+    anchor_element = figma_renderer.find_exactly_one(screen_data, anchor)
+    logger.debug(f"_lookup_span_in_child_of_anchor {anchor_element=}")
+    if anchor_element is not None:
+        if len(anchor_element.children) > child_index:
+            groups: FigmaNode = anchor_element.children[child_index]
+            logger.debug(f"_lookup_span_in_child_of_anchor {groups=}")
+            if len(groups.get_spans) > span_index:
+                node = groups.get_spans[span_index]
+                logger.debug(f"_lookup_span_in_child_of_anchor {node=}")
+                assert type(node) == ui.html
+                return node
+    return None
 
 
 def porto_login_code_screen_correct(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType,
@@ -107,11 +176,22 @@ def porto_login_code_screen_incorrect(cp_id: ChargePointId, evse_id: EVSEId, fsm
     map_click_action("ACTION_SELF_BACK", UIManagerFSMEvent.on_back, fsm, screen_data)
 
 
-def test_pin(pin):
+def test_pin(pin, context : UIManagerContext):
     if "X" in pin:
         return "INCOMPLETE"
     if pin == "00000000":
+        arrival = dt.now(tz=datetime.UTC).replace(minute=0,second=0,microsecond=0)
+        departure = arrival + timedelta(days=30)
+        booking_details[pin] = BookingDetails(arrival_time=arrival,
+                                              departure_time=departure,
+                                              original_departure_time=departure,
+                                              session_duration=departure-arrival)
+
+    if pin in booking_details:
+        context.session_pin = pin
+        context.session_info = booking_details[pin]
         return "CORRECT"
+
     return "INCORRECT"
 
 
@@ -141,9 +221,9 @@ def porto_login_code_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManage
             button_style = "width: 140px; " + common_style
             arrow_style = "width: 316px; " + common_style
             code_dispatchers = [dispatch(fsm, UIManagerFSMEvent.on_correct_pin,
-                                         condition=lambda s=state: test_pin(s["code"]) == "CORRECT"),
+                                         condition=lambda s=state, fsm=fsm: test_pin(s["code"], fsm.context) == "CORRECT"),
                                 dispatch(fsm, UIManagerFSMEvent.on_incorrect_pin,
-                                         condition=lambda s=state: test_pin(s["code"]) == "INCORRECT"),
+                                         condition=lambda s=state, fsm=fsm: test_pin(s["code"], fsm.context) == "INCORRECT"),
                                 ]
             with ui.column():
                 with ui.row().style("gap: 36px; font-family: Raleway; font-weight: 300; font-variation: light; "):
@@ -241,11 +321,15 @@ def session_confirmed_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManag
 
 
 def car_not_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    figma_renderer.render_screen("ready_mode_booked")
+    root, screen_data = figma_renderer.render_screen("ready_mode_booked")
+    update_generic_fields(screen_data, state=dict())
+
 
 
 def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     root, screen_data = figma_renderer.render_screen("ready_mode_booked")
+    update_generic_fields(screen_data, state=dict())
+
     input_pad = figma_renderer.find_exactly_one(screen_data, "INFO_CHARGING_STATUS")
     if input_pad is not None:
         nch = len(input_pad.ui_element.default_slot.children)
@@ -261,7 +345,8 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     txfsm = cp.fsm.context.transaction_fsms[evse_id]
     evse = txfsm.context.evse
-    state = {"countdown": 60}
+    state = {"countdown": 30}
+
 
     async def on_countdown():
         state.update({"countdown": state["countdown"] - 1})
@@ -271,19 +356,28 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
 
     ui.timer(1, on_countdown)
-    
+
     root, screen_data = figma_renderer.render_screen("charging_mode")
+    update_generic_fields(screen_data, state=state)
+
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_early_stop, fsm, screen_data)
+
+    session_end_time = _lookup_span_in_child_of_anchor("SESSION_END_DATE_TIME", child_index=0, span_index=1, screen_data=screen_data)
+    if session_end_time is not None:
+        session_end_time.bind_content_from(fsm.context.tx_fsm.context.session_info, "departure_time",
+                                           backward=lambda x: f"<br>until {format_datetime(x)}")
+
     live_power = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_LIVE_CHARGING_POWER", index=1)
+
     if live_power is not None:
         live_power.bind_text_from(evse,
-                                  "last_reported_power", 
+                                  "last_reported_power",
                                   backward= lambda x: f"{x:.1f} kW")
-    #timeout_notice = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_TIMEOUT_NOTICE")
-    #if timeout_notice is not None:
-    #    timeout_notice.bind_text_from(state, "countdown", backward=lambda x: f"You can now leave the car, this screen will automatically close in {x} second{'s' if x > 1 else ''}...")
+    timeout_notice = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_TIMEOUT_NOTICE")
+    if timeout_notice is not None:
+        timeout_notice.bind_text_from(state, "countdown", backward=lambda x: f"You can now leave the car, this screen will automatically close in {x} second{'s' if x > 1 else ''}...")
 
-    
+
     return
 
     with ui.column(align_items="center"):
@@ -326,6 +420,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     root, screen_data = figma_renderer.render_screen("final_thanks")
     state = {"countdown": 60}
+    update_generic_fields(screen_data, state=state)
 
     async def on_countdown():
         state.update({"countdown": state["countdown"] - 1})

@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from server.callable_interface import CallableInterface
 
 from server.data.evse_status import EvseStatus
+from server.data.booking_details import BookingDetails
 from util.types import TransactionId
 
 from typing import Any
@@ -41,4 +42,4 @@ class TxManagerContext(BaseModel):
     evse : EvseStatus = Field(default_factory=EvseStatus)
     tx_id : TransactionId | None = None
     cp_interface : CallableInterface | None = None
-    session_info : dict[str, Any] = Field(default_factory=dict)
+    session_info : BookingDetails | None = None
