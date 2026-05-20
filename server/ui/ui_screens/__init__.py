@@ -98,7 +98,7 @@ async def delete_last_in_code(state):
     state["code"] = "".join(new_code_l)
 
 def format_datetime(x : datetime.datetime):
-    return x.strftime("%d %b %Y - %H:%M")
+    return x.astimezone(datetime.timezone("Portugal")).strftime("%d %b %Y - %H:%M")
 
 def format_session_duration(td: timedelta) -> str:
     total_hours = int(td.total_seconds() / 3600 + 0.5)

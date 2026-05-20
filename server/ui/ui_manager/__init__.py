@@ -186,7 +186,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     async def save_booking(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         self.tx_fsm.context.session_info = BookingDetails.model_validate(ctxt.session_info.model_dump())
-        
+
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         redis = get_default_redis()
