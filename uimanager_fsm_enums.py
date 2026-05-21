@@ -25,7 +25,6 @@ class UIManagerFSMCondition(str, Enum):
 
 
 class UIManagerFSMEvent(str, Enum):
-    on_state_changed = 'on_state_changed'
     on_exit='on_exit'
     on_correct_pin='on_correct_pin'
     on_incorrect_pin='on_incorrect_pin'

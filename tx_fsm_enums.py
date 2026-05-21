@@ -17,7 +17,6 @@ class TxFSMCondition(str, Enum):
 
 
 class TxFSMEvent(str, Enum):
-    on_state_changed = 'on_state_changed'
     on_authorized='on_authorized'
     on_deauthorized='on_deauthorized'
     on_report_interval='on_report_interval'

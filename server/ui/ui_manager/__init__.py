@@ -32,6 +32,9 @@ from server.data import UIManagerContext, BookingDetails
 
 import sys
 
+from server.utils.data_providers import booking_details
+from util import setup_logging
+
 if "--trace" in sys.argv:
     from snoop import snoop
 else:
@@ -51,6 +54,9 @@ else:
     OCPPServerHandler = object
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from tx_fsm_enums import TxFSMState
+
+logger = setup_logging(__name__)
+logger.setLevel(logging.INFO)
 
 ui_manager_uml="""@startuml
 [*] --> EVSEPage
@@ -121,7 +127,8 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         self.on(UIManagerFSMState.session_end_summary.on_enter, self.trigger_remote_stop)
 
         self.tx_fsm.on(TxFSMState.transaction.on_enter, self.on_start_transaction)
-        
+
+        self.on(UIManagerFSMState.booking_pincorrect.on_enter, self.load_booking_details)
         self.on(UIManagerFSMState.car_not_connected.on_enter, self.update_booking_to_tx_fsm)
 
     async def on_start_transaction(self):
@@ -172,10 +179,19 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         #ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         #ctxt.session_pins.redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), 100)
 
+    async def load_booking_details(self, *vargs, **kwargs):
+        context: UIManagerContext = self.context
+        pin = context.session_pin
+        if context.tx_fsm.context.session_info is not None:
+            context.session_info = context.tx_fsm.context.session_info
+        else:
+            context.session_info = booking_details[pin]
+            context.tx_fsm.context.session_info = booking_details[pin]
+
     async def update_booking_to_tx_fsm(self, *vargs, **kwargs):
         ctxt: UIManagerContext = self.context
         ctxt.tx_fsm.context.session_info = ctxt.session_info
-    
+
     async def set_new_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context
         ctxt.session_pin = str(random.randint(100000,999999))
@@ -209,17 +225,17 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         return self.context.timeout_time < datetime.now()
 
     def if_session_is_not_ready(self, *vargs):
-        logging.debug(f"if_session_is_not_ready check {self.tx_fsm.current_state=} {self.tx_fsm=}")
+        logger.debug(f"if_session_is_not_ready check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.tx_fsm.current_state not in [TxManagerFSMState.ready]
 
     def if_session_is_ready(self, *vargs):
-        logging.debug(f"if_session_is_ready check {self.tx_fsm.current_state=} {self.tx_fsm=}")
+        logger.debug(f"if_session_is_ready check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.tx_fsm.current_state in [TxManagerFSMState.ready]
 
     def if_session_fault(self, *vargs):
-        logging.debug(f"if_session_fault check {self.tx_fsm.current_state=} {self.tx_fsm=}")
+        logger.debug(f"if_session_fault check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.tx_fsm.current_state in [TxManagerFSMState.fault]
 
     def if_car_present_but_session_is_not_running(self, *vargs):
-        logging.debug(f"if_car_present_but_session_is_not_running check {self.tx_fsm.current_state=} {self.tx_fsm=}")
+        logger.debug(f"if_car_present_but_session_is_not_running check {self.tx_fsm.current_state=} {self.tx_fsm=}")
         return self.if_car_present(*vargs) and self.if_session_is_not_ready(*vargs)

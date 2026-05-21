@@ -55,7 +55,7 @@ class ChargePointContext:
     id : ChargePointId = "provisional"
 
 
-    transaction_fsms: defaultdict[EVSEId, TxManagerFSMType] = field(default_factory=lambda : defaultdict(TxFSMServer))
+    transaction_fsms: dict[EVSEId, TxManagerFSMType] = field(default_factory=dict)
 
     connection_task : Any = None
 

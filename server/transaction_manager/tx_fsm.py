@@ -43,6 +43,8 @@ from util.interval_trigger import main_setpoint_loop, refresh_setpoint_loop
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType, transaction_manager_uml
 from tx_manager_fsm_enums import TxManagerFSMState, TxManagerFSMCondition, TxManagerFSMEvent
 from util import setup_logging, time_based_id, get_app_args
+from util.types import EVSEId
+
 
 @cached(cache={})
 def get_cache_dicts():
@@ -57,10 +59,13 @@ logger = setup_logging(__name__)
 
 class TxFSMServer(TxManagerFSMType):
 
-    def __init__(self):
+    def __init__(self, cp_id : str, evse_id : EVSEId):
         super().__init__(transaction_manager_uml,
                          se_factory=TxManagerFSMState,
                          context=TxManagerContext())
+
+        self.my_fsm_id = f"EVSE <{cp_id}:{evse_id}>"
+
         self.apply_to_all_conditions(TxManagerFSMCondition.if_available, self.if_available)
         self.apply_to_all_conditions(TxManagerFSMCondition.if_occupied, self.if_occupied)
 
@@ -69,17 +74,16 @@ class TxFSMServer(TxManagerFSMType):
         self.on(TxManagerFSMState.upkeep.on_enter, self.enter_upkeep)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
 
-        self.on("on_state_changed", self.save_fsm_state)
+        self.on("state_changed", self.save_fsm_state)
 
         main_setpoint_loop().subscribe(lambda s=self: s.handle(TxManagerFSMEvent.on_setpoint_apply_mark))
         refresh_setpoint_loop().subscribe(lambda s=self: s.handle(TxManagerFSMEvent.on_setpoint_refresh_mark))
 
-        self.my_fsm_id : str = ""
 
-    async def try_restore_fsm(self, fsm_id):
-        logger.warning(f"try_restore_fsm {fsm_id=}")
+    async def try_restore_fsm(self):
+        logger.warning(f"try_restore_fsm {self.my_fsm_id=}")
         latest_transaction_cache, fsm_state_cache, fsm_context_cache = get_cache_dicts()
-        self.my_fsm_id = fsm_id
+
         if self.my_fsm_id in fsm_state_cache:
             saved_state = fsm_state_cache[self.my_fsm_id]
             await self.transition_to_new_state(TxManagerFSMState(saved_state))
@@ -91,13 +95,16 @@ class TxFSMServer(TxManagerFSMType):
                 logger.warning(f"restored FSM context {self.my_fsm_id=} {self.context=} {saved_context=}")
 
     async def save_fsm_state(self, *vargs):
+        logger.info(f"save_fsm_state {self.my_fsm_id=}")
         if self.my_fsm_id != "":
             latest_transaction_cache, fsm_state_cache, fsm_context_cache = get_cache_dicts()
             fsm_state_cache[self.my_fsm_id] = self.current_state.value
             ctxt = self.context
             copy_context = copy.copy(ctxt)
             copy_context.cp_interface = None
-            fsm_context_cache[self.my_fsm_id] = copy_context.model_dump_json()
+            jsonified = copy_context.model_dump_json()
+            logger.info(f"about to save FSM {self.my_fsm_id} context {jsonified=}")
+            fsm_context_cache[self.my_fsm_id] = jsonified
 
     async def enter_upkeep(self, *vargs):
         # Send upkeep power profile as stack 0

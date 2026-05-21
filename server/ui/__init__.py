@@ -53,11 +53,12 @@ class CPCard(Element):
     online = BindableProperty(
         on_change=lambda sender, value: cast(Self, sender)._handle_online_change(value))
 
-    def __init__(self, fsm : ChargePointFSMType, **kwargs):
+    def __init__(self, charge_point, **kwargs):
         from server.ocpp_server_handler import charge_points
         super().__init__(tag="div")
-        self.fsm = fsm
-        self.cp_context : ChargePointContext = fsm.context
+        self.fsm = charge_point.fsm
+        self.charge_point = charge_point
+        self.cp_context : ChargePointContext = charge_point.fsm.context
         cp = charge_points[str(self.cp_context.id)]
         self.card = ui.card()
         self.bind_online_from(self.cp_context, "online")
@@ -87,8 +88,10 @@ class CPCard(Element):
                 ui.button("REPORT", on_click=request_and_open_report).classes("w-40")
                 ui.button(text="UI", icon="qr_code", on_click=qr_dialog.open if qr_dialog is not None else None)
 
-        for connid in self.cp_context.transaction_fsms:
-            self.on_new_evse(connid)
+        for evse_id in self.cp_context.transaction_fsms:
+            async def deferred_cpcard_setup(_evse_id=evse_id):
+                await self.on_new_evse(_evse_id)
+            ui.timer(0, deferred_cpcard_setup, once=True)
 
 
 
@@ -103,7 +106,7 @@ class CPCard(Element):
         self.card.classes(add="bg-green" if card_online_status else "bg-red")
         self.card.update()
 
-    def on_new_evse(self, evse_id : EVSEId):
+    async def on_new_evse(self, evse_id : EVSEId):
         from server.ocpp_server_handler import charge_points
         logger.warning(f"on new connector {evse_id}")
         with self.connector_container:
@@ -112,7 +115,7 @@ class CPCard(Element):
                 evse = cp.get_evse(evse_id)
                 new_label = ui.label(text=f"{evse_id}: {evse.connector_status}")
                 new_label.bind_text_from(evse, "connector_status", backward=lambda x, cid=evse_id: f"{cid}: {x}")
-                tx_fsm = self.cp_context.transaction_fsms[evse_id]
+                tx_fsm = await cp._ensure_tx_fsm_exists(self.cp_context.id, evse_id)
                 tx_label = ui.label(text=f"{str(tx_fsm.current_state)}")
                 tx_label.bind_text_from(tx_fsm, "current_state")
                 def exec_async(_evse_id, operation):

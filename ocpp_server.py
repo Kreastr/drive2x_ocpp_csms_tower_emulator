@@ -40,6 +40,7 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
 from nicegui import ui, app, background_tasks
 from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingProfileKindEnumType, ChargingRateUnitEnumType
 
+from client.data import TxFSMContext
 from server.data import BookingDetails
 from server.data.car_db import SessionInfo, CAR_DB, CarDetails
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
@@ -312,6 +313,14 @@ def check_control(cp_id : ChargePointId, site_tag : str):
 
 SITE_TIMEZONES = {"d2x_ga3_demo": timezone("Europe/Helsinki")}
 
+@app.get("/charger_state/{cp_id}/{evse_id}")
+async def charger_state(cp_id : ChargePointId, evse_id : EVSEId):
+    if cp_id not in charge_points:
+        return {"status": "error"}
+    else:
+        return {"context": str(charge_points[cp_id].fsm.context.transaction_fsms[evse_id].context),
+                "current_state": charge_points[cp_id].fsm.context.transaction_fsms[evse_id].current_state}
+
 @app.get("/status_cache")
 async def status_cache():
     session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
@@ -373,7 +382,7 @@ async def index():
     with ui.row().mark("cp_card_container"):
         for cpid in charge_points:
             if cpid != "provisional":
-                CPCard(charge_points[cpid].fsm).mark(cpid)
+                CPCard(charge_points[cpid]).mark(cpid)
 
 
 @ui.page("/d2x_ui/{cp_id}")
@@ -574,7 +583,7 @@ async def main_screen_block(cp_id, evse_id):
         fsm.load_from_redis()
         cp = charge_points[cp_id]
         state_dependent_frame(cp_id, evse_id, fsm, cp)
-        fsm.on(UIManagerFSMEvent.on_state_changed, lambda *vargs: state_dependent_frame.refresh())
+        fsm.on("state_changed", lambda *vargs: state_dependent_frame.refresh())
         ui.timer(1, fsm.loop)
         #ui.separator()
         #with ui.row(align_items="center").classes('items-center justify-around'):

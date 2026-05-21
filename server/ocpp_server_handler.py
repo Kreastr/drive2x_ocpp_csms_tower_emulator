@@ -55,7 +55,7 @@ from server.ui.nicegui import gui_info
 from util.types import *
 from server.ui.ui_manager import UIManagerFSMType
 
-from typing import Any
+from typing import Any, Optional
 
 from server.callable_interface import CallableInterface
 
@@ -194,7 +194,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
         def add_card(grid):
             with grid:
-                CPCard(self.fsm).mark(self.fsm.context.id)
+                CPCard(self).mark(self.fsm.context.id)
 
         await broadcast_to(app=gui_info.app,
                            kind=gui_info.ui.row,
@@ -286,6 +286,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.handle_status_notification_inner(conn_status)
         return call_result.StatusNotification()
 
+
+
     async def handle_status_notification_inner(self, conn_status):
         if self.fsm.current_state in [ChargePointFSMState.identified,
                                       ChargePointFSMState.booted,
@@ -293,10 +295,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                                       ChargePointFSMState.running_transaction,
                                       ChargePointFSMState.closing]:
 
-            tx_fsm: TxFSMServer = self.fsm.context.transaction_fsms[conn_status.evse_id]
-
-            if tx_fsm.context.cp_interface is None:
-                tx_fsm.context.cp_interface = self
+            tx_fsm = await self._ensure_tx_fsm_exists(self.id,
+                                                      conn_status.evse_id)
 
             tx_fsm.context.evse.connector_status = conn_status.connector_status
             tx_fsm.context.evse.evse_id = conn_status.evse_id
@@ -310,17 +310,25 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             # if conn_status.connector_status == "Occupied":
             #    await tx_fsm.handle(TxManagerFSMEvent.on_start_tx_event)
 
-            if conn_status.evse_id not in self.fsm.context.transaction_fsms:
-                self.fsm.context.transaction_fsms[conn_status.evse_id].fsm_name = f"EVSE <{self.id}:{conn_status.evse_id}>"
-                self.fsm.context.transaction_fsms[conn_status.evse_id].context.evse = conn_status
-                self.fsm.context.transaction_fsms[conn_status.evse_id].context.cp_interface = self
-                await broadcast_to(app=gui_info.app,
-                                   op=lambda x: x.on_new_evse(conn_status.evse_id),
-                                   page="/",
-                                   kind=CPCard, marker=self.fsm.context.id)
-            else:
-                self.fsm.context.transaction_fsms[
+            self.fsm.context.transaction_fsms[
                     conn_status.evse_id].context.evse.connector_status = conn_status.connector_status
+
+    async def _ensure_tx_fsm_exists(self, cp_id : str, evse_id : EVSEId) -> TxFSMServer:
+        if evse_id not in self.fsm.context.transaction_fsms:
+            tx_fsm = TxFSMServer(cp_id, evse_id)
+            await tx_fsm.try_restore_fsm()
+            self.fsm.context.transaction_fsms[evse_id] = tx_fsm
+
+            tx_fsm.context.cp_interface = self
+
+            async def deferred_cp_card_setup(x, _evse_id=evse_id):
+                await x.on_new_evse(_evse_id)
+
+            await broadcast_to(app=gui_info.app,
+                               op=deferred_cp_card_setup,
+                               page="/",
+                               kind=CPCard, marker=self.fsm.context.id)
+        return self.fsm.context.transaction_fsms[evse_id]
 
     @on(Action.heartbeat)
     async def on_heartbeat(self, **data):
@@ -400,11 +408,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         else: 
             evse_id = EVSEId(data["evse"]["id"])
 
-        tx_fsm = self.fsm.context.transaction_fsms[evse_id]
+        tx_fsm = await self._ensure_tx_fsm_exists(self.id, evse_id)
 
         event_type = data["event_type"]
-
-
 
         logger.info(f" TX EVENT {event_type=} {evse_id} {reported_tx_id=} {tx_fsm.context.tx_id=}")
 

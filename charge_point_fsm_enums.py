@@ -18,7 +18,6 @@ class ChargePointFSMCondition(str, Enum):
 
 
 class ChargePointFSMEvent(str, Enum):
-    on_state_changed = 'on_state_changed'
     on_start='on_start'
     on_serial_number_obtained='on_serial_number_obtained'
     on_serial_number_not_obtained='on_serial_number_not_obtained'

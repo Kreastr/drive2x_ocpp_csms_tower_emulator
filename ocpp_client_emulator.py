@@ -197,7 +197,7 @@ class OCPPClient(ChargePoint):
 
         self.settings["ChargingStation"]["SerialNumber"] = self.id
         self.tid = None
-        self.evse_id_count = 3
+        self.evse_id_count = 1
         self.evse_ids = [i+1 for i in range(self.evse_id_count)]
         
         self._init_charge_point_controller()

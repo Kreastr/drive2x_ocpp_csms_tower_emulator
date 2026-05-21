@@ -24,6 +24,7 @@ Union nor the granting authority can be held responsible for them.
 
 
 import base64
+import inspect
 import io
 import logging
 from datetime import timedelta
@@ -144,7 +145,11 @@ async def broadcast_to(app, op, page, **filters):
     for client in app.clients(page):
         with client:
             for old in ElementFilter(**filters):
-                op(old)
+                if inspect.iscoroutinefunction(op):
+                    await op(old)
+                else:    
+                    op(old)
+                
 
 
 def log_async_call(log_sink):

@@ -31,11 +31,10 @@ from beartype import beartype
 from nicegui import ui
 import sys
 
-from numpy import ceil
-
 from server.data import BookingDetails, UIManagerContext
 from server.ui.models.figma_document_model import FigmaNode
 from server.ui.renderer_singletone import figma_renderer
+from server.utils.data_providers import booking_details
 
 if "--trace" in sys.argv:
     pass
@@ -51,9 +50,8 @@ from util.types import ChargePointId, EVSEId
 from zoneinfo import ZoneInfo
 
 logger = setup_logging(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
-booking_details : dict[str, BookingDetails] = dict()
 
 def gdpraccepted_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
     ui.label("Do you have a pre-booked session?")
@@ -140,7 +138,10 @@ def update_generic_fields(screen_data, state):
     date_time_now_element = figma_renderer.maybe_find_one_label_child_of(screen_data, "BOOKING_DATE_TIME")
     if date_time_now_element is None:
         date_time_now = figma_renderer.find_exactly_one(screen_data, "BOOKING_DATE_TIME")
-        date_time_now_element = date_time_now.ui_element
+        try:
+            date_time_now_element = date_time_now.ui_element
+        except AttributeError:
+            pass
 
     if date_time_now_element is not None:
         assert type(date_time_now_element) is ui.label
@@ -190,11 +191,6 @@ def test_pin(pin, context : UIManagerContext):
 
     if pin in booking_details:
         context.session_pin = pin
-        if context.tx_fsm.context.session_info is not None:
-            context.session_info = context.tx_fsm.context.session_info
-        else:
-            context.session_info = booking_details[pin]
-            context.tx_fsm.context.session_info = booking_details[pin]
         return "CORRECT"
 
     return "INCORRECT"
@@ -369,7 +365,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     session_end_time = _lookup_span_in_child_of_anchor("SESSION_END_DATE_TIME", child_index=0, span_index=1, screen_data=screen_data)
     if session_end_time is not None:
-        session_end_time.bind_content_from(fsm.context.tx_fsm.context.session_info, "departure_time",
+        session_end_time.bind_content_from(txfsm.context.session_info, "departure_time",
                                            backward=lambda x: f"<br>until {format_datetime(x)}")
 
     live_power = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_LIVE_CHARGING_POWER", index=1)
