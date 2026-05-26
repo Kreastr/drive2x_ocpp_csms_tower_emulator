@@ -246,6 +246,7 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "PORTO_APT_": "porto_apt",
            "LatinkiHQ": "d2x_ga3_demo",
            "1132523008": "d2x_ga3_demo",
+           "1132523008": "d2x_ga3_demo",
            "1132523017": "d2x_ga3_demo"
            }
 
@@ -309,6 +310,9 @@ def check_control(cp_id : ChargePointId, site_tag : str):
             if str(cp_id).startswith(prefix):
                 control_allowed = True
                 break
+    # If nothing else controls this charger than default to demo group.
+    if control_allowed == False and site_tag == "d2x_ga3_demo":
+        return True
     return control_allowed
 
 SITE_TIMEZONES = {"d2x_ga3_demo": timezone("Europe/Helsinki")}
