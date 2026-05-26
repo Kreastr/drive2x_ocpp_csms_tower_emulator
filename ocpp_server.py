@@ -27,7 +27,7 @@ import asyncio
 import datetime
 import logging
 import traceback
-from typing import Optional
+from typing import Optional, Literal
 
 import dateutil.parser
 import pytz
@@ -45,6 +45,7 @@ from server.data import BookingDetails
 from server.data.car_db import SessionInfo, CAR_DB, CarDetails
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.figma_renderer import FigmaRenderer
+from server.ui.localization import localize
 from server.ui.nicegui import gui_info
 from server.ui.renderer_singletone import figma_renderer
 from tx_manager_fsm_enums import TxManagerFSMState
@@ -389,15 +390,15 @@ async def index():
                 CPCard(charge_points[cpid]).mark(cpid)
 
 
-@ui.page("/d2x_ui/{cp_id}")
-async def d2x_ui_landing(cp_id : ChargePointId):
+@ui.page("/d2x_ui/{language}/{cp_id}")
+async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
     if str(cp_id) == "1132523027":
         cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}')
 
-    root, screen_data = figma_renderer.render_screen("standby_available")
+    root, screen_data = figma_renderer.render_screen("standby_available", language)
 
     state = {"status": "OFFLINE"}
 
@@ -415,7 +416,7 @@ async def d2x_ui_landing(cp_id : ChargePointId):
 
     def gated_navigation(cpid=cp_id):
         if cpid in charge_points:
-            ui.navigate.to(f"/d2x_ui/{cp_id}/1")
+            ui.navigate.to(f"/d2x_ui/{language}/{cp_id}/1")
 
     ui.timer(1, refresh_status)
 
@@ -502,8 +503,8 @@ def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManag
 #    figma_renderer.render_header()
 #    figma_renderer.render_screen(screen)
 
-@ui.page("/d2x_ui/{cp_id}/{evse_id}")
-async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
+@ui.page("/d2x_ui/{language}/{cp_id}/{evse_id}")
+async def d2x_ui_evse(language: Literal["EN", "PT"], cp_id : ChargePointId, evse_id : EVSEId):
     if str(cp_id) == "1132523027":
         cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
@@ -511,28 +512,28 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
     ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=get_default_redis(), session_timeout=5)
     semaphore.acquire()
-    await screen_size_refreshable_block(cp_id, evse_id, semaphore)
+    await screen_size_refreshable_block(cp_id, evse_id, semaphore, language)
     ui.timer(1, lambda : semaphore.acquire())
 
 wheight = 0
 wwidth = 0
 @ui.refreshable
-async def screen_size_refreshable_block(cp_id, evse_id, semaphore):
+async def screen_size_refreshable_block(cp_id, evse_id, semaphore, language):
 
     if wheight > 700 and wwidth > 380:
         with ui.card(align_items="center").classes('fixed-center ').style(
                 "min-width: 20rem; text-align: justify;").bind_visibility_from(semaphore, "acquired"):
-            await main_screen_block(cp_id, evse_id)
+            await main_screen_block(cp_id, evse_id, language)
         with ui.card().classes('fixed-center').bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-            await pend_semaphore_screen_block(semaphore, cp_id)
+            await pend_semaphore_screen_block(semaphore, cp_id, language)
     else:
         with ui.row().classes("justify-center full-width"):
             with ui.column(align_items="center").style(
                     "text-align: justify; background: white;").classes("p-5").bind_visibility_from(semaphore, "acquired"):
-                await main_screen_block(cp_id, evse_id)
+                await main_screen_block(cp_id, evse_id, language)
             with ui.column(align_items="center").style(
                     "text-align: justify; background: white;").classes("p-5").bind_visibility_from(semaphore, "acquired", backward=lambda x: not x):
-                await pend_semaphore_screen_block(semaphore, cp_id)
+                await pend_semaphore_screen_block(semaphore, cp_id, language)
 
 def refresh_on_resize(event):
     global wheight
@@ -543,34 +544,43 @@ def refresh_on_resize(event):
     screen_size_refreshable_block.refresh()
 
 
-async def pend_semaphore_screen_block(semaphore, cp_id):
+async def pend_semaphore_screen_block(semaphore, cp_id, language):
 
-    error_heading, error_title, error_message = error_screen(heading="Please wait",
+    error_heading, error_title, error_message = error_screen(heading=localize("Please wait", language),
                                                                    title="",
                                                                    text="",
-                                                                   cp_id=cp_id)
+                                                                   cp_id=cp_id,
+                                                             language=language)
 
     if error_message is not None:
-        error_message.text = format_queue_position(semaphore.rank)
+        error_message.text = format_queue_position(semaphore.rank, language)
         error_message.bind_text_from(semaphore,
                                      "rank",
-                                     backward=format_queue_position)
+                                     backward=lambda x, l=language: format_queue_position(x, l))
 
 
-async def main_screen_block(cp_id, evse_id):
+async def main_screen_block(cp_id, evse_id, language):
     session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
     if cp_id not in charge_points:
-        error_heading, error_title, error_message = error_screen(heading="ERROR",
-                                                                       title="Unregistered device",
-                                                                       text=f"Charge Point with ID {cp_id} is not active. Please try later.",
-                                                                       cp_id=cp_id)
+        error_heading, error_title, error_message = error_screen(heading=localize("ERROR", language),
+                                                                 title=localize("Unregistered device", language),
+                                                                 text=localize(f"Charge Point with ID", language)+
+                                                                      f" {cp_id} "+
+                                                                      localize("is not active. Please try later.", language),
+                                                                  cp_id=cp_id,
+                                                             language=language)
 
         ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
     elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
-        error_heading, error_title, error_message = error_screen(heading="ERROR",
-                                                                       title="Inactive equipment",
-                                                                       text=f"EV charging equipment with ID {evse_id} is not active on device {cp_id}. Please try later.",
-                                                                       cp_id=cp_id)
+        error_heading, error_title, error_message = error_screen(heading=localize("ERROR", language),
+                                                                       title=localize("Inactive equipment", language),
+                                                                       text=localize(f"EV charging equipment with ID",language) +
+                                                                            f" {evse_id} "+
+                                                                            localize(f"is not active on device", language) +
+                                                                            f" {cp_id}"+
+                                                                            localize(f". Please try later.", language),
+                                                                       cp_id=cp_id,
+                                                             language=language)
 
         ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
 
@@ -600,10 +610,10 @@ async def styling():
     ui.query("body").style("background-color: #d4fade;")
 
 
-def format_queue_position(rank):
-    return (f"This resource is busy. "
-            f"You are in the queue to access the resource. "
-            f"Your place in the queue is {rank+1}")
+def format_queue_position(rank, language):
+    return (localize(f"This resource is busy.", language) + " " +
+            localize(f"You are in the queue to access the resource.", language) + " " +
+            localize(f"Your place in the queue is", language) + f" {rank+1}.")
 
 if __name__ in {"__main__", "__mp_main__"}:
     args = get_app_args()

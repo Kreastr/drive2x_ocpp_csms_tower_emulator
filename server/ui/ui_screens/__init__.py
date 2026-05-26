@@ -26,13 +26,14 @@ import traceback
 from datetime import datetime as dt
 from datetime import timedelta
 import datetime
-from typing import Optional
+from typing import Optional, Literal
 
 from beartype import beartype
 from nicegui import ui
 import sys
 
 from server.data import BookingDetails, UIManagerContext
+from server.ui.localization import localize
 from server.ui.models.figma_document_model import FigmaNode
 from server.ui.renderer_singletone import figma_renderer
 from server.utils.data_providers import booking_details
@@ -54,7 +55,7 @@ logger = setup_logging(__name__)
 logger.setLevel(logging.INFO)
 
 
-def gdpraccepted_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+def gdpraccepted_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     ui.label("Do you have a pre-booked session?")
     with ui.row():
         ui.button("Yes, I have a booking",
@@ -63,8 +64,8 @@ def gdpraccepted_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSM
                   on_click=async_l(lambda: fsm.handle(UIManagerFSMEvent.on_continue_without_booking)))
 
 
-def new_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("data_message")
+def new_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("data_message", language)
     user_agreement = figma_renderer.maybe_find_one_label_child_of(screen_data, "TEXT_AREA_LEGAL")
     if user_agreement is not None:
         user_agreement.style("overflow: scroll;")
@@ -106,8 +107,8 @@ def format_session_duration(td: timedelta) -> str:
     days, hours = divmod(total_hours, 24)
     return f"{days}d" if days > 0 else "" + f"{hours}h"
 
-def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("session_details")
+def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("session_details", language)
     map_click_action("ACTION_SELF_CONFIRM", UIManagerFSMEvent.on_confirm_session, fsm, screen_data)
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_exit, fsm, screen_data)
 
@@ -176,15 +177,15 @@ def _lookup_span_in_child_of_anchor(anchor, child_index, span_index, screen_data
 
 
 def porto_login_code_screen_correct(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType,
-                                    cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("login_code_correct")
+                                    cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("login_code_correct", language)
     map_click_action("ACTION_SELF_CONFIRM", UIManagerFSMEvent.on_confirm_session, fsm, screen_data)
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_exit, fsm, screen_data)
 
 
 def porto_login_code_screen_incorrect(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType,
-                                      cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("login_code_error")
+                                      cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("login_code_error", language)
     map_click_action("ACTION_SELF_BACK", UIManagerFSMEvent.on_back, fsm, screen_data)
 
 
@@ -210,8 +211,8 @@ def test_pin(pin, context : UIManagerContext):
 
 
 @beartype
-def porto_login_code_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("login_code")
+def porto_login_code_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("login_code", language)
     input_pad = figma_renderer.find_exactly_one(screen_data, "INPUT_KEYPAD")
     code_display_parent = figma_renderer.find_exactly_one(screen_data, "CHILD_INPUT_PARKING_CODE")
 
@@ -274,7 +275,7 @@ def map_click_action(anchor_id, event, fsm, screen_data):
         button_accept.on('click', dispatch(fsm, event))
 
 
-def edit_booking_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+def edit_booking_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     ui.label("Please enter all of the following details related to your charging session").classes("w-60")
     with ui.column():
         moment = datetime.now()
@@ -319,7 +320,7 @@ def edit_booking_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSM
             "w-60")
 
 
-def session_confirmed_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+def session_confirmed_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     ui.label("Here are your session details").classes("w-60")
     with ui.column():
         ui.select(["D2X Cars"], value=fsm.context.session_info["car_make"], label="Car make").classes("w-60").disable()
@@ -334,14 +335,14 @@ def session_confirmed_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManag
         ui.button("START SESSION", on_click=dispatch(fsm, UIManagerFSMEvent.on_start_session)).classes("w-60")
 
 
-def car_not_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("ready_mode_booked")
+def car_not_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("ready_mode_booked", language)
     update_generic_fields(screen_data, state=dict())
 
 
 
-def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("ready_mode_booked")
+def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("ready_mode_booked", language)
     update_generic_fields(screen_data, state=dict())
 
     input_pad = figma_renderer.find_exactly_one(screen_data, "INFO_CHARGING_STATUS")
@@ -355,7 +356,7 @@ def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFS
     #ui.button("AUTHORISE CHARGING/DISCHARGING", on_click=dispatch(fsm, UIManagerFSMEvent.on_start)).classes("w-60")
 
 
-def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
+def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
 
     txfsm = cp.fsm.context.transaction_fsms[evse_id]
     evse = txfsm.context.evse
@@ -371,7 +372,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     ui.timer(1, on_countdown)
 
-    root, screen_data = figma_renderer.render_screen("charging_mode")
+    root, screen_data = figma_renderer.render_screen("charging_mode", language)
     update_generic_fields(screen_data, state=state)
 
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_early_stop, fsm, screen_data)
@@ -440,8 +441,8 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
 
 
-def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    root, screen_data = figma_renderer.render_screen("final_thanks")
+def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    root, screen_data = figma_renderer.render_screen("final_thanks", language)
     state = {"countdown": 60}
     update_generic_fields(screen_data, state=state)
 
@@ -458,17 +459,17 @@ def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIMan
     if timeout_notice is not None:
         timeout_notice.bind_text_from(state, "countdown", backward=lambda x: f"This window will automatically close in {x} second{'s' if x > 1 else ''}...")
 
-def car_connected_too_soon_error_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler):
-    error_screen("ERROR",
-                 "You have connected your EV too early.",
-                 "Please disconnect the car and only reconnect it once instructed by the charger.",
+def car_connected_too_soon_error_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
+    error_screen(localize("ERROR", language),
+                 localize("You have connected your EV too early.", language),
+                 localize("Please disconnect the car and only reconnect it once instructed by the charger.", language),
                  cp_id,
                  hide_button=True)
 
 
 
-def error_screen(heading, title, text, cp_id : ChargePointId, hide_button=False):
-    root, screen_data = figma_renderer.render_screen("error_page")
+def error_screen(heading, title, text, cp_id : ChargePointId, hide_button=False, language="EN"):
+    root, screen_data = figma_renderer.render_screen("error_page", language)
 
     error_heading = figma_renderer.maybe_find_one_label_child_of(screen_data, "ERROR")
     if error_heading is not None:

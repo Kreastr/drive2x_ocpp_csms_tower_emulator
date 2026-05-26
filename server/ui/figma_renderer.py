@@ -1,7 +1,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 
 import yaml
 from anytree import findall
@@ -9,6 +9,7 @@ from nicegui import ui, context
 from slugify import slugify
 
 from util import setup_logging
+from .localization import localize
 from .models.figma_document_model import FigmaNode, NodeType, Color, LayoutMode, Constraint, StyleInfo, TextCase
 
 
@@ -138,9 +139,9 @@ class FigmaRenderer():
 
 
     @staticmethod
-    def add_newline_breaks(text):
+    def add_newline_breaks(text, language):
         for separator in ["\n", "\u2028"]:
-            text = "<br/>".join(text.split(separator))
+            text = "<br/>".join(map(lambda x: localize(x, language), text.split(separator)))
         return text
 
     @staticmethod
@@ -163,7 +164,7 @@ class FigmaRenderer():
         return k2, v2
 
     @staticmethod
-    def format_spans(raw_text, styleOverrideTable, parent_node : FigmaNode):
+    def format_spans(raw_text, styleOverrideTable, parent_node : FigmaNode, language):
         for d in raw_text:
             style=""
             style_data = {}
@@ -173,14 +174,15 @@ class FigmaRenderer():
                 for k, v in map(FigmaRenderer.font_style_map, style_data.items()):
                     style += f"{k}: {v}; "
 
-            logger.debug(f"span {FigmaRenderer.add_newline_breaks(d['text']), style}")
-            element = ui.html(FigmaRenderer.add_newline_breaks(d['text']), tag="span").style(style) # , sanitize=False
+            logger.debug(f"span {FigmaRenderer.add_newline_breaks(d['text'], language), style}")
+            element = ui.html(FigmaRenderer.add_newline_breaks(d['text'], language), tag="span").style(style) # , sanitize=False
             parent_node.all_spans.append(element)
             
 
 
     @staticmethod
     def render_node(current_node : FigmaNode,
+                    language : Literal["EN", "PT"],
                     skip_footers=False,
                     parent_node=None,
                     parent_container=False):
@@ -203,11 +205,11 @@ class FigmaRenderer():
             if current_node.characterStyleOverrides is not None:
                 raw_text = FigmaRenderer.split_spans(raw_text[0]["text"], current_node.characterStyleOverrides)
             if len(raw_text) == 1:
-                current_element = ui.label(text=raw_text[0]["text"])
+                current_element = ui.label(text=localize(raw_text[0]["text"], language))
             else:
                 current_element = ui.element()
                 with current_element:
-                        FigmaRenderer.format_spans(raw_text, current_node.styleOverrideTable, current_node)
+                        FigmaRenderer.format_spans(raw_text, current_node.styleOverrideTable, current_node, language)
             logger.debug(f"TEXT {current_node.name=} {current_node=}")
         elif current_node.type in [NodeType.Frame, NodeType.Group, NodeType.Instance]:
 
@@ -234,6 +236,7 @@ class FigmaRenderer():
                 with current_element:
                     for c in current_node.children:
                         FigmaRenderer.render_node(c,
+                                                  language,
                                                   skip_footers=skip_footers,
                                                   parent_node=current_node,
                                                   parent_container=me_containter)
@@ -389,7 +392,7 @@ class FigmaRenderer():
         return findall(screen_data, filter_=lambda x: x.name.startswith(name))
 
 
-    def render_screen(self, page_name: str):
+    def render_screen(self, page_name: str, language : Literal["EN", "PT"]):
         if page_name not in self.all_screens:
             return
         screen_data = copy.deepcopy(self.all_screens[page_name])
@@ -406,7 +409,7 @@ class FigmaRenderer():
         footer.children[0].layoutMode = None
         footer.children[0].children[0].layoutMode = None
         footer.children[1].layoutMode = None
-        root = FigmaRenderer.render_node(screen_data)
+        root = FigmaRenderer.render_node(screen_data, language)
         root.style("min-height: 1936px;"
                    "border: 3px solid;"
                    "overflow: hidden; "
