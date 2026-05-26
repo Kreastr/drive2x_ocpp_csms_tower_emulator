@@ -22,6 +22,7 @@ only and do not necessarily reflect those of the European Union, CINEA or UKRI. 
 Union nor the granting authority can be held responsible for them.
 """
 import logging
+import traceback
 from datetime import datetime as dt
 from datetime import timedelta
 import datetime
@@ -135,19 +136,21 @@ def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManager
 
 
 def update_generic_fields(screen_data, state):
-    date_time_now_element = figma_renderer.maybe_find_one_label_child_of(screen_data, "BOOKING_DATE_TIME")
-    if date_time_now_element is None:
-        date_time_now = figma_renderer.find_exactly_one(screen_data, "BOOKING_DATE_TIME")
-        try:
-            date_time_now_element = date_time_now.ui_element
-        except AttributeError:
-            pass
-
-    if date_time_now_element is not None:
-        assert type(date_time_now_element) is ui.label
-        date_time_now_element.bind_text_from(state, "current_time", backward=format_datetime)
-        ui.timer(5, lambda: state.update(dict(current_time=dt.now(tz=datetime.UTC))))
-
+    try:
+        date_time_now_element = figma_renderer.maybe_find_one_label_child_of(screen_data, "BOOKING_DATE_TIME")
+        if date_time_now_element is None:
+            date_time_now = figma_renderer.find_exactly_one(screen_data, "BOOKING_DATE_TIME")
+            try:
+                date_time_now_element = date_time_now.ui_element
+            except AttributeError:
+                pass
+    
+        if date_time_now_element is not None:
+            assert type(date_time_now_element) is ui.label
+            date_time_now_element.bind_text_from(state, "current_time", backward=format_datetime)
+            ui.timer(5, lambda: state.update(dict(current_time=dt.now(tz=datetime.UTC))))
+    except:
+        logger.warning(f"update_generic_fields exception {traceback.format_exc()}")
 
 
 def _lookup_span_in_child_of_anchor(anchor, child_index, span_index, screen_data) -> Optional[ui.html]:
@@ -159,9 +162,16 @@ def _lookup_span_in_child_of_anchor(anchor, child_index, span_index, screen_data
             logger.debug(f"_lookup_span_in_child_of_anchor {groups=}")
             if len(groups.get_spans) > span_index:
                 node = groups.get_spans[span_index]
-                logger.debug(f"_lookup_span_in_child_of_anchor {node=}")
+                logger.warning(f"_lookup_span_in_child_of_anchor {node=}")
                 assert type(node) == ui.html
                 return node
+            else:
+                logger.warning(f"_lookup_span_in_child_of_anchor {groups=}")
+        else:
+            logger.warning(len(anchor_element.children) < child_index)
+    else:
+        logger.warning(f"_lookup_span_in_child_of_anchor {anchor_element=}")
+        
     return None
 
 
@@ -182,12 +192,15 @@ def test_pin(pin, context : UIManagerContext):
     if "X" in pin:
         return "INCOMPLETE"
     if pin == "00000000":
-        arrival = dt.now(tz=datetime.UTC).replace(minute=0,second=0,microsecond=0)
-        departure = arrival + timedelta(days=30)
-        booking_details[pin] = BookingDetails(arrival_time=arrival,
-                                              departure_time=departure,
-                                              original_departure_time=departure,
-                                              session_duration=departure-arrival)
+        pin = "master-"+str(context.charge_point.get_charge_point_id())
+
+        if pin not in booking_details:
+            arrival = dt.now(tz=datetime.UTC).replace(minute=0,second=0,microsecond=0)
+            departure = arrival + timedelta(days=30)
+            booking_details[pin] = BookingDetails(arrival_time=arrival,
+                                                  departure_time=departure,
+                                                  original_departure_time=departure,
+                                                  session_duration=departure-arrival)
 
     if pin in booking_details:
         context.session_pin = pin
@@ -363,10 +376,19 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_early_stop, fsm, screen_data)
 
-    session_end_time = _lookup_span_in_child_of_anchor("SESSION_END_DATE_TIME", child_index=0, span_index=1, screen_data=screen_data)
+    session_end_time = _lookup_span_in_child_of_anchor("SESSION_END_DATE_TIME", 
+                                                       child_index=0, 
+                                                       span_index=1, 
+                                                       screen_data=screen_data)
     if session_end_time is not None:
-        session_end_time.bind_content_from(txfsm.context.session_info, "departure_time",
-                                           backward=lambda x: f"<br>until {format_datetime(x)}")
+        logger.debug(f"Normal session {txfsm=} {txfsm.context=} {txfsm.context.session_info=}")
+        logger.debug(f"{session_end_time=}")
+        assert txfsm.context.session_info is not None
+        session_end_time.content = f"<br>until {format_datetime(txfsm.context.session_info.departure_time)}"
+        #session_end_time.bind_content_from(txfsm.context.session_info, "departure_time",
+        #                                   backward=lambda x: f"<br>until {format_datetime(x)}")
+    else:
+        logger.debug(f"session_end_time is None")
 
     live_power = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_LIVE_CHARGING_POWER", index=1)
 

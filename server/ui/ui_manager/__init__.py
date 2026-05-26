@@ -84,7 +84,8 @@ CarConnected --> NormalSession : if session is ready
 NormalSession --> EVSESelectPage : on exit
 NormalSession --> SessionEndSummary : if car not present
 NormalSession --> SessionEndSummary : if session is not ready
-NormalSession --> SessionEndSummary : on early stop
+NormalSession --> StoppingSession : on early stop
+StoppingSession --> SessionEndSummary
 NormalSession --> SessionEndSummary : if session fault
 SessionEndSummary --> EVSESelectPage : on exit
 
@@ -121,11 +122,9 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
                                      self.if_car_present_but_session_is_not_running)
 
         #self.on(UIManagerFSMState.session_first_start.on_enter, self.set_new_pin)
-        #self.on(UIManagerFSMState.session_first_start.on_enter, self.save_booking)
         self.on(UIManagerFSMState.car_connected.on_enter, self.trigger_remote_start)
-        #self.on(UIManagerFSMState.normal_session.on_exit, self.clear_pin)
+        self.on(UIManagerFSMState.stopping_session.on_enter, self.clear_session_pin_and_master_booking)
         self.on(UIManagerFSMState.session_end_summary.on_enter, self.trigger_remote_stop)
-
         self.tx_fsm.on(TxFSMState.transaction.on_enter, self.on_start_transaction)
 
         self.on(UIManagerFSMState.booking_pincorrect.on_enter, self.load_booking_details)
@@ -156,9 +155,17 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
 
     @snoop
     def get_session_remaining_duration(self):
-        ts =  dtparse(self.context.session_info["departure_date"] + "T" + self.context.session_info["departure_time"])
+        ctxt : UIManagerContext = self.context
+        ts =  ctxt.session_info.departure_time
         return int(math.ceil((ts-datetime.now()).total_seconds()))
 
+    async def clear_session_pin_and_master_booking(self, *vargs, **kwargs):
+        ctxt : UIManagerContext = self.context
+        ctxt.session_info = None
+        ctxt.tx_fsm.context.session_info = None
+        if ctxt.session_pin.startswith("master-"):
+            del booking_details[ctxt.session_pin]
+        ctxt.session_pin = ""
 
     async def trigger_remote_stop(self, *vargs, **kwargs):
         if TYPE_CHECKING:
@@ -182,9 +189,7 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
     async def load_booking_details(self, *vargs, **kwargs):
         context: UIManagerContext = self.context
         pin = context.session_pin
-        if context.tx_fsm.context.session_info is not None:
-            context.session_info = context.tx_fsm.context.session_info
-        else:
+        if pin in booking_details:
             context.session_info = booking_details[pin]
             context.tx_fsm.context.session_info = booking_details[pin]
 
@@ -198,10 +203,6 @@ class UIManagerFSMType(AFSM[UIManagerFSMState, UIManagerFSMCondition, UIManagerF
         ctxt.session_pins[ctxt.cp_evse_id] = ctxt.session_pin
         redis = get_default_redis()
         redis.expire(ctxt.session_pins._format_key(ctxt.cp_evse_id), self.get_session_remaining_duration())
-
-    async def save_booking(self, *vargs, **kwargs):
-        ctxt : UIManagerContext = self.context
-        self.tx_fsm.context.session_info = BookingDetails.model_validate(ctxt.session_info.model_dump())
 
     async def clear_pin(self, *vargs, **kwargs):
         ctxt : UIManagerContext = self.context

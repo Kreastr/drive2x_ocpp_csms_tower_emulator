@@ -472,6 +472,7 @@ STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.car_not_connected: car_not_connected_screen,
                     UIManagerFSMState.car_connected: car_connected_screen,
                     UIManagerFSMState.normal_session: normal_session_screen,
+                    UIManagerFSMState.stopping_session: session_end_summary_screen,
                     UIManagerFSMState.session_end_summary: session_end_summary_screen,
                     UIManagerFSMState.car_connected_too_soon: car_connected_too_soon_error_screen,
                     UIManagerFSMState.evsepage: new_session_screen

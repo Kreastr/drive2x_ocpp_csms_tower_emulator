@@ -1,3 +1,4 @@
+import copy
 import logging
 from pathlib import Path
 from typing import Optional
@@ -391,7 +392,7 @@ class FigmaRenderer():
     def render_screen(self, page_name: str):
         if page_name not in self.all_screens:
             return
-        screen_data = self.all_screens[page_name]
+        screen_data = copy.deepcopy(self.all_screens[page_name])
         ui.query('body').style(f'background-color: black; line-height: 1; ')
         context.client.content.classes('p-0').style(
             "min-height: 1936px;"

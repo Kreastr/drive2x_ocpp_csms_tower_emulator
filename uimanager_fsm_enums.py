@@ -13,6 +13,7 @@ class UIManagerFSMState(StateBase, str, Enum):
     car_not_connected='car_not_connected'
     car_connected='car_connected'
     session_end_summary='session_end_summary'
+    stopping_session='stopping_session'
     car_connected_too_soon='car_connected_too_soon'
 
 class UIManagerFSMCondition(str, Enum):
