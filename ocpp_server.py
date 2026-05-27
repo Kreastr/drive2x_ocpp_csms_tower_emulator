@@ -389,8 +389,11 @@ async def index():
             if cpid != "provisional":
                 CPCard(charge_points[cpid]).mark(cpid)
 
+@ui.page("/d2x_ui/{cp_id}")
+async def d2x_ui_evse(cp_id : ChargePointId):
+    ui.navigate.to(f"/d2x_ui/{cp_id}/EN")
 
-@ui.page("/d2x_ui/{language}/{cp_id}")
+@ui.page("/d2x_ui/{cp_id}/{language}")
 async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
     if str(cp_id) == "1132523027":
         cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
@@ -416,7 +419,7 @@ async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
 
     def gated_navigation(cpid=cp_id):
         if cpid in charge_points:
-            ui.navigate.to(f"/d2x_ui/{language}/{cp_id}/1")
+            ui.navigate.to(f"/d2x_ui/{cp_id}/1/{language}")
 
     ui.timer(1, refresh_status)
 
@@ -491,19 +494,23 @@ def set_lang(lang: str) -> None:
 
 
 @ui.refreshable
-def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler):
+def state_dependent_frame(cp_id : ChargePointId, evse_id : EVSEId, fsm : UIManagerFSMType, cp : OCPPServerHandler, language):
     #ui.label(fsm.current_state)
     #ui.label(cp_id)
     #ui.label(evse_id)
     if fsm.current_state in STATE_SCREEN_MAP:
-        STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp)
+        STATE_SCREEN_MAP[fsm.current_state](cp_id, evse_id, fsm, cp, language)
 
 #@ui.page("/d2x_ui/test/{screen}")
 #async def d2x_ui_test(screen : str):
 #    figma_renderer.render_header()
 #    figma_renderer.render_screen(screen)
 
-@ui.page("/d2x_ui/{language}/{cp_id}/{evse_id}")
+@ui.page("/d2x_ui/{cp_id}/{evse_id}")
+async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
+    ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}/EN")
+
+@ui.page("/d2x_ui/{cp_id}/{evse_id}/{language}")
 async def d2x_ui_evse(language: Literal["EN", "PT"], cp_id : ChargePointId, evse_id : EVSEId):
     if str(cp_id) == "1132523027":
         cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
@@ -570,7 +577,7 @@ async def main_screen_block(cp_id, evse_id, language):
                                                                   cp_id=cp_id,
                                                              language=language)
 
-        ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
+        ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}/{language}"), once=True)
     elif evse_id not in charge_points[cp_id].fsm.context.transaction_fsms:
         error_heading, error_title, error_message = error_screen(heading=localize("ERROR", language),
                                                                        title=localize("Inactive equipment", language),
@@ -582,7 +589,7 @@ async def main_screen_block(cp_id, evse_id, language):
                                                                        cp_id=cp_id,
                                                              language=language)
 
-        ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}"), once=True)
+        ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}/{language}"), once=True)
 
     else:
         fsm = UIManagerFSMType(uml=ui_manager_uml,
@@ -597,7 +604,7 @@ async def main_screen_block(cp_id, evse_id, language):
         fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
         fsm.load_from_redis()
         cp = charge_points[cp_id]
-        state_dependent_frame(cp_id, evse_id, fsm, cp)
+        state_dependent_frame(cp_id, evse_id, fsm, cp, language)
         fsm.on("state_changed", lambda *vargs: state_dependent_frame.refresh())
         ui.timer(1, fsm.loop)
         #ui.separator()

@@ -490,6 +490,6 @@ def error_screen(heading, title, text, cp_id : ChargePointId, hide_button=False,
         else:
             button_exit : ui.element = button_exit.ui_element
             button_exit.classes('cursor-pointer')
-            button_exit.on('click', lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
+            button_exit.on('click', lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{language}"))
 
     return error_heading, error_title, error_message
