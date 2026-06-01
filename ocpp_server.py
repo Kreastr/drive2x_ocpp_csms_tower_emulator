@@ -395,8 +395,8 @@ async def d2x_ui_evse(cp_id : ChargePointId):
 
 @ui.page("/d2x_ui/{cp_id}/{language}")
 async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
-    if str(cp_id) == "1132523027":
-        cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
+    #if str(cp_id) == "1132523027":
+    #    cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'Drive2X UI - {cp_id}')
