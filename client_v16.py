@@ -28,8 +28,37 @@ Union nor the granting authority can be held responsible for them.
 >>> jdata
 {'connectorId': 1, 'transactionId': 282683992, 'meterValue': [{'timestamp': '2025-11-26T13:20:51.934Z', 'sampledValue': [{'unit': 'Wh', 'value': 0, 'location': 'Outlet', 'measurand': 'Energy.Active.Import.Register'}, {'unit': 'W', 'value': 180000, 'location': 'Outlet', 'measurand': 'Power.Active.Import'}, {'unit': 'W', 'value': 180000, 'location': 'Outlet', 'measurand': 'Power.Offered'}, {'unit': 'Percent', 'value': 19.5444, 'location': 'EV', 'measurand': 'SoC'}]}]}
 >>> rq = MeterValuesRequest.model_validate(jdata)
->>> convert_meter_values_to_201(rq)
-[MeterValueType(timestamp='2025-11-26 13:20:51.934000+00:00', sampled_value=[SampledValueType(value=0.0, context=None, measurand=<MeasurandEnumType.energy_active_import_register: 'Energy.Active.Import.Register'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<UnitOfMeasureType.wh: 'Wh'>), SampledValueType(value=180000.0, context=None, measurand=<MeasurandEnumType.power_active_import: 'Power.Active.Import'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<UnitOfMeasureType.w: 'W'>), SampledValueType(value=180000.0, context=None, measurand=<MeasurandEnumType.power_offered: 'Power.Offered'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<UnitOfMeasureType.w: 'W'>), SampledValueType(value=19.5444, context=None, measurand=<MeasurandEnumType.soc: 'SoC'>, phase=None, location=None, signed_meter_value=None, unit_of_measure=<UnitOfMeasureType.percent: 'Percent'>)])]
+>>> print(",\\n".join(str(convert_meter_values_to_201(rq)).split(",")))
+[MeterValueType(timestamp='2025-11-26T13:20:51.934000+00:00',
+ sampled_value=[SampledValueType(value=0.0,
+ context=None,
+ measurand=<MeasurandEnumType.energy_active_import_register: 'Energy.Active.Import.Register'>,
+ phase=None,
+ location=None,
+ signed_meter_value=None,
+ unit_of_measure=<StandardizedUnitsOfMeasureType.wh: 'Wh'>),
+ SampledValueType(value=180000.0,
+ context=None,
+ measurand=<MeasurandEnumType.power_active_import: 'Power.Active.Import'>,
+ phase=None,
+ location=None,
+ signed_meter_value=None,
+ unit_of_measure=<ChargingRateUnitEnumType.watts: 'W'>),
+ SampledValueType(value=180000.0,
+ context=None,
+ measurand=<MeasurandEnumType.power_offered: 'Power.Offered'>,
+ phase=None,
+ location=None,
+ signed_meter_value=None,
+ unit_of_measure=<ChargingRateUnitEnumType.watts: 'W'>),
+ SampledValueType(value=19.5444,
+ context=None,
+ measurand=<MeasurandEnumType.soc: 'SoC'>,
+ phase=None,
+ location=None,
+ signed_meter_value=None,
+ unit_of_measure=<StandardizedUnitsOfMeasureType.percent: 'Percent'>)])]
+
 """
 import datetime
 from abc import ABC, abstractmethod
@@ -106,9 +135,11 @@ MEASURAND_MAPPING = {Measurand.soc : enums201.MeasurandEnumType.soc,
                      Measurand.power_offered : enums201.MeasurandEnumType.power_offered}
 
 
-#UNIT_MAP = {UnitOfMeasure.w: UnitOfMeasureType(,
-#            UnitOfMeasure.wh: enums201.UnitOfMeasureType.wh,
-#            UnitOfMeasure.percent: enums201.UnitOfMeasureType.percent}
+UNIT_MAP = {UnitOfMeasure.w: enums201.ChargingRateUnitEnumType.watts,
+            UnitOfMeasure.a: enums201.ChargingRateUnitEnumType.amps,
+            UnitOfMeasure.v: enums201.StandardizedUnitsOfMeasureType.v,
+            UnitOfMeasure.wh: enums201.StandardizedUnitsOfMeasureType.wh,
+            UnitOfMeasure.percent: enums201.StandardizedUnitsOfMeasureType.percent}
 
 STATUS_MAP = {ChargePointStatus.preparing: ConnectorStatusEnumType.available,
               ChargePointStatus.available: ConnectorStatusEnumType.available,
@@ -151,11 +182,11 @@ def convert_meter_values_to_201(rq):
                 else:
                     logger.warning(f"Failed to convert measurand info {sv.measurand}")
             unit = None
-            #if sv.unit is not None:
-            #    if sv.unit in UNIT_MAP:
-            #        unit = UNIT_MAP[sv.unit]
-            #    else:
-            #        logger.warning(f"Failed to convert measurand unit {sv.unit}")
+            if sv.unit is not None:
+                if sv.unit in UNIT_MAP:
+                    unit = UNIT_MAP[sv.unit]
+                else:
+                    logger.warning(f"Failed to convert measurand unit {sv.unit}")
             v201_sampled_values.append(SampledValueType(fv,
                                                         measurand=measurand,
                                                         unit_of_measure=unit))

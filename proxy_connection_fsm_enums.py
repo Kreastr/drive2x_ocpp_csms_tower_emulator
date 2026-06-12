@@ -17,7 +17,6 @@ class ProxyConnectionFSMCondition(str, Enum):
 
 
 class ProxyConnectionFSMEvent(str, Enum):
-    on_state_changed = 'on_state_changed'
     on_client_boot_notification_forwarded='on_client_boot_notification_forwarded'
     on_client_disconnect='on_client_disconnect'
     on_server_disconnect='on_server_disconnect'
