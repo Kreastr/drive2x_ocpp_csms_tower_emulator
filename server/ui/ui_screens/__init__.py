@@ -278,7 +278,7 @@ def map_click_action(anchor_id, event, fsm, screen_data):
 def edit_booking_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     ui.label("Please enter all of the following details related to your charging session").classes("w-60")
     with ui.column():
-        moment = datetime.now()
+        moment = datetime.datetime.now()
         fsm.context.session_info.update({"car_make": "D2X Cars",
                                          "car_model": "D2X Virtual EV (2025-)",
                                          "departure_date": moment.isoformat()[:10],

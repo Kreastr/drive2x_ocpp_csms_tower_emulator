@@ -83,6 +83,12 @@ def clamp_setpoint(evse: EvseStatus):
 @beartype
 class OCPPServerHandler(CallableInterface, ChargePoint):
 
+    def is_connected_to_ocpp_upstream(self) -> bool:
+        raise NotImplemented("OCPPServerHandler does not yet support upstream/downstream logic")
+
+    def is_connected_to_ocpp_downstream(self) -> bool:
+        raise NotImplemented("OCPPServerHandler does not yet support upstream/downstream logic")
+
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
         self.events = []
@@ -104,7 +110,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.fsm.on(ChargePointFSMState.force_booted.on_enter, self.try_cached_status_notifications)
 
     @log_async_call(logger.warning)
-    async def call_payload(
+    async def call_downstream_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
         return await self.call(payload, suppress, unique_id, skip_schema_validation)
@@ -151,7 +157,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     async def request_serial_bg(self, **kwargs):
         await asyncio.sleep(3)  # toDo fix with wait for connection
         try:
-            result: call_result.GetVariables | None = await self.call_payload(
+            result: call_result.GetVariables | None = await self.call_downstream_payload(
                 call.GetVariables([GetVariableDataType(component=ComponentType(name="ChargingStation"),
                                                        variable=VariableType(name="SerialNumber"))]))
         except TimeoutError:
@@ -216,7 +222,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     @on(Action.notify_event)
     async def on_notify_event(self, **data):
-        self.log_event(("notify_event", (data)))
+        self.log_event(("notify_event", data))
         return call_result.NotifyEvent()
 
     @on(Action.boot_notification)
@@ -267,7 +273,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     async def on_status_notification(self, **status_data):
         session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         from server.ui import CPCard
-        self.log_event(("status_notification", (status_data)))
+        self.log_event(("status_notification", status_data))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {status_data=}")
         conn_status = EvseStatus(**status_data)
 
@@ -332,7 +338,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     @on(Action.heartbeat)
     async def on_heartbeat(self, **data):
-        self.log_event(("heartbeat", (data)))
+        self.log_event(("heartbeat", data))
         logger.warning(f"id={self.fsm.context.id} on_heartbeat {data=}")
         await self.set_online()
         return call_result.Heartbeat(
@@ -366,9 +372,10 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                                     evse.last_reported_power = sv["value"]
                                 else:
                                     logger.warning(f"Unexpected unit of Power.Active.Import measurand {power_unit=}")
-                                    evse.last_reported_power = None
+                                    evse.last_reported_power = 0
                             else:
-                                logger.warning(f"No unit in meter value {sv=}")
+                                logger.warning(f"No unit in meter value {sv=}. Assumed kW")
+                                evse.last_reported_power = sv["value"]/1000.0
                     logger.error(f"post meter values {evse=} {sv=}")
         except:
             logger.error(f"{traceback.format_exc()=}")
@@ -378,13 +385,13 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     @on(Action.authorize)
     async def on_authorize(self, **data):
-        self.log_event(("authorize", (data)))
+        self.log_event(("authorize", data))
         logger.warning(f"id={self.fsm.context.id} on_authorize {data=}")
         return call_result.Authorize(id_token_info=IdTokenInfoType(status=AuthorizationStatusEnumType.accepted))
 
     @on(Action.transaction_event)
     async def on_transaction_event(self, **data):
-        self.log_event(("transaction_event", (data)))
+        self.log_event(("transaction_event", data))
         logger.warning(f"id={self.fsm.context.id} on_transaction_event {data=}")
 
         if any_of(lambda: "event_type" not in data,
@@ -448,7 +455,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     @on(Action.notify_report)
     async def on_notify_report(self, **report_data):
-        self.log_event(("notify_report", (report_data)))
+        self.log_event(("notify_report", report_data))
         logger.warning(f"id={self.fsm.context.id} on_notify_report {report_data=}")
         try:
             for record in report_data["report_data"]:
@@ -463,7 +470,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.events.append(event_data)
 
     async def request_full_report(self, *vargs):
-        result = await self.call_payload(
+        result = await self.call_downstream_payload(
             call.GetBaseReport(request_id=time_based_id(),
                                report_base=ReportBaseEnumType.full_inventory))
         logging.warning(f"request_full_report {result=}")
@@ -474,7 +481,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             del boot_notification_cache[self.fsm.context.id]
         if self.fsm.context.id in status_notification_cache:
             del status_notification_cache[self.fsm.context.id]
-        response : call_result.Reset | None = await self.call_payload(call.Reset(type=ResetEnumType.immediate))
+        response : call_result.Reset | None = await self.call_downstream_payload(call.Reset(type=ResetEnumType.immediate))
         if response is None:
             await self.fsm.handle(ChargePointFSMEvent.on_reset_rejected)
             return
@@ -494,8 +501,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         await self.fsm.context.transaction_fsms[evse_id].handle(TxManagerFSMEvent.on_clear_fault)
 
     async def do_set_charging_profile(self, evse_id: EVSEId, charging_profile : ChargingProfileType) -> bool:
-        result : call_result.SetChargingProfile = await self.call_payload(call.SetChargingProfile(evse_id=evse_id,
-                                                                     charging_profile=charging_profile))
+        result : call_result.SetChargingProfile = await self.call_downstream_payload(call.SetChargingProfile(evse_id=evse_id,
+                                                                                                             charging_profile=charging_profile))
         return result.status == ChargingProfileStatusEnumType.accepted
 
     async def do_remote_stop(self, evse_id : EVSEId):

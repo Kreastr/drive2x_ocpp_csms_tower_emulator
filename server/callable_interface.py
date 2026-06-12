@@ -25,15 +25,35 @@ Union nor the granting authority can be held responsible for them.
 
 from abc import abstractmethod, ABC
 
+class SupportsBootNotificationForwarding(ABC):
+
+    @abstractmethod
+    async def try_forward_data_to_upstream(self):
+        pass
+
+class SupportsUpstreamReconnect(ABC):
+
+    @abstractmethod
+    async def try_connect_to_upstream(self):
+        pass
 
 class CallableInterface(ABC):
     
     @abstractmethod
-    async def call_payload(
+    async def call_downstream_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
         pass
 
     @abstractmethod
     def get_charge_point_id(self) -> str:
+        pass
+
+    @abstractmethod
+    def is_connected_to_ocpp_upstream(self) -> bool:
+        pass
+
+
+    @abstractmethod
+    def is_connected_to_ocpp_downstream(self) -> bool:
         pass

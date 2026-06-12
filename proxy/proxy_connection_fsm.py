@@ -21,6 +21,7 @@ Funded by the European Union and UKRI. Views and opinions expressed are however 
 only and do not necessarily reflect those of the European Union, CINEA or UKRI. Neither the European
 Union nor the granting authority can be held responsible for them.
 """
+import datetime
 
 from beartype import beartype
 
@@ -30,6 +31,7 @@ from proxy_connection_fsm_enums import ProxyConnectionFSMEvent, ProxyConnectionF
 from .proxy_connection_context import ProxyConnectionContext
 from .proxy_connection_fsm_type import ProxyConnectionFSMType, proxy_connection_uml, ProxyConnectionFSMState
 
+HEARTBEAT_TIMEOUT = 120
 
 class ProxyConnectionFSM(ProxyConnectionFSMType):
     
@@ -40,16 +42,33 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
                          se_factory=ProxyConnectionFSMState,
                          context=context,
                          **kwargs)
-        
-        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_new_state_timeout, callback=lambda *vargs, **kwargs: False)
-        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_heartbeat_timeout, callback=lambda *vargs, **kwargs: False)
-        self.on(ProxyConnectionFSMState.new.on_enter, self.start_new_timeout_timer)
+
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_heartbeat_timeout, callback=self.if_heartbeat_timeout)
+        self.on(ProxyConnectionFSMState.connected.on_enter, self.start_new_heartbeat_timer)
+        self.on(ProxyConnectionFSMState.connected.on_enter, self.handle_delayed_boot_notifications)
+        self.on(ProxyConnectionFSMState.autonomous_loop.on_enter, self.start_new_heartbeat_timer)
+        self.on(ProxyConnectionFSMState.autonomous_loop.on_loop, self.try_connect_to_upstream)
         
 
-    @staticmethod
-    def if_charge_setpoint(context : ProxyConnectionContext, other):
-        return context.evse.setpoint > 0
-    
     async def start_new_timeout_timer(self):
-        self.context 
+        ctxt : ProxyConnectionContext = self.context
+        ctxt.timeout_timer_start = datetime.datetime.now()
+
+    async def handle_delayed_boot_notifications(self):
+        ctxt : ProxyConnectionContext = self.context
+        ctxt.charge_point_interface.try_forward_data_to_upstream()
+        
+    async def try_connect_to_upstream(self):
+        ctxt : ProxyConnectionContext = self.context
+        ctxt.charge_point_interface.try_connect_to_upstream()
+        
+    async def start_new_heartbeat_timer(self):
+        ctxt : ProxyConnectionContext = self.context
+        ctxt.timeout_timer_start = datetime.datetime.now()
+
+    async def if_heartbeat_timeout(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        if (datetime.datetime.now() - ctxt.timeout_timer_start).total_seconds() > HEARTBEAT_TIMEOUT:
+            return True
+        return False
         

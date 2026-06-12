@@ -3,24 +3,20 @@ from afsm.state_base import StateBase
 
 class ProxyConnectionFSMState(StateBase, str, Enum):
     new='new'
-    connected='connected'
-    timed_out='timed_out'
-    serial_polled='serial_polled'
+    autonomous_loop='autonomous_loop'
     server_disconnected='server_disconnected'
+    connected='connected'
     client_disconnected='client_disconnected'
     shutting_down='shutting_down'
     finalizing='finalizing'
 
 class ProxyConnectionFSMCondition(str, Enum):
-    if_new_state_timeout='if_new_state_timeout'
     if_heartbeat_timeout='if_heartbeat_timeout'
+    if_client_disconnected='if_client_disconnected'
+    if_server_disconnected='if_server_disconnected'
 
 
 class ProxyConnectionFSMEvent(str, Enum):
-    on_client_boot_notification_forwarded='on_client_boot_notification_forwarded'
-    on_client_disconnect='on_client_disconnect'
-    on_server_disconnect='on_server_disconnect'
-    on_termination_request='on_termination_request'
     on_heartbeat='on_heartbeat'
-    on_serial_response_validated='on_serial_response_validated'
-    on_serial_validation_failed='on_serial_validation_failed'
+    on_server_connected='on_server_connected'
+    on_termination_request='on_termination_request'

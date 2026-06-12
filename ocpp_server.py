@@ -29,7 +29,6 @@ import logging
 import traceback
 from typing import Optional, Literal
 
-import dateutil.parser
 import pytz
 import websockets
 from ocpp.v201 import call
@@ -40,9 +39,7 @@ from ocpp.v201.datatypes import ComponentType, VariableType, \
 from nicegui import ui, app, background_tasks
 from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingProfileKindEnumType, ChargingRateUnitEnumType
 
-from client.data import TxFSMContext
 from server.data import BookingDetails
-from server.data.car_db import SessionInfo, CAR_DB, CarDetails
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.figma_renderer import FigmaRenderer
 from server.ui.localization import localize
@@ -76,7 +73,7 @@ from server.ui.ui_screens import new_session_screen, car_not_connected_screen, c
     session_end_summary_screen, porto_login_code_screen, \
     porto_login_code_screen_correct, porto_login_code_screen_incorrect, booking_details_screen, error_screen, \
     car_connected_too_soon_error_screen
-from uimanager_fsm_enums import UIManagerFSMState, UIManagerFSMEvent
+from uimanager_fsm_enums import UIManagerFSMState
 from util import setup_logging, get_slot_start, get_slot_duration, get_app_args
 from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
@@ -127,7 +124,7 @@ async def get_remote_ip(cp, websocket):
 
 
 async def set_measurement_variables(cp : CallableInterface):
-    result: call_result.SetVariables = await cp.call_payload(
+    result: call_result.SetVariables = await cp.call_downstream_payload(
         call.SetVariables(set_variable_data=[SetVariableDataType(
             attribute_value="Energy.Active.Import.Register,Energy.Active.Export.Register,SoC",
             component=ComponentType(name="AlignedDataCtrlr"),
@@ -173,7 +170,7 @@ async def events(cp_id : ChargePointId, component: str, variable: str, value: st
 
     cp : OCPPServerHandler = charge_points[cp_id]
 
-    result: call_result.SetVariables = await cp.call_payload(
+    result: call_result.SetVariables = await cp.call_downstream_payload(
         call.SetVariables(set_variable_data=[SetVariableDataType(
             attribute_value=value,
             component=ComponentType(name=component),
@@ -255,9 +252,9 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse | GenericErrorResponse:
     if get_slot_start(setpoints.expected_slot_start_time) != setpoints.expected_slot_start_time:
         return GenericErrorResponse(error_message="Expected slot start time is not aligned.")
-    if setpoints.expected_slot_start_time < datetime.datetime.now(datetime.timezone.utc):
+    if setpoints.expected_slot_start_time < datetime.datetime.now(datetime.UTC):
         return GenericErrorResponse(error_message="Expected slot start time has passed.")
-    if get_slot_start(datetime.datetime.now(datetime.timezone.utc), offset=1) != setpoints.expected_slot_start_time:
+    if get_slot_start(datetime.datetime.now(datetime.UTC), offset=1) != setpoints.expected_slot_start_time:
         return GenericErrorResponse(error_message="Only accepts setpoints for the next time slot.")
 
     try:
@@ -338,7 +335,7 @@ async def boot_cache():
 
 @app.get("/sca_data/evs/{tag}")
 async def sca_data_evs(tag : str) -> SCADataEVs:
-    response = SCADataEVs(soc_estimate_valid_at=datetime.datetime.now(datetime.timezone.utc))
+    response = SCADataEVs(soc_estimate_valid_at=datetime.datetime.now(datetime.UTC))
     for cp_id, cp in charge_points.items():
         control_allowed = check_control(cp_id, tag)
 

@@ -30,21 +30,19 @@ from server.data.tx_manager_context import TxManagerContext
 
 proxy_connection_uml = """@startuml
 [*] -> New
-New --> Connected : on client boot notification forwarded
-New --> TimedOut : if new state timeout
-TimedOut --> SerialPolled : on serial response validated
-TimedOut --> ServerDisconnected : on serial validation failed
-TimedOut --> Connected : on client boot notification forwarded
-SerialPolled --> Connected : on heartbeat
-SerialPolled --> ServerDisconnected : if heartbeat timeout
-Connected --> ClientDisconnected : on client disconnect
-Connected --> ServerDisconnected : on server disconnect
+New --> AutonomousLoop
+AutonomousLoop --> AutonomousLoop : on heartbeat
+AutonomousLoop --> ServerDisconnected : if heartbeat timeout
+AutonomousLoop --> Connected : on server connected
+AutonomousLoop --> ServerDisconnected : on termination request
+Connected --> ClientDisconnected : if client disconnected
+Connected --> AutonomousLoop : if server disconnected
 Connected --> ShuttingDown : on termination request
 Connected --> ShuttingDown : if heartbeat timeout
 Connected --> Connected : on heartbeat
-ShuttingDown --> ServerDisconnected : on server disconnect
-ClientDisconnected --> Finalizing : on server disconnect
-ServerDisconnected --> Finalizing : on client disconnect
+ShuttingDown --> ServerDisconnected : if server disconnected
+ClientDisconnected --> Finalizing : if server disconnected
+ServerDisconnected --> Finalizing : if client disconnected
 Finalizing --> [*]
 @enduml
 """

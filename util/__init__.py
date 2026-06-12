@@ -30,7 +30,9 @@ import logging
 from datetime import timedelta
 from argparse import ArgumentParser
 from datetime import datetime, timezone
-from beartype.typing import TypeVar, Generic, Type
+from typing import NewType, TypeVar, Type
+
+from beartype.typing import Generic
 from functools import wraps
 from logging import getLogger
 from beartype.typing import Callable, Iterator
@@ -147,9 +149,9 @@ async def broadcast_to(app, op, page, **filters):
             for old in ElementFilter(**filters):
                 if inspect.iscoroutinefunction(op):
                     await op(old)
-                else:    
+                else:
                     op(old)
-                
+
 
 
 def log_async_call(log_sink):

@@ -71,7 +71,7 @@ from logging import getLogger
 from typing import Optional
 
 import websockets
-from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
+from ocpp.v16.enums import ChargePointStatus, Reason, Measurand
 from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType, \
     IdTokenType, UnitOfMeasureType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, \
@@ -79,7 +79,7 @@ from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, Transac
 from ocpp.v201.enums import Action
 
 from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
-from ocpp_models.v16 import meter_values
+
 from ocpp_models.v16.authorize import AuthorizeRequest
 from ocpp_models.v16.boot_notification import BootNotificationRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest, MeterValue, SampledValue
@@ -95,7 +95,6 @@ from ocpp_models.v201.reset import ResetRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from ocpp_models.v201.set_variables import SetVariablesRequest
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
-from proxy_connection_fsm_enums import ProxyConnectionFSMEvent
 from util import log_req_response, with_request_model, async_camelize_kwargs
 
 logger = getLogger(__name__)
@@ -226,12 +225,12 @@ class OCPPClientV201(ChargePoint):
         if tx_id is not None:
             self.tx_seq_no += 1
             if len(rq.meterValue):
-                await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
-                                                              timestamp=rq.meterValue[0].timestamp.isoformat(),
-                                                              trigger_reason=TriggerReasonEnumType.meter_value_periodic,
-                                                              seq_no=self.tx_seq_no,
-                                                              transaction_info=TransactionType(tx_id), meter_value=v201_meter_values))
-        await self.call_payload(call.MeterValues(evse_id=rq.connectorId, meter_value=v201_meter_values))
+                await self.call_upstream_payload(call.TransactionEvent(event_type=TransactionEventEnumType.updated,
+                                                                       timestamp=rq.meterValue[0].timestamp.isoformat(),
+                                                                       trigger_reason=TriggerReasonEnumType.meter_value_periodic,
+                                                                       seq_no=self.tx_seq_no,
+                                                                       transaction_info=TransactionType(tx_id), meter_value=v201_meter_values))
+        await self.call_upstream_payload(call.MeterValues(evse_id=rq.connectorId, meter_value=v201_meter_values))
 
 
     async def status_notification_request(self, rq : StatusNotificationRequest) -> call_result.StatusNotification:
@@ -248,15 +247,15 @@ class OCPPClientV201(ChargePoint):
             fwd_status = ConnectorStatusEnumType.unavailable
         req_time = rq.timestamp
         if req_time is None:
-            req_time = datetime.datetime.now(datetime.timezone.utc)
-        return await self.call_payload(call.StatusNotification(timestamp=req_time.isoformat(),
-                                                               connector_status=fwd_status,
-                                                               evse_id=rq.connectorId,
-                                                               connector_id=1))
+            req_time = datetime.datetime.now(datetime.UTC)
+        return await self.call_upstream_payload(call.StatusNotification(timestamp=req_time.isoformat(),
+                                                                        connector_status=fwd_status,
+                                                                        evse_id=rq.connectorId,
+                                                                        connector_id=1))
 
 
     async def boot_notification_request(self, rq : BootNotificationRequest) -> call_result.BootNotification:
-        return await self.call_payload(call.BootNotification(
+        return await self.call_upstream_payload(call.BootNotification(
                 charging_station=ChargingStationType(vendor_name=rq.chargePointVendor,
                                                      model=rq.chargePointModel,
                                                      serial_number=rq.chargePointSerialNumber,
@@ -267,18 +266,18 @@ class OCPPClientV201(ChargePoint):
     async def send_transaction_event(self, rq : call.TransactionEvent):
         self.tx_seq_no += 1
         rq.seq_no = self.tx_seq_no
-        await self.call_payload(rq)
+        await self.call_upstream_payload(rq)
 
     async def start_transaction_request(self, rq : StartTransactionRequest, tx_id : str, remote_start_id : Optional[int] = None) -> call_result.TransactionEvent:
         self.tx_seq_no = 1
-        return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
-                                                             timestamp=rq.timestamp.isoformat(),
-                                                             trigger_reason=TriggerReasonEnumType.remote_start if remote_start_id is not None else TriggerReasonEnumType.authorized,
-                                                             seq_no=self.tx_seq_no,
-                                                             transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id),
-                                                             evse=EVSEType(id=rq.connectorId, connector_id=1),
-                                                             id_token=IdTokenType(id_token=rq.idTag, type=IdTokenEnumType.central if remote_start_id is not None else IdTokenEnumType.iso14443)),
-                                       )
+        return await self.call_upstream_payload(call.TransactionEvent(event_type=TransactionEventEnumType.started,
+                                                                      timestamp=rq.timestamp.isoformat(),
+                                                                      trigger_reason=TriggerReasonEnumType.remote_start if remote_start_id is not None else TriggerReasonEnumType.authorized,
+                                                                      seq_no=self.tx_seq_no,
+                                                                      transaction_info=TransactionType(tx_id, remote_start_id=remote_start_id),
+                                                                      evse=EVSEType(id=rq.connectorId, connector_id=1),
+                                                                      id_token=IdTokenType(id_token=rq.idTag, type=IdTokenEnumType.central if remote_start_id is not None else IdTokenEnumType.iso14443)),
+                                                )
 
 
     async def stop_transaction_request(self, rq : StopTransactionRequest, tx_id : str) -> call_result.TransactionEvent:
@@ -287,16 +286,16 @@ class OCPPClientV201(ChargePoint):
             reason = STOP_REASON_MAP[rq.reason]
         else:
             reason = TriggerReasonEnumType.abnormal_condition
-        return await self.call_payload(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
-                                                             timestamp=rq.timestamp.isoformat(),
-                                                             trigger_reason=reason,
-                                                             seq_no=self.tx_seq_no,
-                                                             transaction_info=TransactionType(tx_id),
-                                                             custom_data={"original_reason": str(rq.reason), "vendor_id": "OCPP v16 Proxy"}))
+        return await self.call_upstream_payload(call.TransactionEvent(event_type=TransactionEventEnumType.ended,
+                                                                      timestamp=rq.timestamp.isoformat(),
+                                                                      trigger_reason=reason,
+                                                                      seq_no=self.tx_seq_no,
+                                                                      transaction_info=TransactionType(tx_id),
+                                                                      custom_data={"original_reason": str(rq.reason), "vendor_id": "OCPP v16 Proxy"}))
 
 
     async def heartbeat_request(self) -> call_result.Heartbeat:
-        return await self.call_payload(call.Heartbeat())
+        return await self.call_upstream_payload(call.Heartbeat())
 
     @on(Action.request_start_transaction)
     @log_req_response
@@ -358,22 +357,28 @@ class OCPPClientV201(ChargePoint):
         return await self.client_interface.on_server_set_variables(request)
 
     @log_req_response
-    async def call_payload(
+    async def call_upstream_payload(
         self, payload, suppress=True, unique_id=None, skip_schema_validation=False
     ):
 
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except asyncio.TimeoutError:
+            self.client_interface.server_connection = None
             self.close_connection()
+            logger.error(f"Got asyncio.TimeoutError during request {payload=}")
         except websockets.exceptions.ConnectionClosedOK:
-            await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
+            self.client_interface.server_connection = None
+            logger.warning(f"Upstream connection closed OK during request {payload=}")
         except websockets.exceptions.ConnectionClosedError:
-            await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
+            self.client_interface.server_connection = None
+            logger.error(f"Upstream connection closed with ERROR during request {payload=}")
 
     async def close_connection(self):
+        # Inform that we disconnected.
+        self.client_interface.server_connection = None
+        #
         await self._connection.close()
-        await self.client_interface.get_state_machine().handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
     async def on_authorize_request(self, request : AuthorizeRequest) -> call_result.Authorize:
-        return await self.call_payload(call.Authorize(id_token=IdTokenType(id_token=request.idTag, type=IdTokenEnumType.iso14443)))
+        return await self.call_upstream_payload(call.Authorize(id_token=IdTokenType(id_token=request.idTag, type=IdTokenEnumType.iso14443)))

@@ -24,12 +24,16 @@ Union nor the granting authority can be held responsible for them.
 
 import dataclasses
 import datetime
+from abc import ABC
 
-from server.callable_interface import CallableInterface
+from server.callable_interface import CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect
 
+
+class CPInterface(ABC, CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect):
+    pass
 
 @dataclasses.dataclass
 class ProxyConnectionContext:
-    charge_point_interface : CallableInterface | None = None
+    charge_point_interface : CPInterface | None = None
     csms_interface : CallableInterface | None = None
     timeout_timer_start : datetime.datetime | None = None

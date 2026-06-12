@@ -27,7 +27,10 @@ from beartype import beartype
 from ocpp.v201.datatypes import StatusInfoType
 
 import sys
-if "--trace" in sys.argv: 
+
+from redis_dict import RedisDict
+
+if "--trace" in sys.argv:
     from snoop import snoop
 else:
     snoop = lambda x: x
@@ -66,8 +69,8 @@ class ChargingProfileComponent:
 
     def __init__(self, evse_ids : list[int],
                        evse_hard_limits : dict[int, LimitDescriptor],
-                       profile_table : Optional[dict[str, Any]] = None,
-                       active_transaction_table : Optional[dict[str, Any]] = None):
+                       profile_table : Optional[dict[str, Any] | RedisDict ] = None,
+                       active_transaction_table : Optional[dict[str, Any] | RedisDict ] = None):
         self.evse_ids = evse_ids
         self.evse_hard_limits : dict[int, LimitDescriptor] = evse_hard_limits
         self.installed_profiles : defaultdict[int, list[ChargingProfileType]] = defaultdict(list)

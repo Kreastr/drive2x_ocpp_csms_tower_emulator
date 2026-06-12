@@ -24,7 +24,7 @@ Union nor the granting authority can be held responsible for them.
 import copy
 import datetime
 import json
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
 from cachetools import cached
@@ -73,6 +73,7 @@ class TxFSMServer(TxManagerFSMType):
         self.on(TxManagerFSMState.occupied.on_enter, self.send_auth_to_cp)
         self.on(TxManagerFSMState.upkeep.on_enter, self.enter_upkeep)
         self.on(TxManagerFSMState.terminating.on_enter, self.send_deauth_to_cp)
+        self.context : Optional[TxManagerContext] = None
 
         self.on("state_changed", self.save_fsm_state)
 
@@ -139,7 +140,7 @@ class TxFSMServer(TxManagerFSMType):
 
             stop_request = call.RequestStopTransaction(transaction_id=self.context.tx_id)
             
-            result = await self.context.cp_interface.call_payload(
+            result = await self.context.cp_interface.call_downstream_payload(
                 stop_request)
             logger.warning(f"send_deauth_to_cp {stop_request=} {result=}")
             if result is not None:
@@ -152,7 +153,7 @@ class TxFSMServer(TxManagerFSMType):
     async def send_auth_to_cp(self, *vargs):
         self.context : TxManagerContext
         if self.context.cp_interface is not None:
-            result = await self.context.cp_interface.call_payload(
+            result = await self.context.cp_interface.call_downstream_payload(
                 call.RequestStartTransaction(evse_id=self.context.evse.evse_id,
                                              remote_start_id=time_based_id(),
                                              id_token=IdTokenType(id_token=str(uuid4()), type=IdTokenEnumType.central)))
