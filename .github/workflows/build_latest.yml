@@ -17,6 +17,8 @@ jobs:
 
       - name: Create latest.zip
         run: |
+          echo "${GITHUB_REF_NAME}" > VERSION
+          cat VERSION
           zip -r latest.zip . \
             -x ".git/*" \
             -x ".github/*"
