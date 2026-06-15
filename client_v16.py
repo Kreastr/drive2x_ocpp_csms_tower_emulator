@@ -36,28 +36,33 @@ Union nor the granting authority can be held responsible for them.
  phase=None,
  location=None,
  signed_meter_value=None,
- unit_of_measure=<StandardizedUnitsOfMeasureType.wh: 'Wh'>),
+ unit_of_measure=UnitOfMeasureType(unit=<StandardizedUnitsOfMeasureType.wh: 'Wh'>,
+ multiplier=0)),
  SampledValueType(value=180000.0,
  context=None,
  measurand=<MeasurandEnumType.power_active_import: 'Power.Active.Import'>,
  phase=None,
  location=None,
  signed_meter_value=None,
- unit_of_measure=<ChargingRateUnitEnumType.watts: 'W'>),
+ unit_of_measure=UnitOfMeasureType(unit=<ChargingRateUnitEnumType.watts: 'W'>,
+ multiplier=0)),
  SampledValueType(value=180000.0,
  context=None,
  measurand=<MeasurandEnumType.power_offered: 'Power.Offered'>,
  phase=None,
  location=None,
  signed_meter_value=None,
- unit_of_measure=<ChargingRateUnitEnumType.watts: 'W'>),
+ unit_of_measure=UnitOfMeasureType(unit=<ChargingRateUnitEnumType.watts: 'W'>,
+ multiplier=0)),
  SampledValueType(value=19.5444,
  context=None,
  measurand=<MeasurandEnumType.soc: 'SoC'>,
  phase=None,
  location=None,
  signed_meter_value=None,
- unit_of_measure=<StandardizedUnitsOfMeasureType.percent: 'Percent'>)])]
+ unit_of_measure=UnitOfMeasureType(unit=<StandardizedUnitsOfMeasureType.percent: 'Percent'>,
+ multiplier=0))])]
+
 
 """
 import datetime
@@ -68,7 +73,7 @@ from typing import Optional
 import websockets
 from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
 from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType, \
-    IdTokenType
+    IdTokenType, UnitOfMeasureType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, \
     TriggerReasonEnumType, IdTokenEnumType
 from ocpp.v201.enums import Action
@@ -184,7 +189,7 @@ def convert_meter_values_to_201(rq):
             unit = None
             if sv.unit is not None:
                 if sv.unit in UNIT_MAP:
-                    unit = UNIT_MAP[sv.unit]
+                    unit = UnitOfMeasureType(unit=UNIT_MAP[sv.unit], multiplier=0)
                 else:
                     logger.warning(f"Failed to convert measurand unit {sv.unit}")
             v201_sampled_values.append(SampledValueType(fv,
