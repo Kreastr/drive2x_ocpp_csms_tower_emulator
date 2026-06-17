@@ -100,6 +100,8 @@ class FigmaRenderer():
         for s in screens:
 
             name, names = FigmaRenderer.get_unique_name(slugify(s.name, separator="_"), names)
+            # Detach parent so that we do not deepcopy the whole interface tree for every client
+            s.parent = None
             export[name] = s
             logger.info(f"export_screens_to_dict {name=}")
         return export
