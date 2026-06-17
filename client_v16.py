@@ -71,7 +71,7 @@ from logging import getLogger
 from typing import Optional
 
 import websockets
-from ocpp.v16.enums import ChargePointStatus, Reason, Measurand
+from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
 from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType, \
     IdTokenType, UnitOfMeasureType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, \

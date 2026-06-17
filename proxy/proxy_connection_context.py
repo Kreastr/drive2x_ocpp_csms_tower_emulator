@@ -29,7 +29,7 @@ from abc import ABC
 from server.callable_interface import CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect
 
 
-class CPInterface(ABC, CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect):
+class CPInterface(CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect, ABC):
     pass
 
 @dataclasses.dataclass

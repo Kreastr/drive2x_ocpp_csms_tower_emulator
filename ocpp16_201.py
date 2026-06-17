@@ -48,7 +48,7 @@ from ocpp.v201.enums import SetVariableStatusEnumType, GetVariableStatusEnumType
 
 from redis_dict import RedisDict
 from typing_extensions import TypeVar
-from websockets import Subprotocol
+from websockets import Subprotocol, ConnectionClosedOK, ConnectionClosedError
 
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
 from ocpp_models.v16.authorize import AuthorizeRequest
@@ -123,6 +123,7 @@ async def connect_as_client(client_interface : OCPPServerV16Interface, uri : str
         logger.info(f"Connecting to {uri=} {ws_args=}")
         async with websockets.connect(uri, **ws_args) as ws:
             cp = OCPPClientV201(client_interface, serial_number, ws)
+            client_interface.server_connection = cp
             await on_connect_cb(cp)
 
 
@@ -130,7 +131,6 @@ async def connect_as_client(client_interface : OCPPServerV16Interface, uri : str
         raise
     except:
         logger.error(traceback.format_exc())
-        fsm.handle(ProxyConnectionFSMEvent.on_server_disconnect)
 
 
 def find_value_from_v16_response(result, v16key) -> Optional[Any]:
@@ -193,12 +193,19 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         proxy_setpoint_update_loop().subscribe(self.periodic_setpoint_update)
 
     @log_req_response
+    async def try_connect_to_upstream(self):
+        await self.run()
+
+    @log_req_response
     async def periodic_setpoint_update(self, *vargs, **kwargs):
         
         if self.server_connection is not None and self.server_connection.cpc is not None:
             next_setpoint = self.server_connection.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
-            result: call_result.ChangeConfiguration = await self.call_downstream_payload(
-                call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
+            try:
+                result: call_result.ChangeConfiguration = await self.call_downstream_payload(
+                    call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
+            except DownstreamClosedException:
+                pass
 
     async def fsm_task(self):
         while self.fsm.current_state != ProxyConnectionFSMState.finalizing:
@@ -206,23 +213,32 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             await asyncio.sleep(1)
         proxy_setpoint_update_loop().unsubscribe(self.periodic_setpoint_update)
 
-    async def server_connection_task(self, cp : OCPPClientV201):
-        self.server_connection = cp
-        logger.warning("self.server_connection.start")
+    async def upstream_connection_task(self, cp : OCPPClientV201):
+        logger.warning("upstream_connection_task()")
         fsm_task = asyncio.create_task(self.fsm_task())
         server_task = asyncio.create_task(self.server_connection.start())
 
         try:
-            logger.warning("self.start before")
             await self.start()
-            logger.warning("self.start after")
-        except Exception as e   :
-            logger.warning(f"Exception in server_task start: {e} {traceback.format_exc()}")
+        except ConnectionClosedOK:
+            self.server_connection = None
+            logger.info("Upstream connection closed OK.")
+        except ConnectionClosedError:
+            self.server_connection = None
+            logger.warning("Upstream connection closed with error.")
+        except Exception as e:
+            try:
+                self.server_connection._connection()
+            except:
+                pass
+
+            self.server_connection = None
+            logger.error(f"Exception in server_task start: {e} {traceback.format_exc()}")
 
         try:
             await server_task
         except Exception as e:
-            logger.warning(f"Exception in server_task: {e}")
+            logger.error(f"Exception in server_task: {e}")
 
         await fsm_task
 
@@ -230,7 +246,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         await connect_as_client(client_interface=self,
                                 uri=ProxyConfigurator.get_global_config().upstream_uri,
                                 serial_number=self.id,
-                                on_connect_cb=self.server_connection_task,
+                                on_connect_cb=self.upstream_connection_task,
                                 fsm=self.fsm)
 
     @log_req_response
@@ -382,7 +398,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                 TX_MAP_16_TO_201[str(txid16)] = tx_id_201
                 TX_MAP_201_TO_16[tx_id_201] = txid16
             txid = TX_MAP_16_TO_201[str(txid16)]
-        await self.server_connection.meter_values_request(request, tx_id=txid)
+        if self.server_connection is not None:
+            # Todo cache meter values
+            await self.server_connection.meter_values_request(request, tx_id=txid)
         return call_result.MeterValues(
         )
 
@@ -486,9 +504,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             v16_type = RESET_TYPE_MAP[request.type]
         else:
             v16_type = ResetType.hard
-        response : call_result.Reset = await self.call_downstream_payload(call.Reset(type=v16_type))
+        response : Optional[call_result.Reset] = await self.call_downstream_payload(call.Reset(type=v16_type))
 
-        if response.status in RESET_STATUS_MAP:
+        if response is not None and response.status in RESET_STATUS_MAP:
             v201_status = RESET_STATUS_MAP[response.status]
         else:
             v201_status = ResetStatusEnumType.rejected
