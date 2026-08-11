@@ -214,6 +214,8 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def fsm_loop_runner(self, *vargs, **kwargs):
         if self.fsm.current_state != ProxyConnectionFSMState.finalizing:
             await self.fsm.loop()
+            if self.fsm.current_state == ProxyConnectionFSMState.connecting:
+                await self.try_forward_data_to_upstream()
             self.logger.warning(f"FSM state is {self.fsm.current_state}")
         else:
             self.logger.warning(f"{self.fsm} Unsubscribed from periodic loops.")
@@ -331,6 +333,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         async with self.lock_try_forward:
             for i in range(30):
                 if self.cached_boot_notification is not None:
+                    if self.upstream_interface is None:
+                        return
+                    else:
                         result = await self.upstream_interface.boot_notification_request(self.cached_boot_notification)
                         if result is not None:
                             if result.status == RegistrationStatusEnumType.accepted:
@@ -339,7 +344,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                             else:
                                 logger.warning(f"Upstream rejected cached boot notification: {result=}")
                         return result
-                asyncio.sleep(1)
+                await asyncio.sleep(1)
             await self.fsm.handle(ProxyConnectionFSMEvent.on_upstream_accepted_boot_notification)
 
 

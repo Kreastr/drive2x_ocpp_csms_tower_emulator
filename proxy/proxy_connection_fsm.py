@@ -61,11 +61,8 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
         self.on(ProxyConnectionFSMState.autonomous_loop.on_loop, self.try_connect_to_upstream)
         self.on(ProxyConnectionFSMState.connecting.on_loop, self.try_forward_boot_and_status_data)
         
-    async def handle_delayed_boot_notifications(self, *vargs, **kwargs):
-        ctxt : ProxyConnectionContext = self.context
-        await ctxt.charge_point_interface.try_forward_data_to_upstream()
-
     async def try_forward_boot_and_status_data(self, *vargs, **kwargs):
+        logger.warning("try_forward_boot_and_status_data outer")
         ctxt: ProxyConnectionContext = self.context
         await ctxt.charge_point_interface.try_forward_data_to_upstream()
 
