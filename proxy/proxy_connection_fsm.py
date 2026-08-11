@@ -49,48 +49,48 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
                          context=context,
                          **kwargs)
 
-        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_heartbeat_timeout, callback=self.if_heartbeat_timeout)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_downstream_heartbeat_timeout, callback=self.if_heartbeat_timeout)
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_client_disconnected, callback=self.if_client_disconnected)
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_server_disconnected, callback=self.if_server_disconnected)
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_server_connected, callback=self.if_server_connected)
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_start_up_delay_done, callback=self.if_start_up_delay_done)
-        self.on(ProxyConnectionFSMState.start_up.on_enter, self.start_new_heartbeat_timer)
-        self.on(ProxyConnectionFSMState.connected.on_enter, self.start_new_heartbeat_timer)
+        self.on(ProxyConnectionFSMState.start_up.on_enter, self.start_new_downstream_heartbeat_timer)
+        self.on(ProxyConnectionFSMState.connected.on_enter, self.start_new_downstream_heartbeat_timer)
         #self.on(ProxyConnectionFSMState.connected.on_enter, self.handle_delayed_boot_notifications)
-        self.on(ProxyConnectionFSMState.autonomous_loop.on_enter, self.start_new_heartbeat_timer)
+        self.on(ProxyConnectionFSMState.autonomous_loop.on_enter, self.start_new_downstream_heartbeat_timer)
         self.on(ProxyConnectionFSMState.autonomous_loop.on_loop, self.try_connect_to_upstream)
+        self.on(ProxyConnectionFSMState.connecting.on_loop, self.try_forward_boot_and_status_data)
         
-
-    async def start_new_timeout_timer(self, *vargs, **kwargs):
-        ctxt : ProxyConnectionContext = self.context
-        ctxt.timeout_timer_start = datetime.datetime.now()
-
     async def handle_delayed_boot_notifications(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
         await ctxt.charge_point_interface.try_forward_data_to_upstream()
-        
+
+    async def try_forward_boot_and_status_data(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        await ctxt.charge_point_interface.try_forward_data_to_upstream()
+
     async def try_connect_to_upstream(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
         await ctxt.charge_point_interface.try_connect_to_upstream()
         
-    async def start_new_heartbeat_timer(self, *vargs, **kwargs):
+    async def start_new_downstream_heartbeat_timer(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
-        ctxt.timeout_timer_start = datetime.datetime.now()
-        logger.info(f"start_new_heartbeat_timer {ctxt.timeout_timer_start=}")
+        ctxt.downstream_hb_timeout_timer_start = datetime.datetime.now()
+        logger.info(f"start_new_heartbeat_timer {ctxt.downstream_hb_timeout_timer_start=}")
 
     def if_heartbeat_timeout(self, *vargs, **kwargs):
         ctxt: ProxyConnectionContext = self.context
         time_now = datetime.datetime.now()
-        if (time_now - ctxt.timeout_timer_start).total_seconds() > HEARTBEAT_TIMEOUT:
-            logger.info(f"if_heartbeat_timeout is true with {ctxt.timeout_timer_start=} and {time_now=}")
+        if (time_now - ctxt.downstream_hb_timeout_timer_start).total_seconds() > HEARTBEAT_TIMEOUT:
+            logger.info(f"if_heartbeat_timeout is true with {ctxt.downstream_hb_timeout_timer_start=} and {time_now=}")
             return True
         return False
 
     def if_start_up_delay_done(self, *vargs, **kwargs):
         ctxt: ProxyConnectionContext = self.context
         time_now = datetime.datetime.now()
-        if (time_now - ctxt.timeout_timer_start).total_seconds() > START_UP_DELAY:
-            logger.info(f"if_start_up_delay_done is true with {ctxt.timeout_timer_start=} and {time_now=}")
+        if (time_now - ctxt.downstream_hb_timeout_timer_start).total_seconds() > START_UP_DELAY:
+            logger.info(f"if_start_up_delay_done is true with {ctxt.downstream_hb_timeout_timer_start=} and {time_now=}")
             return True
         return False
 

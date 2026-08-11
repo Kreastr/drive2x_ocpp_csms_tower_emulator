@@ -32,15 +32,20 @@ proxy_connection_uml = """@startuml
 [*] --> New
 New --> StartUp
 StartUp --> AutonomousLoop : if start up delay done
-AutonomousLoop --> AutonomousLoop : on heartbeat
-AutonomousLoop --> Connected : if server connected
+AutonomousLoop --> AutonomousLoop : on downstream heartbeat
+AutonomousLoop --> Connecting : if server connected
 AutonomousLoop --> ClientDisconnected : on termination request
 AutonomousLoop --> ClientDisconnected : if client disconnected
+Connecting --> Connecting : on downstream heartbeat
+Connecting --> Connected : on upstream accepted boot notification
+Connecting --> ClientDisconnected : if client disconnected
+Connecting --> ShuttingDown : on termination request
+Connecting --> AutonomousLoop : if downstream heartbeat timeout
 Connected --> ClientDisconnected : if client disconnected
 Connected --> AutonomousLoop : if server disconnected
 Connected --> ShuttingDown : on termination request
-Connected --> AutonomousLoop : if heartbeat timeout
-Connected --> Connected : on heartbeat
+Connected --> ClientDisconnected : if downstream heartbeat timeout
+Connected --> Connected : on downstream heartbeat
 ShuttingDown --> ServerDisconnected : if server disconnected
 ClientDisconnected --> Finalizing : if server disconnected
 ServerDisconnected --> Finalizing : if client disconnected

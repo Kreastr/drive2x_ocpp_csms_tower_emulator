@@ -37,4 +37,4 @@ class CPInterface(CallableInterface, SupportsBootNotificationForwarding, Support
 class ProxyConnectionContext:
     charge_point_interface : CPInterface | None = None
     csms_interface : CallableInterface | None = None
-    timeout_timer_start : datetime.datetime | None = None
+    downstream_hb_timeout_timer_start : datetime.datetime | None = None

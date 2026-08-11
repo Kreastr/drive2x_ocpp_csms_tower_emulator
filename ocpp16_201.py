@@ -311,9 +311,6 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         if rq.chargePointSerialNumber is None:
             rq.chargePointSerialNumber = self.id
         self.cached_boot_notification = rq
-        if self.upstream_interface is None:
-            await asyncio.sleep(5)
-        await self.try_forward_data_to_upstream()
 
         return call_result.BootNotification(
             current_time=datetime.now(UTC_TZ).isoformat(),
@@ -323,6 +320,8 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
     async def try_forward_data_to_upstream(self):
         logger.warning("try_forward_data_to_upstream")
+        if self.upstream_interface is None:
+            await asyncio.sleep(5)
         if self.cached_boot_notification is not None:
             if self.upstream_interface is not None:
                 result = await self.upstream_interface.boot_notification_request(self.cached_boot_notification)
