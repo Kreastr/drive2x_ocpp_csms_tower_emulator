@@ -28,7 +28,7 @@ import logging
 import socket
 import uuid
 from datetime import datetime, timedelta, UTC
-from asyncio import CancelledError
+from asyncio import CancelledError, Lock
 from logging import getLogger
 from time import sleep
 
@@ -206,6 +206,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         self.upstream_interface : OCPPClientV201 | None = None
         self.downstream_connected : bool = True
         self.cached_boot_notification : Optional[BootNotificationRequest] = None
+        self.lock_try_forward : Lock = Lock()
         proxy_setpoint_update_loop().subscribe(self.periodic_setpoint_update)
         proxy_fsm_update_loop().subscribe(self.fsm_loop_runner)
 
@@ -323,17 +324,23 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         logger.warning("try_forward_data_to_upstream")
         if self.upstream_interface is None:
             await asyncio.sleep(5)
-        if self.cached_boot_notification is not None:
-            if self.upstream_interface is not None:
-                result = await self.upstream_interface.boot_notification_request(self.cached_boot_notification)
-                if result is not None:
-                    if result.status == RegistrationStatusEnumType.accepted:
-                        logger.info(f"Upstream accepted cached boot notification: {result=}")
-                        await self.fsm.handle(ProxyConnectionFSMEvent.on_upstream_accepted_boot_notification)
-                    else:
-                        logger.warning(f"Upstream rejected cached boot notification: {result=}")
-                return result
-        raise GenericError(description="Failed to forward Boot Notification to disconnected upstream", details=dict(retryable=True))
+
+        if self.lock_try_forward.locked():
+            return
+
+        async with self.lock_try_forward:
+            for i in range(30):
+                if self.cached_boot_notification is not None:
+                        result = await self.upstream_interface.boot_notification_request(self.cached_boot_notification)
+                        if result is not None:
+                            if result.status == RegistrationStatusEnumType.accepted:
+                                logger.info(f"Upstream accepted cached boot notification: {result=}")
+                                await self.fsm.handle(ProxyConnectionFSMEvent.on_upstream_accepted_boot_notification)
+                            else:
+                                logger.warning(f"Upstream rejected cached boot notification: {result=}")
+                        return result
+                asyncio.sleep(1)
+            await self.fsm.handle(ProxyConnectionFSMEvent.on_upstream_accepted_boot_notification)
 
 
 
