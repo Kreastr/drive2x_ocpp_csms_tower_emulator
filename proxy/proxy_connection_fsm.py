@@ -67,11 +67,11 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
 
     async def handle_delayed_boot_notifications(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
-        ctxt.charge_point_interface.try_forward_data_to_upstream()
+        await ctxt.charge_point_interface.try_forward_data_to_upstream()
         
     async def try_connect_to_upstream(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
-        ctxt.charge_point_interface.try_connect_to_upstream()
+        await ctxt.charge_point_interface.try_connect_to_upstream()
         
     async def start_new_heartbeat_timer(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
