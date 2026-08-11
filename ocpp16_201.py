@@ -414,7 +414,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
     @on(Action.heartbeat)
     async def on_heartbeat(self, **data):
-        await self.fsm.handle(ProxyConnectionFSMEvent.on_heartbeat)
+        await self.fsm.handle(ProxyConnectionFSMEvent.on_downstream_heartbeat)
 
         if self.is_connected_to_ocpp_upstream():
             try:
