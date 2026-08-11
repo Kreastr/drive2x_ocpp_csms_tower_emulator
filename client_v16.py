@@ -368,8 +368,7 @@ class OCPPClientV201(ChargePoint):
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except asyncio.TimeoutError:
-            self.client_interface.upstream_interface = None
-            await self.close_connection()
+            # Do not force close connection yet. 
             logger.error(f"Got asyncio.TimeoutError during request {payload=}")
             raise ocpp.exceptions.GenericError(description="Upstream is disconnected. Cannot deliver.",
                                                details=dict(retryable=True))

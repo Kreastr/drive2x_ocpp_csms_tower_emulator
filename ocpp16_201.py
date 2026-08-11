@@ -223,7 +223,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     @log_req_response
     async def try_connect_to_upstream(self):
         if self.upstream_interface is not None:
-            self.upstream_interface.close_connection()
+            await self.upstream_interface.close_connection()
 
         async def connect_cb(cp, s=self):
             s.fsm.context : ProxyConnectionContext
@@ -283,7 +283,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                 raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
                                                    details=dict(retryable=True))
         except asyncio.TimeoutError:
-            self.downstream_connected = False
+            # Do not mark downstream as disconnected. This is not the hard fault yet.
             logger.warning(f"Got asyncio.TimeoutError while calling downstream payload {payload=}")
             raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
                                                details=dict(retryable=True))
@@ -328,6 +328,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                 if result is not None:
                     if result.status == RegistrationStatusEnumType.accepted:
                         logger.info(f"Upstream accepted cached boot notification: {result=}")
+                        await self.fsm.handle(ProxyConnectionFSMEvent.on_upstream_accepted_boot_notification)
                     else:
                         logger.warning(f"Upstream rejected cached boot notification: {result=}")
                 return result
