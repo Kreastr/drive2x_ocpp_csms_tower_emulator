@@ -228,7 +228,6 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         async def connect_cb(cp, s=self):
             s.fsm.context : ProxyConnectionContext
             s.fsm.context.csms_interface = cp
-            s.fsm.context.proxy_interface = self
             await s.start()
         # Callback will set upstream_interface for this class
         await connect_as_client(client_interface=self,

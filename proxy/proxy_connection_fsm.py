@@ -96,15 +96,15 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
 
     def if_client_disconnected(self, *vargs, **kwargs):
         ctxt: ProxyConnectionContext = self.context
-        if ctxt.proxy_instance is None:
+        if ctxt.charge_point_interface is None:
             return True
-        return ctxt.proxy_instance.is_connected_to_ocpp_downstream()
+        return not ctxt.charge_point_interface.is_connected_to_ocpp_downstream()
 
     def if_server_disconnected(self, *vargs, **kwargs):
         ctxt: ProxyConnectionContext = self.context
-        if ctxt.proxy_instance is None:
+        if ctxt.charge_point_interface is None:
             return True
-        return ctxt.proxy_instance.is_connected_to_ocpp_upstream()
+        return not ctxt.charge_point_interface.is_connected_to_ocpp_upstream()
 
     def if_server_connected(self, *vargs, **kwargs):
         return not self.if_server_disconnected()
