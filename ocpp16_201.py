@@ -213,9 +213,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def fsm_loop_runner(self, *vargs, **kwargs):
         if self.fsm.current_state != ProxyConnectionFSMState.finalizing:
             await self.fsm.loop()
-            self.logger.info(f"FSM state is {self.fsm.current_state}")
+            self.logger.warning(f"FSM state is {self.fsm.current_state}")
         else:
-            self.logger.info(f"{self.fsm} Unsubscribed from periodic loops.")
+            self.logger.warning(f"{self.fsm} Unsubscribed from periodic loops.")
             proxy_fsm_update_loop().unsubscribe(self.fsm_loop_runner)
             proxy_setpoint_update_loop().unsubscribe(self.periodic_setpoint_update)
             await self.close_downstream_connection()
