@@ -313,7 +313,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         self.cached_boot_notification = rq
         if self.upstream_interface is None:
             await asyncio.sleep(5)
-        self.try_forward_data_to_upstream()
+        await self.try_forward_data_to_upstream()
 
         return call_result.BootNotification(
             current_time=datetime.now(UTC_TZ).isoformat(),
@@ -412,19 +412,29 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             logger.warning(f"Unknown transaction has ended {rq.transactionId=}. Cannot notify CSMS. {rq=}")
 
         return call_result.StopTransaction()
-    
-    @on(Action.heartbeat)
-    @log_req_response
-    async def on_heartbeat(self, **data):
-        await self._ensure_upstream()
-        response = await self.upstream_interface.heartbeat_request()
-        if response is None:
-            return call_result.Heartbeat(
-                current_time=datetime.now(tz=UTC).isoformat()
-            )
 
+    @on(Action.heartbeat)
+    async def on_heartbeat(self, **data):
+        await self.fsm.handle(ProxyConnectionFSMEvent.on_heartbeat)
+
+        if self.is_connected_to_ocpp_upstream():
+            try:
+                response = await self.upstream_interface.heartbeat_request()
+
+                if response is not None and getattr(response, "current_time", None):
+                    return call_result.Heartbeat(
+                        current_time=response.current_time
+                    )
+
+            except Exception:
+                self.logger.exception(
+                    "Upstream heartbeat failed; replying locally"
+                )
+                self.close_upstream_connection()
+
+        # Autonomous/offline fallback.
         return call_result.Heartbeat(
-            current_time=response.current_time
+            current_time=datetime.now(tz=UTC).isoformat()
         )
 
     @on(Action.meter_values, skip_schema_validation=True)
@@ -558,6 +568,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def close_upstream_connection(self, *vargs):
         if self.upstream_interface:
             await self.upstream_interface.close_connection()
+            self.upstream_interface = None
 
     async def close_downstream_connection(self, *vargs):
         self.downstream_connected = False
