@@ -228,7 +228,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         async def connect_cb(cp, s=self):
             s.fsm.context : ProxyConnectionContext
             s.fsm.context.csms_interface = cp
-            await s.start()
+            await cp.start()
         # Callback will set upstream_interface for this class
         await connect_as_client(client_interface=self,
                                 uri=ProxyConfigurator.get_global_config().upstream_uri,
@@ -430,7 +430,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                 self.logger.exception(
                     "Upstream heartbeat failed; replying locally"
                 )
-                self.close_upstream_connection()
+                await self.close_upstream_connection()
 
         # Autonomous/offline fallback.
         return call_result.Heartbeat(
@@ -567,8 +567,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
     async def close_upstream_connection(self, *vargs):
         if self.upstream_interface:
-            await self.upstream_interface.close_connection()
+            tmp_ref = self.upstream_interface
             self.upstream_interface = None
+            await tmp_ref.close_connection()
 
     async def close_downstream_connection(self, *vargs):
         self.downstream_connected = False
