@@ -29,16 +29,17 @@ from proxy.proxy_connection_context import ProxyConnectionContext
 from server.data.tx_manager_context import TxManagerContext
 
 proxy_connection_uml = """@startuml
-[*] -> New
-New --> AutonomousLoop
+[*] --> New
+New --> StartUp
+StartUp --> AutonomousLoop : if start up delay done
 AutonomousLoop --> AutonomousLoop : on heartbeat
-AutonomousLoop --> ServerDisconnected : if heartbeat timeout
-AutonomousLoop --> Connected : on server connected
-AutonomousLoop --> ServerDisconnected : on termination request
+AutonomousLoop --> Connected : if server connected
+AutonomousLoop --> ClientDisconnected : on termination request
+AutonomousLoop --> ClientDisconnected : if client disconnected
 Connected --> ClientDisconnected : if client disconnected
 Connected --> AutonomousLoop : if server disconnected
 Connected --> ShuttingDown : on termination request
-Connected --> ShuttingDown : if heartbeat timeout
+Connected --> AutonomousLoop : if heartbeat timeout
 Connected --> Connected : on heartbeat
 ShuttingDown --> ServerDisconnected : if server disconnected
 ClientDisconnected --> Finalizing : if server disconnected

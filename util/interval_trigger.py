@@ -95,3 +95,10 @@ def proxy_setpoint_update_loop() -> AIOIntervalTrigger:
     if _proxy_setpoint_update_loop is None:
         _proxy_setpoint_update_loop = AIOIntervalTrigger(period=timedelta(seconds=15), name="Proxy Setpoint Update Timer")
     return _proxy_setpoint_update_loop
+
+_proxy_fsm_update_loop = None
+def proxy_fsm_update_loop() -> AIOIntervalTrigger:
+    global _proxy_fsm_update_loop
+    if _proxy_fsm_update_loop is None:
+        _proxy_fsm_update_loop = AIOIntervalTrigger(period=timedelta(seconds=5), name="Proxy FSM Update Timer")
+    return _proxy_fsm_update_loop

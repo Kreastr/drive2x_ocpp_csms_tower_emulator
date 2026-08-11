@@ -49,3 +49,4 @@ class StopTransactionRequest(BaseModel):
     transactionId: int
     reason : Optional[Reason] = None
     transactionData : Optional[list[MeterValue]] = None
+    connectorId : Optional[int] = None

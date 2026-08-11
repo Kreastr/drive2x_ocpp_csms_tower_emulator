@@ -25,6 +25,7 @@ Union nor the granting authority can be held responsible for them.
 
 import asyncio
 import logging
+import socket
 import uuid
 from datetime import datetime, timedelta, UTC
 from asyncio import CancelledError
@@ -34,7 +35,8 @@ from time import sleep
 import ocpp.v16.enums
 from afsm import AFSM
 from beartype import beartype
-from ocpp.exceptions import TypeConstraintViolationError
+from ocpp.exceptions import TypeConstraintViolationError, GenericError
+from ocpp.messages import CallError
 from ocpp.routing import on
 from ocpp.v16.datatypes import IdTagInfo
 from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus, ResetType
@@ -75,7 +77,7 @@ from util import async_camelize_kwargs, log_req_response, with_request_model, ti
 from datetime import  timezone
 
 from util.db import get_default_redis
-from util.interval_trigger import proxy_setpoint_update_loop
+from util.interval_trigger import proxy_setpoint_update_loop, proxy_fsm_update_loop
 
 UTC_TZ = timezone(timedelta(0))
 
@@ -114,8 +116,9 @@ async def connect_as_client(client_interface : OCPPServerV16Interface, uri : str
     #uri = "wss://drive2x.lut.fi:443/ocpp/CP_ESS_01"
 
     ctx = ssl.create_default_context(cafile=certifi.where())  # <- CA bundle
-    ws_args: dict[str, Any] = dict(subprotocols=["ocpp2.0.1"],
-                                   open_timeout=15)
+    ws_args = dict(subprotocols=["ocpp2.0.1"],
+                   open_timeout=15)
+
 
     if uri.startswith("wss://"):
         ws_args["ssl"] = ctx
@@ -123,15 +126,21 @@ async def connect_as_client(client_interface : OCPPServerV16Interface, uri : str
         logger.info(f"Connecting to {uri=} {ws_args=}")
         async with websockets.connect(uri, **ws_args) as ws:
             cp = OCPPClientV201(client_interface, serial_number, ws)
-            client_interface.server_connection = cp
+            client_interface.upstream_interface = cp
             await on_connect_cb(cp)
 
-
+    except websockets.exceptions.InvalidStatus as e:
+            logger.info(str(e))
+            await asyncio.sleep(15)
     except asyncio.exceptions.CancelledError:
+        await asyncio.sleep(15)
         raise
-    except:
-        logger.error(traceback.format_exc())
-
+    except Exception as e:
+        if "[Errno 8]" in str(e):
+            logger.info(str(e))
+            await asyncio.sleep(15)
+        else:
+            logger.error(traceback.format_exc())
 
 def find_value_from_v16_response(result, v16key) -> Optional[Any]:
     value = None
@@ -147,16 +156,27 @@ T = TypeVar("T")
 def categorize_variables(rq_list : list[T]):
     request_list: dict[str, T] = {}
     reject_list: list[T] = []
+    request_serial = False
     for var in rq_list:
         cname = var.component.name
         vname = var.variable.name
+        if cname == "ChargingStation" and vname == "SerialNumber":
+            request_serial = True
+            continue
         if cname in CONFIGURATION_MAP:
             if vname in CONFIGURATION_MAP[cname]:
                 request_list[CONFIGURATION_MAP[cname][vname]] = var
                 continue
         reject_list.append(var)
-    return reject_list, request_list
+    return reject_list, request_list, request_serial
 
+
+def serial_var_component(serial_number):
+    resp_cmpnt = ComponentType(name="ChargePoint",
+                               instance=None)
+    resp_var = VariableType(name="SerialNumber",
+                            instance=var.variable.instance)
+    return resp_cmpnt, resp_var
 
 def clone_var_component(var):
     if var.component.evse:
@@ -172,10 +192,6 @@ def clone_var_component(var):
     return resp_cmpnt, resp_var
 
 
-class DownstreamClosedException(Exception):
-    pass
-
-
 @beartype
 class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
@@ -185,69 +201,76 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         self.pending_tx_profiles = dict()
         self.fsm = ProxyConnectionFSM(ProxyConnectionContext(charge_point_interface=self),
                                                              fsm_name=f"OCPPServer16Proxy <{self.id} {datetime.now(tz=UTC).isoformat()}>")
-        self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_client_connection)
-        self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_server_connection)
-        self.server_connection : OCPPClientV201 | None = None
+        self.fsm.on(ProxyConnectionFSMState.server_disconnected.on_enter, self.close_downstream_connection)
+        self.fsm.on(ProxyConnectionFSMState.client_disconnected.on_enter, self.close_upstream_connection)
+        self.upstream_interface : OCPPClientV201 | None = None
         self.downstream_connected : bool = True
         self.cached_boot_notification : Optional[BootNotificationRequest] = None
         proxy_setpoint_update_loop().subscribe(self.periodic_setpoint_update)
+        proxy_fsm_update_loop().subscribe(self.fsm_loop_runner)
+
+    @log_req_response
+    async def fsm_loop_runner(self, *vargs, **kwargs):
+        if self.fsm.current_state != ProxyConnectionFSMState.finalizing:
+            await self.fsm.loop()
+        else:
+            self.logger.info(f"{self.fsm} Unsubscribed from periodic loops.")
+            proxy_fsm_update_loop().unsubscribe(self.fsm_loop_runner)
+            proxy_setpoint_update_loop().unsubscribe(self.periodic_setpoint_update)
+            await self.close_downstream_connection()
+            await self.close_upstream_connection()
 
     @log_req_response
     async def try_connect_to_upstream(self):
-        await self.run()
+        if self.upstream_interface is not None:
+            self.upstream_interface.close_connection()
+
+        async def connect_cb(cp, s=self):
+            s.fsm.context : ProxyConnectionContext
+            s.fsm.context.csms_interface = cp
+            s.fsm.context.proxy_interface = self
+            await s.start()
+        # Callback will set upstream_interface for this class
+        await connect_as_client(client_interface=self,
+                                uri=ProxyConfigurator.get_global_config().upstream_uri,
+                                serial_number=self.id,
+                                on_connect_cb=connect_cb,
+                                fsm=self.fsm)
 
     @log_req_response
     async def periodic_setpoint_update(self, *vargs, **kwargs):
         
-        if self.server_connection is not None and self.server_connection.cpc is not None:
-            next_setpoint = self.server_connection.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
+        if self.upstream_interface is not None and self.upstream_interface.cpc is not None:
+            next_setpoint = self.upstream_interface.cpc.get_power_setpoint(1, datetime.now(tz=UTC))
             try:
                 result: call_result.ChangeConfiguration = await self.call_downstream_payload(
                     call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
-            except DownstreamClosedException:
+            except Exception:
+                self.logger.error("ToDo. Cleanup periodic_setpoint_update for dead connections")
                 pass
 
-    async def fsm_task(self):
-        while self.fsm.current_state != ProxyConnectionFSMState.finalizing:
-            await self.fsm.loop()
-            await asyncio.sleep(1)
-        proxy_setpoint_update_loop().unsubscribe(self.periodic_setpoint_update)
-
-    async def upstream_connection_task(self, cp : OCPPClientV201):
+    async def upstream_connection_task(self):
         logger.warning("upstream_connection_task()")
-        fsm_task = asyncio.create_task(self.fsm_task())
-        server_task = asyncio.create_task(self.server_connection.start())
 
         try:
-            await self.start()
+            await self.try_connect_to_upstream()
         except ConnectionClosedOK:
-            self.server_connection = None
+            self.upstream_interface = None
             logger.info("Upstream connection closed OK.")
+            await asyncio.sleep(10)
         except ConnectionClosedError:
-            self.server_connection = None
+            self.upstream_interface = None
             logger.warning("Upstream connection closed with error.")
+            await asyncio.sleep(10)
         except Exception as e:
             try:
-                self.server_connection._connection()
+                self.upstream_interface.close_connection()
             except:
                 pass
 
-            self.server_connection = None
-            logger.error(f"Exception in server_task start: {e} {traceback.format_exc()}")
+            self.upstream_interface = None
+            logger.warning(f"Exception in server_task start: {e} {traceback.format_exc()}")
 
-        try:
-            await server_task
-        except Exception as e:
-            logger.error(f"Exception in server_task: {e}")
-
-        await fsm_task
-
-    async def run(self):
-        await connect_as_client(client_interface=self,
-                                uri=ProxyConfigurator.get_global_config().upstream_uri,
-                                serial_number=self.id,
-                                on_connect_cb=self.upstream_connection_task,
-                                fsm=self.fsm)
 
     @log_req_response
     async def call_downstream_payload(
@@ -258,16 +281,23 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                 return await self.call(payload, suppress, unique_id, skip_schema_validation)
             else:
                 logger.info(f"Downstream is already disconnected while calling downstream payload {payload=}. Raising ")
-                raise DownstreamClosedException("Cannot finish downstream request due to closed connection.")
+                raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
+                                                   details=dict(retryable=True))
         except asyncio.TimeoutError:
             self.downstream_connected = False
             logger.warning(f"Got asyncio.TimeoutError while calling downstream payload {payload=}")
+            raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
+                                               details=dict(retryable=True))
         except websockets.exceptions.ConnectionClosedOK:
             self.downstream_connected = False
             logger.info(f"Got ConnectionClosedOK while calling downstream payload {payload=}")
+            raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
+                                               details=dict(retryable=True))
         except websockets.exceptions.ConnectionClosedError:
             self.downstream_connected = False
             logger.warning(f"Got websockets.exceptions.ConnectionClosedError while calling downstream payload {payload=}")
+            raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
+                                               details=dict(retryable=True))
 
 
     #@on(Action.notify_event)
@@ -282,6 +312,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         if rq.chargePointSerialNumber is None:
             rq.chargePointSerialNumber = self.id
         self.cached_boot_notification = rq
+        if self.upstream_interface is None:
+            await asyncio.sleep(5)
+        self.try_forward_data_to_upstream()
 
         return call_result.BootNotification(
             current_time=datetime.now(UTC_TZ).isoformat(),
@@ -290,16 +323,17 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         )
 
     async def try_forward_data_to_upstream(self):
+        logger.warning("try_forward_data_to_upstream")
         if self.cached_boot_notification is not None:
-            if self.server_connection is not None:
-                result = await self.server_connection.boot_notification_request(self.cached_boot_notification)
+            if self.upstream_interface is not None:
+                result = await self.upstream_interface.boot_notification_request(self.cached_boot_notification)
                 if result is not None:
                     if result.status == RegistrationStatusEnumType.accepted:
                         logger.info(f"Upstream accepted cached boot notification: {result=}")
-                        self.cached_boot_notification = None
                     else:
                         logger.warning(f"Upstream rejected cached boot notification: {result=}")
-                        self.cached_boot_notification = None
+                return result
+        raise GenericError(description="Failed to forward Boot Notification to disconnected upstream", details=dict(retryable=True))
 
 
 
@@ -309,10 +343,21 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     @log_req_response
     @with_request_model(StatusNotificationRequest)
     async def on_status_notification(self, rq : StatusNotificationRequest, **kwargs):
-        await self.server_connection.status_notification_request(rq)
+        await self._ensure_upstream()
+        await self.upstream_interface.status_notification_request(rq)
+
         return call_result.StatusNotification(
         )
 
+    async def _ensure_upstream(self):
+        if self.upstream_interface is None:
+            await asyncio.sleep(5)
+            if self.upstream_interface is None:
+                self.logger.error(f"Upstream disconnected while FSM is in state {self.fsm.current_state}")
+                if self.fsm.current_state == ProxyConnectionFSMState.finalizing:
+                    await self.close_downstream_connection()
+                raise GenericError(description=f"Failed to forward upstream. {self.fsm.current_state} {self.fsm}",
+                                   details=dict(retryable=True))
 
     @on(Action.start_transaction)
     @async_camelize_kwargs
@@ -326,17 +371,17 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         TX_MAP_16_TO_201[tx_id_16] = tx_id_201
         TX_MAP_201_TO_16[tx_id_201] = tx_id_16
         
-        self.server_connection.cpc.on_tx_start(rq.connectorId, tx_id_201)
+        self.upstream_interface.cpc.on_tx_start(rq.connectorId, tx_id_201)
 
         if (self.remote_start_id is not None and 
             self.remote_start_id in self.pending_tx_profiles):
             profile : ChargingProfileType = self.pending_tx_profiles[self.remote_start_id]
             profile.transactionId = tx_id_201
-            install_result = self.server_connection.cpc.install_profile_if_possible(profile, rq.connectorId)
+            install_result = self.upstream_interface.cpc.install_profile_if_possible(profile, rq.connectorId)
             if install_result is not None:
                 logger.error(f"Failed installing pending Tx Profile: {profile} Reason: {install_result} for {tx_id_201=}/{tx_id_16=}")
             
-        await self.server_connection.start_transaction_request(rq, tx_id_201, self.remote_start_id)
+        await self.upstream_interface.start_transaction_request(rq, tx_id_201, self.remote_start_id)
         
         rsid = self.remote_start_id
         self.remote_start_id = None
@@ -362,8 +407,8 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
         if str(rq.transactionId) in TX_MAP_16_TO_201:
             tx_id_201 = TX_MAP_16_TO_201[str(rq.transactionId)]
-            self.server_connection.cpc.on_tx_end(tx_id_201)
-            await self.server_connection.stop_transaction_request(rq, tx_id_201)
+            self.upstream_interface.cpc.on_tx_end(tx_id_201)
+            await self.upstream_interface.stop_transaction_request(rq, tx_id_201)
         else:
             logger.warning(f"Unknown transaction has ended {rq.transactionId=}. Cannot notify CSMS. {rq=}")
 
@@ -372,15 +417,13 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     @on(Action.heartbeat)
     @log_req_response
     async def on_heartbeat(self, **data):
-        if self.server_connection is None:
-            return None
-
-        response = await self.server_connection.heartbeat_request()
+        await self._ensure_upstream()
+        response = await self.upstream_interface.heartbeat_request()
         if response is None:
             return call_result.Heartbeat(
                 current_time=datetime.now(tz=UTC).isoformat()
             )
-            
+
         return call_result.Heartbeat(
             current_time=response.current_time
         )
@@ -398,9 +441,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                 TX_MAP_16_TO_201[str(txid16)] = tx_id_201
                 TX_MAP_201_TO_16[tx_id_201] = txid16
             txid = TX_MAP_16_TO_201[str(txid16)]
-        if self.server_connection is not None:
+        if self.upstream_interface is not None:
             # Todo cache meter values
-            await self.server_connection.meter_values_request(request, tx_id=txid)
+            await self.upstream_interface.meter_values_request(request, tx_id=txid)
         return call_result.MeterValues(
         )
 
@@ -409,10 +452,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     @async_camelize_kwargs
     @with_request_model(AuthorizeRequest)
     async def on_authorize(self, request: AuthorizeRequest, **data):
-        if self.server_connection is None:
-            return call_result.Authorize(id_tag_info=IdTagInfo(status=AuthorizationStatus.invalid))
+        await self._ensure_upstream()
 
-        result : call_result_201.Authorize = await self.server_connection.on_authorize_request(request)
+        result : call_result_201.Authorize = await self.upstream_interface.on_authorize_request(request)
         logger.info(f"Server responded to auth request {result.id_token_info=}")
         if result.id_token_info["status"] == AuthorizationStatusEnumType.accepted:
             return call_result.Authorize(id_tag_info=IdTagInfo( status=AuthorizationStatus.accepted))
@@ -449,7 +491,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     """
 
     def is_connected_to_ocpp_upstream(self) -> bool:
-        return self.server_connection is not None
+        return self.upstream_interface is not None
 
     def is_connected_to_ocpp_downstream(self) -> bool:
         return self.downstream_connected
@@ -460,7 +502,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def on_server_set_variables(self, request: SetVariablesRequest) -> call_result_201.SetVariables:
         var: SetVariableDataType
         response_variables: list[SetVariableResultType] = []
-        reject_list, request_list = categorize_variables(request.setVariableData)
+        reject_list, request_list, request_serial = categorize_variables(request.setVariableData)
 
         logger.warning(f"{list(request_list)=}")
         logger.warning(f"{reject_list=}")
@@ -495,6 +537,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         return response
 
     @log_req_response
+    @beartype
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
         logger.warning(f"{self.id=}")
         #if self.has_icl_latiniki_hack:
@@ -513,10 +556,11 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
         return call_result_201.Reset(status=v201_status)
 
-    async def close_server_connection(self, *vargs):
-        await self.server_connection.close_connection()
+    async def close_upstream_connection(self, *vargs):
+        if self.upstream_interface:
+            await self.upstream_interface.close_connection()
 
-    async def close_client_connection(self, *vargs):
+    async def close_downstream_connection(self, *vargs):
         self.downstream_connected = False
         await self._connection.close()
 
@@ -528,12 +572,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def on_request_start_transaction(self,
                                            request: RequestStartTransactionRequest) -> call_result_201.RequestStartTransaction:
         self.remote_start_id = request.remoteStartId
-        try:
-            result : call_result.RemoteStartTransaction = await self.call_downstream_payload(call.RemoteStartTransaction(
-                                                                   id_tag=request.idToken.idToken[:20],
-                                                                   connector_id=request.evseId))
-        except asyncio.TimeoutError:
-            return call_result_201.RequestStartTransaction(status=RequestStartStopStatusEnumType.rejected)
+        result : call_result.RemoteStartTransaction = await self.call_downstream_payload(call.RemoteStartTransaction(
+                                                               id_tag=request.idToken.idToken[:20],
+                                                               connector_id=request.evseId))
 
 
         id_tag_status : RemoteStartStopStatus = result.status
@@ -566,25 +607,39 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             req_result = AUTH_STATUS_MAP[result.status]
         else:
             req_result = RequestStartStopStatusEnumType.rejected
-        return call_result_201.RequestStopTransaction(status=RequestStartStopStatusEnumType.accepted)
+        return call_result_201.RequestStopTransaction(status=req_result)
 
 
     async def on_server_get_variables(self, request: GetVariablesRequest) -> call_result_201.GetVariables:
         var : GetVariableDataType
         response_variables : list[GetVariableResultType] = []
-        reject_list, request_list = categorize_variables(request.getVariableData)
+        reject_list, request_list, request_serial = categorize_variables(request.getVariableData)
 
         logger.warning(f"{list(request_list)=}")
         logger.warning(f"{reject_list=}")
         try:
             if len(request_list):
-                result : call_result.GetConfiguration | None = await self.call_downstream_payload(call.GetConfiguration(key=list(request_list)))
-                logger.warning(f"get varaibles {result=}")
+                #try:
+                #    result : call_result.GetConfiguration = await self.call_downstream_payload(call.GetConfiguration(key=list(request_list)))
+                #except GenericError:
+                result = None
+                if result is None:
+                    reject_list += list(request_list)
+                    request_list = dict()
+                else:
+                    logger.info(f"get varaibles {result=}")
             else:
-                result = await self.call_downstream_payload(call.GetConfiguration(key=None))
-                logger.warning(f"get all varaibles {result=}")
+                #result = await self.call_downstream_payload(call.GetConfiguration(key=None))
+                result = None
+                if result is None:
+                    reject_list += list(request_list)
+                    request_list = dict()
+                else:
+                    logger.info(f"get all varaibles {result=}")
+
         except TypeConstraintViolationError:
             result = None
+
 
         for v16key, var in request_list.items():
             resp_cmpnt, resp_var = clone_var_component(var)
@@ -599,6 +654,11 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
                                                                 component=resp_cmpnt,
                                                                 variable=resp_var))
 
+        if request_serial:
+            response_variables.append(GetVariableResultType(attribute_status=GetVariableStatusEnumType.accepted,
+                                                            component=ComponentType(name="ChargePoint"),
+                                                            variable=VariableType(name="SerialNumber"),
+                                                            attribute_value=str(self.id)))
         for var in reject_list:
             var_val = self.get_stub_variable_value(var)
             resp_cmpnt, resp_var = clone_var_component(var)
@@ -628,6 +688,7 @@ async def on_connect(websocket):
 
 
     cp = OCPPServer16Proxy(id=charge_point_id, connection=websocket)
+    await cp.upstream_connection_task()
 
     if charge_point_id in ChargePointInstances:
         old_cp = ChargePointInstances[charge_point_id]
@@ -638,7 +699,7 @@ async def on_connect(websocket):
     ChargePointInstances[charge_point_id] = cp
 
     try:
-        result = await cp.run()
+        result = await cp.start()
     except websockets.exceptions.ConnectionClosedOK:
         result = "Connection closed"
     except Exception as e:

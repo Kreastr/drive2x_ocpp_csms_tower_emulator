@@ -66,10 +66,12 @@ Union nor the granting authority can be held responsible for them.
 
 """
 import datetime
+import logging
 from abc import ABC, abstractmethod
 from logging import getLogger
 from typing import Optional
 
+import ocpp
 import websockets
 from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
 from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType, \
@@ -98,6 +100,7 @@ from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from util import log_req_response, with_request_model, async_camelize_kwargs
 
 logger = getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 from ocpp.routing import on
 from ocpp.v201 import ChargePoint, call, call_result
@@ -295,6 +298,7 @@ class OCPPClientV201(ChargePoint):
 
 
     async def heartbeat_request(self) -> call_result.Heartbeat:
+        logger.info(f"FSM state is {self.client_interface.get_state_machine().current_state}")
         return await self.call_upstream_payload(call.Heartbeat())
 
     @on(Action.request_start_transaction)
@@ -364,19 +368,25 @@ class OCPPClientV201(ChargePoint):
         try:
             return await self.call(payload, suppress, unique_id, skip_schema_validation)
         except asyncio.TimeoutError:
-            self.client_interface.server_connection = None
-            self.close_connection()
+            self.client_interface.upstream_interface = None
+            await self.close_connection()
             logger.error(f"Got asyncio.TimeoutError during request {payload=}")
+            raise ocpp.exceptions.GenericError(description="Upstream is disconnected. Cannot deliver.",
+                                               details=dict(retryable=True))
         except websockets.exceptions.ConnectionClosedOK:
-            self.client_interface.server_connection = None
+            self.client_interface.upstream_interface = None
             logger.warning(f"Upstream connection closed OK during request {payload=}")
+            raise ocpp.exceptions.GenericError(description="Upstream is disconnected. Cannot deliver.",
+                                               details=dict(retryable=True))
         except websockets.exceptions.ConnectionClosedError:
-            self.client_interface.server_connection = None
+            self.client_interface.upstream_interface = None
             logger.error(f"Upstream connection closed with ERROR during request {payload=}")
+            raise ocpp.exceptions.GenericError(description="Upstream is disconnected. Cannot deliver.",
+                                               details=dict(retryable=True))
 
     async def close_connection(self):
         # Inform that we disconnected.
-        self.client_interface.server_connection = None
+        self.client_interface.upstream_interface = None
         #
         await self._connection.close()
 

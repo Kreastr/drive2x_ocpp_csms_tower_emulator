@@ -22,6 +22,8 @@ only and do not necessarily reflect those of the European Union, CINEA or UKRI. 
 Union nor the granting authority can be held responsible for them.
 """
 import datetime
+import logging
+from logging import getLogger
 
 from beartype import beartype
 
@@ -32,6 +34,10 @@ from .proxy_connection_context import ProxyConnectionContext
 from .proxy_connection_fsm_type import ProxyConnectionFSMType, proxy_connection_uml, ProxyConnectionFSMState
 
 HEARTBEAT_TIMEOUT = 120
+START_UP_DELAY = 5
+
+logger = getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 class ProxyConnectionFSM(ProxyConnectionFSMType):
     
@@ -44,31 +50,62 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
                          **kwargs)
 
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_heartbeat_timeout, callback=self.if_heartbeat_timeout)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_client_disconnected, callback=self.if_client_disconnected)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_server_disconnected, callback=self.if_server_disconnected)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_server_connected, callback=self.if_server_connected)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_start_up_delay_done, callback=self.if_start_up_delay_done)
+        self.on(ProxyConnectionFSMState.start_up.on_enter, self.start_new_heartbeat_timer)
         self.on(ProxyConnectionFSMState.connected.on_enter, self.start_new_heartbeat_timer)
-        self.on(ProxyConnectionFSMState.connected.on_enter, self.handle_delayed_boot_notifications)
+        #self.on(ProxyConnectionFSMState.connected.on_enter, self.handle_delayed_boot_notifications)
         self.on(ProxyConnectionFSMState.autonomous_loop.on_enter, self.start_new_heartbeat_timer)
         self.on(ProxyConnectionFSMState.autonomous_loop.on_loop, self.try_connect_to_upstream)
         
 
-    async def start_new_timeout_timer(self):
+    async def start_new_timeout_timer(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
         ctxt.timeout_timer_start = datetime.datetime.now()
 
-    async def handle_delayed_boot_notifications(self):
+    async def handle_delayed_boot_notifications(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
         ctxt.charge_point_interface.try_forward_data_to_upstream()
         
-    async def try_connect_to_upstream(self):
+    async def try_connect_to_upstream(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
         ctxt.charge_point_interface.try_connect_to_upstream()
         
-    async def start_new_heartbeat_timer(self):
+    async def start_new_heartbeat_timer(self, *vargs, **kwargs):
         ctxt : ProxyConnectionContext = self.context
         ctxt.timeout_timer_start = datetime.datetime.now()
+        logger.info(f"start_new_heartbeat_timer {ctxt.timeout_timer_start=}")
 
-    async def if_heartbeat_timeout(self, *vargs, **kwargs):
+    def if_heartbeat_timeout(self, *vargs, **kwargs):
         ctxt: ProxyConnectionContext = self.context
-        if (datetime.datetime.now() - ctxt.timeout_timer_start).total_seconds() > HEARTBEAT_TIMEOUT:
+        time_now = datetime.datetime.now()
+        if (time_now - ctxt.timeout_timer_start).total_seconds() > HEARTBEAT_TIMEOUT:
+            logger.info(f"if_heartbeat_timeout is true with {ctxt.timeout_timer_start=} and {time_now=}")
             return True
         return False
-        
+
+    def if_start_up_delay_done(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        time_now = datetime.datetime.now()
+        if (time_now - ctxt.timeout_timer_start).total_seconds() > START_UP_DELAY:
+            logger.info(f"if_start_up_delay_done is true with {ctxt.timeout_timer_start=} and {time_now=}")
+            return True
+        return False
+
+    def if_client_disconnected(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        if ctxt.proxy_instance is None:
+            return True
+        return ctxt.proxy_instance.is_connected_to_ocpp_downstream()
+
+    def if_server_disconnected(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        if ctxt.proxy_instance is None:
+            return True
+        return ctxt.proxy_instance.is_connected_to_ocpp_upstream()
+
+    def if_server_connected(self, *vargs, **kwargs):
+        return not self.if_server_disconnected()
+
