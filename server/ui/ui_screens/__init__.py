@@ -105,7 +105,7 @@ def format_session_duration(td: timedelta) -> str:
     total_hours = int(td.total_seconds() / 3600 + 0.5)
 
     days, hours = divmod(total_hours, 24)
-    return (f"{days}d" if days > 0 else "") + f"{hours}h"
+    return f"{days}d" if days > 0 else "" + f"{hours}h"
 
 def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("session_details", language)
@@ -360,7 +360,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
     txfsm = cp.fsm.context.transaction_fsms[evse_id]
     evse = txfsm.context.evse
-    state = {"countdown": 60}
+    state = {"countdown": 30}
 
 
     async def on_countdown():
@@ -443,7 +443,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
 
 def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("final_thanks", language)
-    state = {"countdown": 20}
+    state = {"countdown": 60}
     update_generic_fields(screen_data, state=state)
 
     async def on_countdown():
