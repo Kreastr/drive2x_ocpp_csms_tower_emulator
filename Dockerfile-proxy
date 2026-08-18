@@ -9,5 +9,5 @@ COPY . /app
 
 WORKDIR /app
 
-CMD python ocpp16_201.py --service_port 16000 --upstream ws://ocpp:9000/ocpp --redis_host redis --redis_port 6379 --redis_db 7
+CMD python ocpp16_201.py --service_port 16000 --upstream ws://ocpp:9000/ocpp --redis_host redis --redis_port 6379 --redis_db 7 --service
 
