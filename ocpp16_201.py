@@ -223,6 +223,11 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         proxy_setpoint_update_loop().subscribe(self.periodic_setpoint_update)
         proxy_fsm_update_loop().subscribe(self.fsm_loop_runner)
 
+    async def route_message(self, raw_msg):
+        """ Override parent class method to reset HB timer on any downstream activity."""
+        await self.fsm.mark_downstream_activity()
+        return await super().route_message(raw_msg)
+
     @log_req_response
     async def fsm_loop_runner(self, *vargs, **kwargs):
         if self.fsm.current_state != ProxyConnectionFSMState.finalizing:

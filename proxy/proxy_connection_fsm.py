@@ -94,6 +94,11 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
         ctxt.downstream_hb_timeout_timer_start = datetime.datetime.now()
         logger.info(f"start_new_heartbeat_timer {ctxt.downstream_hb_timeout_timer_start=}")
 
+    async def mark_downstream_activity(self):
+        ctxt : ProxyConnectionContext = self.context
+        ctxt.downstream_hb_timeout_timer_start = datetime.datetime.now()
+        logger.debug(f"mark_downstream_activity {ctxt.downstream_hb_timeout_timer_start=}")
+
     def if_heartbeat_timeout(self, *vargs, **kwargs):
         ctxt: ProxyConnectionContext = self.context
         time_now = datetime.datetime.now()
