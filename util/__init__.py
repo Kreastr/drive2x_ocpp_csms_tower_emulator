@@ -43,6 +43,9 @@ from camel_converter import dict_to_camel
 from nicegui import ElementFilter, ui
 
 import logging
+import sys
+import ecs_logging
+
 
 from pydantic import BaseModel
 
@@ -50,8 +53,6 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 ET = TypeVar("ET")
-
-import ecs_logging
 
 
 def configure_json_logging():
