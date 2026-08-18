@@ -79,6 +79,7 @@ from datetime import  timezone
 
 from util.db import get_default_redis
 from util.interval_trigger import proxy_setpoint_update_loop, proxy_fsm_update_loop
+from util.types import EVSEId
 
 UTC_TZ = timezone(timedelta(0))
 
@@ -522,6 +523,9 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         await self.call_payload(call.Reset(type=ResetEnumType.immediate))
         await self.close_connection(*vargs)
     """
+
+    def do_set_charging_profile(self, evse_id: EVSEId, charging_profile: ChargingProfileType):
+        raise NotImplemented()
 
     def is_connected_to_ocpp_upstream(self) -> bool:
         return self.upstream_interface is not None

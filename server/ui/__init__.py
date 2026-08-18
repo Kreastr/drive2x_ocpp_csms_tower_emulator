@@ -38,8 +38,8 @@ from nicegui.element import Element
 
 from server.data import ChargePointContext
 if TYPE_CHECKING:
-    from server.ocpp_server_handler import OCPPServerHandler
     from server.charge_point_model import ChargePointFSMType
+from server.ocpp_server_handler import OCPPServerHandler
 from util import qr_link
 from util.types import EVSEId
 
