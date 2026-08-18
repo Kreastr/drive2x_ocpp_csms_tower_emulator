@@ -59,7 +59,6 @@ from typing import Any, Optional
 
 from server.callable_interface import CallableInterface
 
-from server.ui import CPCard
 import traceback
 
 logger = getLogger(__name__)
@@ -277,7 +276,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
     @on(Action.status_notification)
     async def on_status_notification(self, **status_data):
         session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
-        from server.ui import CPCard
         self.log_event(("status_notification", status_data))
         logger.warning(f"id={self.fsm.context.id} on_status_notification {status_data=}")
         conn_status = EvseStatus(**status_data)
@@ -325,6 +323,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                     conn_status.evse_id].context.evse.connector_status = conn_status.connector_status
 
     async def _ensure_tx_fsm_exists(self, cp_id : str, evse_id : EVSEId) -> TxFSMServer:
+        from server.ui import CPCard
         if evse_id not in self.fsm.context.transaction_fsms:
             tx_fsm = TxFSMServer(cp_id, evse_id)
             await tx_fsm.try_restore_fsm()
