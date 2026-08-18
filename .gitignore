@@ -8,3 +8,4 @@ __pycache__
 /mutants/
 *.meta
 *.egg-info
+/VERSION

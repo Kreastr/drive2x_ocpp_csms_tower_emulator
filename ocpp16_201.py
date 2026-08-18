@@ -30,6 +30,7 @@ import uuid
 from datetime import datetime, timedelta, UTC
 from asyncio import CancelledError, Lock
 from logging import getLogger
+from pathlib import Path
 from time import sleep
 
 import ocpp.v16.enums
@@ -199,6 +200,13 @@ def clone_var_component(var):
     return resp_cmpnt, resp_var
 
 
+def get_version_tag():
+    version = ""
+    version_file = Path("VERSION")
+    if version_file.exists() and version_file.is_file():
+        version = Path("VERSION").read_text()
+    return version
+
 @beartype
 class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
 
@@ -316,6 +324,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def on_boot_notification(self, rq : BootNotificationRequest, **kwargs):
         if rq.chargePointSerialNumber is None:
             rq.chargePointSerialNumber = self.id
+        rq.firmwareVersion += "," + get_version_tag()
         self.cached_boot_notification = rq
 
         return call_result.BootNotification(
