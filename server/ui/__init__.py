@@ -27,7 +27,7 @@ import asyncio
 import base64
 import io
 import traceback
-from typing import cast, Self
+from typing import cast, Self, TYPE_CHECKING
 
 import qrcode
 from beartype import beartype
@@ -37,6 +37,8 @@ from nicegui.element import Element
 
 from server.charge_point_model import ChargePointFSMType
 from server.data import ChargePointContext
+if TYPE_CHECKING:
+    from server.ocpp_server_handler import OCPPServerHandler
 from util import qr_link
 from util.types import EVSEId
 
@@ -53,7 +55,7 @@ class CPCard(Element):
     online = BindableProperty(
         on_change=lambda sender, value: cast(Self, sender)._handle_online_change(value))
 
-    def __init__(self, charge_point, **kwargs):
+    def __init__(self, charge_point : OCPPServerHandler, **kwargs):
         from server.ocpp_server_handler import charge_points
         super().__init__(tag="div")
         self.fsm = charge_point.fsm
