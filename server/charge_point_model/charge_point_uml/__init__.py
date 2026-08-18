@@ -32,7 +32,7 @@ Unknown --> Booted : on boot notification
 Rejected --> [*]
 Identified --> Booted : on boot notification
 Identified --> Booted : on cached boot notification
-Identified --> Failing : on boot timeout
+Identified --> ForceBooted : on boot timeout
 Failing --> Failed : on reset accepted
 Failing --> ForceBooted : on reset rejected
 Failed --> [*]
