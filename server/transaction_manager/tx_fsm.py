@@ -100,12 +100,13 @@ class TxFSMServer(TxManagerFSMType):
         if self.my_fsm_id != "":
             latest_transaction_cache, fsm_state_cache, fsm_context_cache = get_cache_dicts()
             fsm_state_cache[self.my_fsm_id] = self.current_state.value
-            ctxt = self.context
-            copy_context = copy.copy(ctxt)
-            copy_context.cp_interface = None
-            jsonified = copy_context.model_dump_json()
-            logger.info(f"about to save FSM {self.my_fsm_id} context {jsonified=}")
-            fsm_context_cache[self.my_fsm_id] = jsonified
+            if self.context is not None:
+                ctxt = self.context
+                copy_context = copy.copy(ctxt)
+                copy_context.cp_interface = None
+                jsonified = copy_context.model_dump_json()
+                logger.info(f"about to save FSM {self.my_fsm_id} context {jsonified=}")
+                fsm_context_cache[self.my_fsm_id] = jsonified
 
     async def enter_upkeep(self, *vargs):
         # Send upkeep power profile as stack 0
