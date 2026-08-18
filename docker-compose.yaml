@@ -54,11 +54,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -fsS -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health >/dev/null || exit 1"
+          "curl -fsS -u elastic:$$ELASTIC_PASSWORD http://localhost:9200/_cluster/health >/dev/null || exit 1"
         ]
       interval: 10s
       timeout: 5s
       retries: 20
+      start_period: 30s
 
    kibana:
     image: docker.elastic.co/kibana/kibana:9.5.1
