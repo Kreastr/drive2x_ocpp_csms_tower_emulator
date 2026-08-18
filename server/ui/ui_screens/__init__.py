@@ -195,7 +195,19 @@ def test_pin(pin, context : UIManagerContext):
     if pin == "00000000":
         pin = "master-"+str(context.charge_point.get_charge_point_id())
 
-        if pin not in booking_details:
+        now = dt.now(tz=datetime.UTC)
+
+        existing_booking = None
+
+        if pin in booking_details:
+            existing_booking = booking_details[pin]
+
+            if existing_booking.departure_time <= now:
+                logger.info(f"Deleting expired booking {pin=} {existing_booking.departure_time=} {now=}")
+                del booking_details[pin]
+                existing_booking = None
+
+        if existing_booking is None:
             arrival = dt.now(tz=datetime.UTC).replace(minute=0,second=0,microsecond=0)
             departure = arrival + timedelta(days=30)
             booking_details[pin] = BookingDetails(arrival_time=arrival,
