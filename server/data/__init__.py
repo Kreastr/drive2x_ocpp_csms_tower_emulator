@@ -26,7 +26,7 @@ Union nor the granting authority can be held responsible for them.
 from _pydatetime import datetime, datetime as dt
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 from server.callable_interface import CallableInterface
 from pydantic import BaseModel, Field
@@ -47,9 +47,9 @@ class ComponentData(BaseModel):
 class ChargePointContext:
     #current_tx : dict[EVSEId, TransactionId] = field(default_factory=dict)
     boot_notifications : list[Any] = field(default_factory=list)
-    remote_ip = None
-    online = False
-    shutdown = False
+    remote_ip : Optional[str] = None
+    online : bool = False
+    shutdown : bool = False
     #tx_status = ""
     timeout : datetime = field(default_factory=datetime.now)
     id : ChargePointId = "provisional"

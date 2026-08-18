@@ -35,10 +35,10 @@ from nicegui import ui
 from nicegui.binding import BindableProperty, bind_from
 from nicegui.element import Element
 
-from server.charge_point_model import ChargePointFSMType
 from server.data import ChargePointContext
 if TYPE_CHECKING:
     from server.ocpp_server_handler import OCPPServerHandler
+    from server.charge_point_model import ChargePointFSMType
 from util import qr_link
 from util.types import EVSEId
 
@@ -50,15 +50,15 @@ logger.setLevel(logging.DEBUG)
 
 
 
-@beartype
 class CPCard(Element):
     online = BindableProperty(
         on_change=lambda sender, value: cast(Self, sender)._handle_online_change(value))
 
+    @beartype
     def __init__(self, charge_point : OCPPServerHandler, **kwargs):
         from server.ocpp_server_handler import charge_points
         super().__init__(tag="div")
-        self.fsm = charge_point.fsm
+        self.fsm : ChargePointFSMType = charge_point.fsm
         self.charge_point = charge_point
         self.cp_context : ChargePointContext = charge_point.fsm.context
         cp = charge_points[str(self.cp_context.id)]
@@ -105,12 +105,14 @@ class CPCard(Element):
         bind_from(self_obj=self, self_name="online",
                   other_obj=var, other_name=name)
 
-    def _handle_online_change(self, card_online_status):
+    @beartype
+    def _handle_online_change(self, card_online_status : bool):
         logger.warning(f"online changes {card_online_status}")
         self.card.classes(remove="bg-green bg-red")
         self.card.classes(add="bg-green" if card_online_status else "bg-red")
         self.card.update()
 
+    @beartype
     async def on_new_evse(self, evse_id : EVSEId):
         from server.ocpp_server_handler import charge_points
         logger.warning(f"on new connector {evse_id}")
