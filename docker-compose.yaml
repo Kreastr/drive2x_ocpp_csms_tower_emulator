@@ -9,6 +9,11 @@ services:
         - redis
       networks:
         - ocpp_net
+      logging:
+        driver: json-file
+        options:
+          max-size: "100m"
+          max-file: "5"
    redis:
       image: redis:7.4-alpine
       restart: always
@@ -17,6 +22,11 @@ services:
         - redisdb:/data
       networks:
         - ocpp_net
+      logging:
+        driver: json-file
+        options:
+          max-size: "100m"
+          max-file: "5"
    vcp:
       image: vcp:latest
       ports: 
@@ -27,6 +37,11 @@ services:
         - ocpp
       networks:
         - ocpp_net
+      logging:
+        driver: json-file
+        options:
+          max-size: "100m"
+          max-file: "5"
    proxy:
       image: proxy:latest
       ports:
@@ -37,6 +52,11 @@ services:
         - ocpp
       networks:
         - ocpp_net
+      logging:
+        driver: json-file
+        options:
+          max-size: "100m"
+          max-file: "5"
 
    elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.5.1
