@@ -194,7 +194,7 @@ def qr_link(url):
 CYCLE_DURATION = 5
 
 @beartype
-def get_slot_start(rtime : datetime, offset : int = 0 ):
+def get_slot_start(rtime : datetime.datetime, offset : int = 0 ):
     """
 
     :param rtime:
