@@ -37,6 +37,16 @@ class SupportsUpstreamReconnect(ABC):
     async def try_connect_to_upstream(self):
         pass
 
+class SupportsClosingUpstreamDownstream(ABC):
+
+    @abstractmethod
+    async def close_upstream_connection(self, *vargs):
+        pass
+    
+    @abstractmethod
+    async def close_downstream_connection(self, *vargs):
+        pass
+    
 class CallableInterface(ABC):
     
     @abstractmethod

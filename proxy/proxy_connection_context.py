@@ -27,10 +27,11 @@ import datetime
 from abc import ABC
 from typing import Any
 
-from server.callable_interface import CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect
+from server.callable_interface import CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect, \
+    SupportsClosingUpstreamDownstream
 
 
-class CPInterface(CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect, ABC):
+class CPInterface(CallableInterface, SupportsBootNotificationForwarding, SupportsUpstreamReconnect, SupportsClosingUpstreamDownstream, ABC):
     pass
 
 @dataclasses.dataclass
@@ -38,3 +39,4 @@ class ProxyConnectionContext:
     charge_point_interface : CPInterface | None = None
     csms_interface : CallableInterface | None = None
     downstream_hb_timeout_timer_start : datetime.datetime | None = None
+    termination_flag : bool = False

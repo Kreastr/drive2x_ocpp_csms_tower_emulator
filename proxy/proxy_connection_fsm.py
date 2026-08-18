@@ -23,12 +23,14 @@ Union nor the granting authority can be held responsible for them.
 """
 import datetime
 import logging
+import os
 from logging import getLogger
 
 from beartype import beartype
 
 
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent, ProxyConnectionFSMCondition
+from util import get_proxy_app_args
 
 from .proxy_connection_context import ProxyConnectionContext
 from .proxy_connection_fsm_type import ProxyConnectionFSMType, proxy_connection_uml, ProxyConnectionFSMState
@@ -54,13 +56,30 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_server_disconnected, callback=self.if_server_disconnected)
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_server_connected, callback=self.if_server_connected)
         self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_start_up_delay_done, callback=self.if_start_up_delay_done)
+        self.apply_to_all_conditions(ProxyConnectionFSMCondition.if_termination_requested, callback=self.if_termination_requested)
         self.on(ProxyConnectionFSMState.start_up.on_enter, self.start_new_downstream_heartbeat_timer)
         self.on(ProxyConnectionFSMState.connected.on_enter, self.start_new_downstream_heartbeat_timer)
+        self.on(ProxyConnectionFSMState.shutting_down.on_enter, self.close_upstream)
+        self.on(ProxyConnectionFSMState.shut_down_server_disconnected.on_enter, self.close_downstream)
+        self.on(ProxyConnectionFSMState.shut_down_server_disconnected.on_exit, self.maybe_exit_proxy)
+        #shut_down_server_disconnected
         #self.on(ProxyConnectionFSMState.connected.on_enter, self.handle_delayed_boot_notifications)
         self.on(ProxyConnectionFSMState.autonomous_loop.on_enter, self.start_new_downstream_heartbeat_timer)
         self.on(ProxyConnectionFSMState.autonomous_loop.on_loop, self.try_connect_to_upstream)
-        self.on(ProxyConnectionFSMState.connecting.on_loop, self.try_forward_boot_and_status_data)
-        
+        self.on(ProxyConnectionFSMState.connecting.on_enter, self.try_forward_boot_and_status_data)
+
+    async def close_upstream(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        await ctxt.charge_point_interface.close_upstream_connection()
+
+    async def close_downstream(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        await ctxt.charge_point_interface.close_downstream_connection()
+
+    async def maybe_exit_proxy(self, *vargs, **kwarg):
+        if not get_proxy_app_args().service:
+            os._exit(0)
+
     async def try_forward_boot_and_status_data(self, *vargs, **kwargs):
         logger.warning("try_forward_boot_and_status_data outer")
         ctxt: ProxyConnectionContext = self.context
@@ -106,3 +125,6 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
     def if_server_connected(self, *vargs, **kwargs):
         return not self.if_server_disconnected()
 
+    def if_termination_requested(self, *vargs, **kwargs):
+        ctxt: ProxyConnectionContext = self.context
+        return ctxt.termination_flag

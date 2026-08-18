@@ -34,19 +34,20 @@ New --> StartUp
 StartUp --> AutonomousLoop : if start up delay done
 AutonomousLoop --> AutonomousLoop : on downstream heartbeat
 AutonomousLoop --> Connecting : if server connected
-AutonomousLoop --> ClientDisconnected : on termination request
+AutonomousLoop --> ShuttingDown : if termination requested
 AutonomousLoop --> ClientDisconnected : if client disconnected
 Connecting --> Connecting : on downstream heartbeat
 Connecting --> Connected : on upstream accepted boot notification
 Connecting --> ClientDisconnected : if client disconnected
-Connecting --> ShuttingDown : on termination request
+Connecting --> ShuttingDown : if termination requested
 Connecting --> AutonomousLoop : if downstream heartbeat timeout
 Connected --> ClientDisconnected : if client disconnected
 Connected --> AutonomousLoop : if server disconnected
-Connected --> ShuttingDown : on termination request
+Connected --> ShuttingDown : if termination requested
 Connected --> ClientDisconnected : if downstream heartbeat timeout
 Connected --> Connected : on downstream heartbeat
-ShuttingDown --> ServerDisconnected : if server disconnected
+ShuttingDown --> ShutDownServerDisconnected : if server disconnected
+ShutDownServerDisconnected --> Finalizing : if client disconnected
 ClientDisconnected --> Finalizing : if server disconnected
 ServerDisconnected --> Finalizing : if client disconnected
 Finalizing --> [*]

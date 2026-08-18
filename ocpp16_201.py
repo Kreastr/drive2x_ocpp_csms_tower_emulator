@@ -87,12 +87,18 @@ from typing import Any, Optional
 import websockets
 import traceback
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 getLogger("websockets.server").setLevel(logging.WARNING)
 getLogger("ocpp").setLevel(logging.WARNING)
 getLogger("websockets.client").setLevel(logging.WARNING)
+getLogger("afsm").setLevel(logging.DEBUG)
 
 CONFIGURATION_MAP = {"V2XChargingCtrlr": {"Setpoint": "pBaseline"}}
 STUBS_MAP = {}
@@ -128,6 +134,7 @@ async def connect_as_client(client_interface : OCPPServerV16Interface, uri : str
             cp = OCPPClientV201(client_interface, serial_number, ws)
             client_interface.upstream_interface = cp
             await on_connect_cb(cp)
+            await cp.start()
 
     except websockets.exceptions.InvalidStatus as e:
             logger.info(str(e))
@@ -214,8 +221,6 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     async def fsm_loop_runner(self, *vargs, **kwargs):
         if self.fsm.current_state != ProxyConnectionFSMState.finalizing:
             await self.fsm.loop()
-            if self.fsm.current_state == ProxyConnectionFSMState.connecting:
-                await self.try_forward_data_to_upstream()
             self.logger.warning(f"FSM state is {self.fsm.current_state}")
         else:
             self.logger.warning(f"{self.fsm} Unsubscribed from periodic loops.")
@@ -232,7 +237,6 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         async def connect_cb(cp, s=self):
             s.fsm.context : ProxyConnectionContext
             s.fsm.context.csms_interface = cp
-            await cp.start()
         # Callback will set upstream_interface for this class
         await connect_as_client(client_interface=self,
                                 uri=ProxyConfigurator.get_global_config().upstream_uri,
@@ -289,8 +293,6 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
         except asyncio.TimeoutError:
             # Do not mark downstream as disconnected. This is not the hard fault yet.
             logger.warning(f"Got asyncio.TimeoutError while calling downstream payload {payload=}")
-            raise ocpp.exceptions.GenericError(description="Downstream is disconnected. Cannot deliver.",
-                                               details=dict(retryable=True))
         except websockets.exceptions.ConnectionClosedOK:
             self.downstream_connected = False
             logger.info(f"Got ConnectionClosedOK while calling downstream payload {payload=}")
@@ -561,7 +563,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     @log_req_response
     @beartype
     async def on_reset(self, request : ResetRequest) -> call_result_201.Reset:
-        logger.warning(f"{self.id=}")
+        logger.warning(f"on_reset {self.id=}")
         #if self.has_icl_latiniki_hack:
         #    v16_type = ResetType.soft
         #else:
@@ -569,12 +571,22 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             v16_type = RESET_TYPE_MAP[request.type]
         else:
             v16_type = ResetType.hard
-        response : Optional[call_result.Reset] = await self.call_downstream_payload(call.Reset(type=v16_type))
+        logger.warning(f"on_reset pre-call {self.id=}")
+        try:
+            response : Optional[call_result.Reset] = await self.call_downstream_payload(call.Reset(type=v16_type))
+        except GenericError:
+            response = None
+
+        logger.warning(f"on_reset post-call {response=}")
 
         if response is not None and response.status in RESET_STATUS_MAP:
             v201_status = RESET_STATUS_MAP[response.status]
         else:
             v201_status = ResetStatusEnumType.rejected
+
+        self.fsm.context : ProxyConnectionContext
+        self.fsm.context.termination_flag = True
+        logger.warning(f"{self.fsm.context=}")
 
         return call_result_201.Reset(status=v201_status)
 
@@ -712,7 +724,7 @@ async def on_connect(websocket):
 
 
     cp = OCPPServer16Proxy(id=charge_point_id, connection=websocket)
-    await cp.upstream_connection_task()
+    task = asyncio.create_task(cp.upstream_connection_task())
 
     if charge_point_id in ChargePointInstances:
         old_cp = ChargePointInstances[charge_point_id]
@@ -729,6 +741,7 @@ async def on_connect(websocket):
     except Exception as e:
         result = f"\n-------Exception {e}-----\n"+traceback.format_exc()+"\n----------------------\n"
     logger.info(f"connection_task.result {result}")
+    await task
 
 
 async def main():
