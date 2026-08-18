@@ -233,8 +233,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         self.fsm.context.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
 
-        if "firmwareVersion" in charging_station:
-            self.fw_version = charging_station["firmwareVersion"]
+        if "firmware_version" in charging_station:
+            self.fw_version = charging_station["firmware_version"]
 
         if "serial_number" in charging_station:
             self.id = charging_station["serial_number"]
