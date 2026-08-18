@@ -37,7 +37,71 @@ services:
         - ocpp
       networks:
         - ocpp_net
+
+   elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.1
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      ELASTIC_PASSWORD: "${ELASTIC_PASSWORD}"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - default
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health >/dev/null || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+   kibana:
+    image: docker.elastic.co/kibana/kibana:9.5.1
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+      ELASTICSEARCH_USERNAME: "kibana_system"
+      ELASTICSEARCH_PASSWORD: "${KIBANA_PASSWORD}"
+    ports:
+      - "127.0.0.1:4080:5601"
+    networks:
+      - default
+
+   elastic-agent:
+    image: docker.elastic.co/elastic-agent/elastic-agent:9.5.1
+    restart: unless-stopped
+    user: root
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ES_USERNAME: "elastic"
+      ES_PASSWORD: "${ELASTIC_PASSWORD}"
+    volumes:
+      - ./elastic-agent.yml:/usr/share/elastic-agent/elastic-agent.yml:ro
+
+      # Read Docker container log files
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+      # Discover container metadata
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Keep Agent state across restarts
+      - elastic-agent-data:/usr/share/elastic-agent/state
+    networks:
+      - default
+
 volumes:
+  elasticsearch-data:
+  elastic-agent-data:
   redisdb:
     driver: local
 networks:
