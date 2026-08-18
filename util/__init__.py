@@ -26,11 +26,10 @@ Union nor the granting authority can be held responsible for them.
 import base64
 import inspect
 import io
-import logging
 from datetime import timedelta
 from argparse import ArgumentParser
-from datetime import datetime, timezone
-from typing import NewType, TypeVar, Type
+import datetime
+from typing import TypeVar, Type
 
 from beartype.typing import Generic
 from functools import wraps
@@ -100,7 +99,7 @@ class ResettableIterator(Generic[ERT]):
 
 
 def get_time_str():
-    return datetime.now(tz=timezone.utc).isoformat()
+    return datetime.datetime.now(tz=datetime.UTC).isoformat()
 
 
 def setup_logging(name):
@@ -118,7 +117,7 @@ def setup_logging(name):
 
 
 def time_based_id():
-    return int((datetime.now() - datetime(2025, 1, 1)).total_seconds() * 10)
+    return int((datetime.datetime.now() - datetime.datetime(2025, 1, 1)).total_seconds() * 10)
 
 
 def any_of(*vargs):
@@ -202,13 +201,13 @@ def get_slot_start(rtime : datetime, offset : int = 0 ):
     :param offset:
     :return:
 
-    >>> get_slot_start(datetime(2023, 8, 15, 10, 4, 37))
+    >>> get_slot_start(datetime.datetime(2023, 8, 15, 10, 4, 37))
     datetime.datetime(2023, 8, 15, 10, 0)
 
-    >>> get_slot_start(datetime(2023, 8, 15, 10, 4, 37), offset=1)
+    >>> get_slot_start(datetime.datetime(2023, 8, 15, 10, 4, 37), offset=1)
     datetime.datetime(2023, 8, 15, 10, 15)
 
-    >>> get_slot_start(datetime(2023, 8, 15, 10, 54, 37), offset=1)
+    >>> get_slot_start(datetime.datetime(2023, 8, 15, 10, 54, 37), offset=1)
     datetime.datetime(2023, 8, 15, 11, 0)
 
     """

@@ -25,6 +25,13 @@ Union nor the granting authority can be held responsible for them.
 
 from abc import abstractmethod, ABC
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ocpp.v201.datatypes import ChargingProfileType
+    from util.types import EVSEId
+
+
 class SupportsBootNotificationForwarding(ABC):
 
     @abstractmethod
@@ -66,4 +73,8 @@ class CallableInterface(ABC):
 
     @abstractmethod
     def is_connected_to_ocpp_downstream(self) -> bool:
+        pass
+    
+    @abstractmethod
+    def do_set_charging_profile(self, evse_id: EVSEId, charging_profile : ChargingProfileType) :
         pass

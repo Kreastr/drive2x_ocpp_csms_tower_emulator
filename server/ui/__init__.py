@@ -98,9 +98,6 @@ class CPCard(Element):
                 await self.on_new_evse(_evse_id)
             ui.timer(0, deferred_cpcard_setup, once=True)
 
-
-
-
     def bind_online_from(self, var, name):
         bind_from(self_obj=self, self_name="online",
                   other_obj=var, other_name=name)
