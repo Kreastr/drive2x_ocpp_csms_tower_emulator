@@ -97,6 +97,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.fsm.fsm_name = f"CP <{self.id}>"
         self.fsm.context : ChargePointContext
 
+        self.fw_version = "Unknown FW version"
+
         self.fsm.on(ChargePointFSMState.created.on_exit, self.connect_and_request_id)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.try_cached_boot_notification)
         self.fsm.on(ChargePointFSMState.identified.on_enter, self.start_boot_timeout)
@@ -230,6 +232,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         session_pins, boot_notification_cache, status_notification_cache = get_redis_caches_cp()
         self.log_event(("boot_notification", (charging_station, reason, vargs, kwargs)))
         self.fsm.context.boot_notifications.append( (charging_station, reason, vargs, kwargs) )
+
+        if "firmwareVersion" in charging_station:
+            self.fw_version = charging_station["firmwareVersion"]
 
         if "serial_number" in charging_station:
             self.id = charging_station["serial_number"]
