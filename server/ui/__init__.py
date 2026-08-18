@@ -71,7 +71,7 @@ class CPCard(Element):
                 ui.label().bind_text(self.cp_context, "id")
                 
                 ui.label("FW version")
-                ui.label().bind_text(self.charge_point, "firmware_version")
+                ui.label().bind_text(self.charge_point, "fw_version")
 
                 ui.label("Remote IP")
                 ui.label().bind_text(self.cp_context, "remote_ip")
