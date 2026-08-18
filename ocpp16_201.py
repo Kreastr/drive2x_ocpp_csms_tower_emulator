@@ -73,7 +73,7 @@ from proxy.proxy_connection_fsm import ProxyConnectionFSM
 from proxy_connection_fsm_enums import ProxyConnectionFSMEvent, ProxyConnectionFSMState
 from server.callable_interface import CallableInterface
 from util import async_camelize_kwargs, log_req_response, with_request_model, time_based_id, \
-    get_proxy_app_args
+    get_proxy_app_args, configure_json_logging
 
 from datetime import  timezone
 
@@ -89,10 +89,7 @@ from typing import Any, Optional
 import websockets
 import traceback
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+configure_json_logging()
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)

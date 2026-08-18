@@ -51,6 +51,25 @@ logger.setLevel(logging.DEBUG)
 
 ET = TypeVar("ET")
 
+import ecs_logging
+
+
+def configure_json_logging():
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    root_logger.handlers.clear()
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        ecs_logging.StdlibFormatter(
+            exclude_fields=[
+                "process",
+            ]
+        )
+    )
+
+    root_logger.addHandler(handler)
 
 class ResettableValue(Generic[ET]):
 

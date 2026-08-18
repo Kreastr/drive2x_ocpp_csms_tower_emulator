@@ -74,7 +74,7 @@ from server.ui.ui_screens import new_session_screen, car_not_connected_screen, c
     porto_login_code_screen_correct, porto_login_code_screen_incorrect, booking_details_screen, error_screen, \
     car_connected_too_soon_error_screen
 from uimanager_fsm_enums import UIManagerFSMState
-from util import setup_logging, get_slot_start, get_slot_duration, get_app_args
+from util import setup_logging, get_slot_start, get_slot_duration, get_app_args, configure_json_logging
 from util.fair_semaphore_redis import FairSemaphoreRedis
 from util.types import *
 
@@ -83,6 +83,7 @@ from server.callable_interface import CallableInterface
 
 from pytz import timezone
 
+configure_json_logging()
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)

@@ -70,7 +70,7 @@ from ocpp_models.v201.get_charging_profiles import GetChargingProfilesRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from tx_fsm_enums import TxFSMState, TxFSMCondition, TxFSMEvent
 from util import ResettableValue, ResettableIterator, get_time_str, setup_logging, log_async_call, get_virtual_cp_args, \
-    async_camelize_kwargs, log_req_response, with_request_model
+    async_camelize_kwargs, log_req_response, with_request_model, configure_json_logging
 from util.db import get_default_redis
 from util.interval_trigger import client_measurand_loop
 
@@ -78,9 +78,11 @@ from redis_dict import RedisDict
 
 from util.types import EVSEId, TransactionId
 
-print("Pre-start delay to let server refresh reliably")
+configure_json_logging()
+
+logging.INFO("Pre-start delay to let server refresh reliably")
 sleep(30)
-print("Pre-start delay done")
+logging.INFO("Pre-start delay done")
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)

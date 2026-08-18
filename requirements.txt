@@ -29,3 +29,4 @@ camel-converter~=5.0.0
 pytz~=2025.2
 FigmaPy~=2018.1.0
 anytree~=2.13.0
+ecs-logging~=2.3.0
