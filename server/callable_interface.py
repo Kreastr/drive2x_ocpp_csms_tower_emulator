@@ -22,6 +22,7 @@ only and do not necessarily reflect those of the European Union, CINEA or UKRI. 
 Union nor the granting authority can be held responsible for them.
 """
 
+from __future__ import annotations
 
 from abc import abstractmethod, ABC
 
@@ -74,7 +75,7 @@ class CallableInterface(ABC):
     @abstractmethod
     def is_connected_to_ocpp_downstream(self) -> bool:
         pass
-    
+
     @abstractmethod
     def do_set_charging_profile(self, evse_id: EVSEId, charging_profile : ChargingProfileType) :
         pass

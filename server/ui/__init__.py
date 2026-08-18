@@ -22,6 +22,7 @@ only and do not necessarily reflect those of the European Union, CINEA or UKRI. 
 Union nor the granting authority can be held responsible for them.
 """
 
+from __future__ import annotations
 
 import asyncio
 import base64
