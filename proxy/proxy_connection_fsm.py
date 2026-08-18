@@ -78,7 +78,7 @@ class ProxyConnectionFSM(ProxyConnectionFSMType):
 
     async def maybe_exit_proxy(self, *vargs, **kwarg):
         if not get_proxy_app_args().service:
-            os._exit(0)
+            os.system("reboot")
 
     async def try_forward_boot_and_status_data(self, *vargs, **kwargs):
         logger.warning("try_forward_boot_and_status_data outer")
