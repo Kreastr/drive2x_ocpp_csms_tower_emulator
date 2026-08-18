@@ -80,9 +80,9 @@ from util.types import EVSEId, TransactionId
 
 configure_json_logging()
 
-logging.INFO("Pre-start delay to let server refresh reliably")
+print("Pre-start delay to let server refresh reliably")
 sleep(30)
-logging.INFO("Pre-start delay done")
+print("Pre-start delay done")
 
 logger = setup_logging(__name__)
 logger.setLevel(logging.DEBUG)
