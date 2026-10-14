@@ -95,8 +95,8 @@ class TxFSMServer(TxManagerFSMType):
                     saved_context.cp_interface = self.context.cp_interface
                 self.context = saved_context
                 logger.warning(f"restored FSM context {self.my_fsm_id=} {self.context=} {saved_context=}")
-            else:
-                self.context = TxManagerContext.model_validate({})
+        else:
+            self.context = TxManagerContext.model_validate({})
 
     async def save_fsm_state(self, *vargs):
         logger.info(f"save_fsm_state {self.my_fsm_id=}")
