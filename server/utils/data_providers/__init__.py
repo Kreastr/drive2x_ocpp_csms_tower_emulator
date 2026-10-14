@@ -39,9 +39,9 @@ logger.setLevel(logging.INFO)
 
 class BookingManager(collections.abc.MutableMapping):
 
-    def __init__(self):
+    def __init__(self, redis=None):
         self.db = RedisDict(f"csms_booking_details",
-                            redis=get_default_redis(arg_provider=get_app_args))
+                            redis=get_default_redis(arg_provider=get_app_args) if redis is None else redis)
 
     @beartype
     def __setitem__(self, key: str, value: BookingDetails, /):

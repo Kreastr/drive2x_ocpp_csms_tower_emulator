@@ -1,9 +1,30 @@
 services:
+   booking_loader:
+    build:
+      context: ./porto_booking_loader
+      dockerfile: Dockerfile
+    image: booking_loader:latest
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - /opt/d2x_mail_log:/data/input:ro
+    depends_on:
+      - redis
+    networks:
+      - ocpp_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
    ocpp:
       image: ocpp:latest
       ports: 
         - 9000:9000
-        - 8000:8000
+        - 127.0.0.1:8000:8000
       restart: unless-stopped
       depends_on:
         - redis

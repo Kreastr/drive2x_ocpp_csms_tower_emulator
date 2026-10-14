@@ -244,24 +244,34 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "D2X_DEMO_": "d2x_ga3_demo",
            "PORTO_APT_": "porto_apt",
            "LatinkiHQ": "d2x_ga3_demo",
-           "1132523008": "d2x_ga3_demo",
-           "1132523017": "d2x_ga3_demo",
-           "1132523027": "d2x_ga3_demo"
+           "1132523008": "porto_apt", # Lab
+           "1132523024": "porto_apt", # Lab
+           "1132523017": "icl_lab",
+           "1132523027": "lut_internal"
            }
 
 @app.post("/sca_data/setpoints")
 async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestResponse | GenericErrorResponse:
+    return await _handle_setpoints(setpoints)
+
+@app.post("/sca_data/setpoints/{request_tag}")
+async def ev_setpoints(setpoints: SetpointRequestResponse, request_tag: str) -> SetpointRequestResponse | GenericErrorResponse:
+    return await _handle_setpoints(setpoints, request_tag)
+
+async def _handle_setpoints(setpoints, request_tag:str=None):
     if get_slot_start(setpoints.expected_slot_start_time) != setpoints.expected_slot_start_time:
         return GenericErrorResponse(error_message="Expected slot start time is not aligned.")
     if setpoints.expected_slot_start_time < datetime.datetime.now(datetime.UTC):
         return GenericErrorResponse(error_message="Expected slot start time has passed.")
     if get_slot_start(datetime.datetime.now(datetime.UTC), offset=1) != setpoints.expected_slot_start_time:
         return GenericErrorResponse(error_message="Only accepts setpoints for the next time slot.")
+    if request_tag is not None and setpoints.site_tag != request_tag:
+        return GenericErrorResponse(error_message="Unauthorized request.")
 
     try:
         confirmed = SetpointRequestResponse(site_tag=setpoints.site_tag,
                                             expected_slot_start_time=setpoints.expected_slot_start_time)
-        iid : ConnectedEVId
+        iid: ConnectedEVId
         for iid, value in setpoints.values.items():
             cp_id = ChargePointId(iid.charge_point_id)
             evse_id = EVSEId(int(iid.evse_id))
@@ -269,12 +279,12 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
             connector_id = iid.connector_id
             if cp_id in charge_points:
                 control_allowed = check_control(cp_id, setpoints.site_tag)
-    
+
                 if not control_allowed:
                     continue
-    
-                cp : OCPPServerHandler = charge_points[cp_id]
-                profile_stack_id = evse_id*10000+100*setpoints.expected_slot_start_time.hour+setpoints.expected_slot_start_time.minute
+
+                cp: OCPPServerHandler = charge_points[cp_id]
+                profile_stack_id = evse_id * 10000 + 100 * setpoints.expected_slot_start_time.hour + setpoints.expected_slot_start_time.minute
 
                 schedule = ChargingScheduleType(id=profile_stack_id,
                                                 charging_rate_unit=ChargingRateUnitEnumType.watts,
@@ -289,10 +299,11 @@ async def ev_setpoints(setpoints: SetpointRequestResponse) -> SetpointRequestRes
                                                      charging_profile_kind=ChargingProfileKindEnumType.absolute,
                                                      charging_schedule=[schedule],
                                                      valid_from=setpoints.expected_slot_start_time.isoformat(),
-                                                     valid_to=(setpoints.expected_slot_start_time+datetime.timedelta(seconds=get_slot_duration())).isoformat())
+                                                     valid_to=(setpoints.expected_slot_start_time + datetime.timedelta(
+                                                         seconds=get_slot_duration())).isoformat())
                 logger.info(f"Will set charging profile on {cp_id=} {evse_id=} {profile_stack_id=} {profile_to_set=}")
                 result = await cp.do_set_charging_profile(evse_id,
-                                           charging_profile=profile_to_set)
+                                                          charging_profile=profile_to_set)
 
                 if result:
                     logger.info(f"Profile confirmed {cp_id=} {evse_id=} {profile_stack_id=}")
@@ -590,24 +601,35 @@ async def main_screen_block(cp_id, evse_id, language):
         ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}/{language}"), once=True)
 
     else:
-        fsm = UIManagerFSMType(uml=ui_manager_uml,
-                               fsm_name=f"UI <{cp_id}:{evse_id}>",
-                               context=UIManagerContext(charge_point=charge_points[cp_id],
-                                                        tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[
-                                                            evse_id],
-                                                        evse=charge_points[cp_id].fsm.context.transaction_fsms[
-                                                            evse_id].context.evse), se_factory=UIManagerFSMState)
-
-        fsm.context.session_pins = session_pins
-        fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
-        fsm.load_from_redis()
-        cp = charge_points[cp_id]
-        state_dependent_frame(cp_id, evse_id, fsm, cp, language)
-        fsm.on("state_changed", lambda *vargs: state_dependent_frame.refresh())
-        ui.timer(1, fsm.loop)
-        #ui.separator()
-        #with ui.row(align_items="center").classes('items-center justify-around'):
-        #    ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
+        if charge_points[cp_id].fsm.context.transaction_fsms[evse_id].context is None:
+            error_heading, error_title, error_message = error_screen(heading=localize("ERROR", language),
+                                                                     title=localize("CP data is not valid yet", language),
+                                                                     text=localize(f"Charge Point with ID", language)+
+                                                                          f" {cp_id} "+
+                                                                          localize("is not active. Please try later.", language),
+                                                                      cp_id=cp_id,
+                                                                 language=language)
+    
+            ui.timer(30, lambda: ui.navigate.to(f"/d2x_ui/{cp_id}/{evse_id}/{language}"), once=True)
+        else:
+            fsm = UIManagerFSMType(uml=ui_manager_uml,
+                                   fsm_name=f"UI <{cp_id}:{evse_id}>",
+                                   context=UIManagerContext(charge_point=charge_points[cp_id],
+                                                            tx_fsm=charge_points[cp_id].fsm.context.transaction_fsms[
+                                                                evse_id],
+                                                            evse=charge_points[cp_id].fsm.context.transaction_fsms[
+                                                                evse_id].context.evse), se_factory=UIManagerFSMState)
+    
+            fsm.context.session_pins = session_pins
+            fsm.context.cp_evse_id = f"{cp_id}-{evse_id}"
+            fsm.load_from_redis()
+            cp = charge_points[cp_id]
+            state_dependent_frame(cp_id, evse_id, fsm, cp, language)
+            fsm.on("state_changed", lambda *vargs: state_dependent_frame.refresh())
+            ui.timer(1, fsm.loop)
+            #ui.separator()
+            #with ui.row(align_items="center").classes('items-center justify-around'):
+            #    ui.button(text="Exit", on_click=lambda: ui.navigate.to(f"/d2x_ui/{cp_id}"))
 
 
 async def styling():

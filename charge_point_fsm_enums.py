@@ -7,9 +7,9 @@ class ChargePointFSMState(StateBase, str, Enum):
     identified='identified'
     rejected='rejected'
     booted='booted'
+    force_booted='force_booted'
     failing='failing'
     failed='failed'
-    force_booted='force_booted'
     running_transaction='running_transaction'
     closing='closing'
 
