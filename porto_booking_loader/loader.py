@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+Copyright LUT University 2026, all rights reserved.
+
 Minimal service that
 
   * Scans a directory for *.yaml files,
