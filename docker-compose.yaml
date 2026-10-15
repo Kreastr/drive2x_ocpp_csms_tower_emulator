@@ -1,9 +1,6 @@
 services:
    booking_loader:
-    build:
-      context: ./porto_booking_loader
-      dockerfile: Dockerfile
-    image: booking_loader:latest
+    image: ocpp:latest
     restart: unless-stopped
     environment:
       - REDIS_HOST=redis
@@ -19,6 +16,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    command: ["python", "./porto_booking_loader/loader.py"]
 
    ocpp:
       image: ocpp:latest
@@ -35,6 +33,7 @@ services:
         options:
           max-size: "100m"
           max-file: "5"
+
    redis:
       image: redis:7.4-alpine
       restart: always
