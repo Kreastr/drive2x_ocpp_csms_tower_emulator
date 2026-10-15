@@ -188,7 +188,8 @@ def porto_login_code_screen_incorrect(cp_id: ChargePointId, evse_id: EVSEId, fsm
     root, screen_data = figma_renderer.render_screen("login_code_error", language)
     map_click_action("ACTION_SELF_BACK", UIManagerFSMEvent.on_back, fsm, screen_data)
 
-
+from snoop import snoop
+@snoop
 def test_pin(pin, context : UIManagerContext):
     if "X" in pin:
         return "INCOMPLETE"
