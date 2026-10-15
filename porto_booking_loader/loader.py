@@ -55,8 +55,12 @@ def _try_parse_date(text: str) -> datetime | None:
         dt = dateparser.parse(
             text.replace("�s", "às"),
             languages=["pt"],
-            settings={"DATE_ORDER": "MDY"},
-        ).replace(tzinfo=ZoneInfo("Europe/Lisbon"))
+            settings={"DATE_ORDER": "MDY",
+                      "PREFER_LOCALE_DATE_ORDER": False,
+                      "TIMEZONE": "Europe/Lisbon",
+                      "RETURN_AS_TIMEZONE_AWARE": True,
+                      },
+        )
         return dt
     except Exception as exc:
         log.error("Could not parse date %r - %s", text, exc)
