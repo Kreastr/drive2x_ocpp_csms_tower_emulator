@@ -32,7 +32,7 @@ FILE_GLOB: str = "*.yaml"
 SCAN_INTERVAL: int = 15             # seconds
 
 # DB
-REDIS_HOST: str = "redis"
+REDIS_HOST: str = "csms_redis"
 REDIS_PORT: int = 6379
 REDIS_DB: int = 2
 

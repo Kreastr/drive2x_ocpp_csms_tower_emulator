@@ -34,7 +34,7 @@ services:
           max-size: "100m"
           max-file: "5"
 
-   redis:
+   csms_redis:
       image: redis:7.4-alpine
       restart: always
       command: redis-server --save 20 1 --loglevel warning
