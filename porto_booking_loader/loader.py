@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from logging import getLogger
 from zoneinfo import ZoneInfo
 from pathlib import Path
 
@@ -24,7 +25,6 @@ import redis
 import yaml
 import dateparser
 
-import util
 from server.data import BookingDetails
 from server.utils.data_providers import BookingManager
 
@@ -37,7 +37,7 @@ REDIS_HOST: str = "redis"
 REDIS_PORT: int = 6379
 REDIS_DB: int = 0
 
-log = util.setup_logging(__name__)
+log = getLogger()
 
 def get_redis_client() -> redis.Redis:
     return redis.Redis(
