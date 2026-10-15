@@ -66,6 +66,7 @@ def load_yaml_file(path: Path) -> tuple[str, BookingDetails] | None:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         order = str(raw["order_number"])
+        order = "0"*(8-len(order)) + order
         start = _try_parse_date(raw["start_date"])
         end   = _try_parse_date(raw["end_date"])
 
