@@ -16,7 +16,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    command: ["python", "./porto_booking_loader/loader.py"]
+    command: ["python", "porto_booking_loader.py"]
 
    ocpp:
       image: ocpp:latest
