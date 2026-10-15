@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import redis
 import yaml
-from dateutil import parser
+import dateparser
 
 import util
 from server.data import BookingDetails
@@ -51,8 +52,12 @@ def get_redis_client() -> redis.Redis:
 def _try_parse_date(text: str) -> datetime | None:
     """Parse the Portuguese-style date string used by the service."""
     try:
-        # Assuming dateutil.parser can understand month names like "outubro".
-        return parser.parse(text, fuzzy=True)
+        dt = dateparser.parse(
+            text.replace("�s", "às"),
+            languages=["pt"],
+            settings={"DATE_ORDER": "MDY"},
+        ).replace(tzinfo=ZoneInfo("Europe/Lisbon"))
+        return dt
     except Exception as exc:
         log.error("Could not parse date %r - %s", text, exc)
         return None
