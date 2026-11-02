@@ -6,350 +6,358 @@
   PT: ' '
 -5.3kW:
   EN: -5.3kW
-  PT: ''
+  PT: -5,3 kW
 . Please try later.:
   EN: . Please try later.
-  PT: ''
+  PT: . Por favor, tente novamente mais tarde.
 '0':
   EN: '0'
-  PT: ''
+  PT: '0'
 '1':
   EN: '1'
-  PT: ''
+  PT: '1'
 10h:
   EN: 10h
-  PT: ''
+  PT: 10 h
 '2':
   EN: '2'
-  PT: ''
+  PT: '2'
 22 Dec 2025 - 10:00:
   EN: 22 Dec 2025 - 10:00
-  PT: ''
+  PT: 22 dez. 2025 - 10:00
 22 Dec 2025 - 20:00:
   EN: 22 Dec 2025 - 20:00
-  PT: ''
+  PT: 22 dez. 2025 - 20:00
 '3':
   EN: '3'
-  PT: ''
+  PT: '3'
 '4':
   EN: '4'
-  PT: ''
+  PT: '4'
 '5':
   EN: '5'
-  PT: ''
+  PT: '5'
 5.3kW:
   EN: 5.3kW
-  PT: ''
+  PT: 5,3 kW
 '6':
   EN: '6'
-  PT: ''
+  PT: '6'
 '7':
   EN: '7'
-  PT: ''
+  PT: '7'
 7 KW:
   EN: 7 KW
-  PT: ''
+  PT: 7 kW
 '8':
   EN: '8'
-  PT: ''
+  PT: '8'
 '9':
   EN: '9'
-  PT: ''
+  PT: '9'
 ':':
   EN: ':'
   PT: ':'
 <br/>If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX:
   EN: <br/>If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX
-  PT: ''
+  PT: <br/>Se nada acontecer, contacte a assistência através do número (+XXX) XX-XXX-XXXX
 <br/>If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.:
-  EN: <br/>If you have a Volkswagen vehicle and have not yet enabled bidirectionality,
-    please do so now.
-  PT: ''
+  EN: <br/>If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.
+  PT: <br/>Se tiver um veículo Volkswagen e ainda não tiver ativado a bidirecionalidade, por favor, faça-o agora.
 AVAILABLE:
   EN: AVAILABLE
-  PT: ''
-Are this information correct?:
-  EN: Are this information correct?
-  PT: ''
+  PT: DISPONÍVEL
+Is this information correct?:
+  EN: Is this information correct?
+  PT: Esta informação está correta?
 BOOKING DETAILS:
   EN: BOOKING DETAILS
-  PT: ''
-'Battery charged:':
-  EN: 'Battery charged:'
-  PT: ''
+  PT: DETALHES DA RESERVA
+Energy charged to the vehicle:
+  EN: Energy charged to the vehicle:
+  PT: Energia carregada no veículo:
+  Energy supplied by the vehicle:
+  EN: Energy supplied by the vehicle:
+  PT: Energia fornecida pelo veículo:
 By using this charger you have contributed to make the smart grid smarter:
-  EN: By using this charger you have contributed to make the smart grid smarter
-  PT: ''
+  EN: By using this charger, you have helped make the electricity grid smarter
+  PT: Ao utilizar este carregador, ajudou a tornar a rede elétrica mais inteligente
 Charge Point with ID:
   EN: Charge Point with ID
-  PT: ''
+  PT: Ponto de carregamento com ID
 Charger:
   EN: Charger
-  PT: ''
+  PT: Carregador
 Charging confIrmed:
-  EN: Charging confIrmed
-  PT: ''
+  EN: Charging confirmed
+  PT: Carregamento confirmado
 Charging confIrmed<br/>:
-  EN: Charging confIrmed<br/>
-  PT: ''
+  EN: Charging confirmed<br/>
+  PT: Carregamento confirmado<br/>
 ENGLISH:
   EN: ENGLISH
-  PT: ''
+  PT: INGLÊS
 ERROR:
   EN: ERROR
-  PT: ''
+  PT: ERRO
 EV charging equipment with ID:
   EN: EV charging equipment with ID
-  PT: ''
+  PT: Equipamento de carregamento de veículo elétrico com ID
 EXIT:
   EN: EXIT
-  PT: ''
+  PT: SAIR
 FAQs:
   EN: FAQs
-  PT: ''
+  PT: Perguntas frequentes
 'For further assistance call: (+XXX) XX-XXX-XXXX':
   EN: 'For further assistance call: (+XXX) XX-XXX-XXXX'
-  PT: ''
-'Grid charged:':
-  EN: 'Grid charged:'
-  PT: ''
-Here is how we process your data.:
-  EN: Here is how we process your data.
-  PT: ''
-IF YOR BOOKING DETAILS ARE INCORRECT, PLEASE CANCEL THE SESSION AND MAKE A NEW ONE FROM THE APP:
-  EN: IF YOR BOOKING DETAILS ARE INCORRECT, PLEASE CANCEL THE SESSION AND MAKE A NEW
-    ONE FROM THE APP
-  PT: ''
+  PT: 'Para assistência adicional, contacte: (+XXX) XX-XXX-XXXX'
+Energy supplied by the grid:
+  EN: Energy supplied by the grid:
+  PT: Energia fornecida pela rede:
+Terms and Conditions for participating in the DriVe2X pilot:
+  EN: Terms and Conditions for participating in the DriVe2X pilot.
+  PT: Termos e Condições de participação no piloto DriVe2X.
+Please review the conditions for participating in the DriVe2X pilot.:
+  EN: Please review the conditions for participating in the DriVe2X pilot.
+  PT: Consulte as condições de participação no piloto DriVe2X.
+If your booking details are incorrect, please cancel the session and update your parking reservation online:
+  EN: If your booking details are incorrect, please cancel the session and update your parking reservation online.
+  PT: Se os dados da sua reserva estiverem incorretos, cancele a sessão e atualize a sua reserva de estacionamento online.
 IMPORTANT:
   EN: IMPORTANT
-  PT: ''
+  PT: IMPORTANTE
 'IMPORTANT:':
   EN: 'IMPORTANT:'
-  PT: ''
+  PT: 'IMPORTANTE:'
 IMPORTANT:<br/>:
   EN: IMPORTANT:<br/>
-  PT: ''
+  PT: IMPORTANTE:<br/>
 IMPORTANT<br/>:
   EN: IMPORTANT<br/>
-  PT: ''
+  PT: IMPORTANTE<br/>
 If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX:
   EN: If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX
-  PT: ''
+  PT: Se nada acontecer, contacte a assistência através do número (+XXX) XX-XXX-XXXX
 If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.:
-  EN: If you have a Volkswagen vehicle and have not yet enabled bidirectionality,
-    please do so now.
-  PT: ''
+  EN: If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.
+  PT: Se tiver um veículo Volkswagen e ainda não tiver ativado a bidirecionalidade, por favor, faça-o agora.
 If you want to Stop the session, click here:
   EN: If you want to Stop the session, click here
-  PT: ''
+  PT: Se pretender terminar a sessão, clique aqui
 'If you want to know more about the Drive2x scan here:':
   EN: 'If you want to know more about the Drive2x scan here:'
-  PT: ''
+  PT: 'Se pretender saber mais sobre o Drive2X, leia o código aqui:'
 Inactive equipment:
   EN: Inactive equipment
-  PT: ''
-Introduce parking booking number to initiate smart charging:
-  EN: Introduce parking booking number to initiate smart charging
-  PT: ''
-'Live charging Power:':
-  EN: 'Live charging Power:'
-  PT: ''
-Login:
-  EN: Login
-  PT: ''
-? 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor
-  incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-  exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute
-  irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-  pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
-  deserunt mollit anim id est laborum.Voluptate asperiores velit suscipit quia voluptatibus
-  tenetur at necessitatibus, quaerat veniam nostrum fuga ipsum laborum illum nobis?
-  Voluptates similique ex voluptas odit officiis expedita qui culpa, molestiae rem
-  ullam nesciunt eaque? Adipisci modi laboriosam et, voluptatem similique nisi nostrum
-  explicabo suscipit corrupti corporis omnis quis totam saepe, ut vel magni recusandae
-  necessitatibus consequatur eos odit, iste officiis praesentium temporibus minima
-  ipsa quia, placeat iste iure modi.Accusamus ullam voluptate ad magni eligendi facere
-  cum non vel, in accusantium dolores culpa labore error molestias suscipit sit qui
-  reprehenderit? Maxime hic optio dicta iste error veniam perferendis, maxime harum
-  architecto corporis explicabo, deleniti necessitatibus odit voluptatibus, nam voluptates
-  voluptatum placeat ea fuga mollitia iste veritatis, praesentium laboriosam vel at
-  minima? Quaerat saepe ullam voluptatem illum, numquam hic nemo rem amet dolorem
-  natus culpa voluptatibus voluptatem consectetur laborum, aut vero nemo, cumque atque
-  illum eligendi exercitationem, saepe odio omnis consequatur iste est consequuntur
-  blanditiis cumque fugiat placeat. Magni eaque dicta pariatur natus commodi saepe
-  consequuntur ex, officiis exercitationem esse obcaecati eos ipsum excepturi voluptate
-  laudantium, culpa officia sapiente expedita assumenda vel necessitatibus incidunt
-  et perspiciatis quo natus, est perferendis eveniet autem veritatis rem corrupti
-  eum.Animi fugit deleniti, quibusdam autem sint quia aliquid nihil architecto vitae,
-  dicta eum enim impedit ratione dignissimos totam beatae aperiam voluptatum quod
-  sed, inventore voluptatem rem modi eum itaque consectetur tempora dicta et similique.
-  Quae quod libero voluptate, voluptates facere temporibus corporis ullam, eos quasi
-  quia qui necessitatibus dolorem commodi esse quaerat, vitae iusto eum facilis assumenda
-  blanditiis libero voluptatum esse consequatur velit?Facilis dicta optio magnam,
-  nemo reprehenderit magnam dolor eius ea laudantium tempore qui quo. Quisquam repudiandae
-  tempora quibusdam dolor eius omnis eos, et quis labore alias nisi quibusdam tenetur
-  fugit voluptates magni quaerat consequuntur, error aliquid nihil nostrum nam ullam
-  omnis quia iure dolorum officia praesentium? Rerum sint ab praesentium mollitia
-  totam labore id, similique nemo in? Itaque reprehenderit corrupti placeat repellat
-  sit, aperiam quibusdam reiciendis quam, enim cum ducimus nostrum architecto vero
-  eveniet nam, natus reprehenderit neque, minima labore quia?
+  PT: Equipamento inativo
+Enter your parking booking number to start the charging session:
+  EN: Enter your parking booking number to start the charging session
+  PT: Introduza o número da sua reserva de estacionamento para iniciar a sessão de carregamento
+Live session power:
+  EN: Live session power:
+  PT: Potência instantânea da sessão:
+  PT: 'Potência de carregamento em tempo real:'
+Validate booking:
+  EN: Validate booking
+  PT: Validar reserva
+
+
+? 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+  Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
+  dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat
+  non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Voluptate asperiores velit suscipit quia voluptatibus
+  tenetur at necessitatibus, quaerat veniam nostrum fuga ipsum laborum illum nobis? Voluptates similique ex voluptas odit
+  officiis expedita qui culpa, molestiae rem ullam nesciunt eaque? Adipisci modi laboriosam et, voluptatem similique nisi
+  nostrum explicabo suscipit corrupti corporis omnis quis totam saepe, ut vel magni recusandae necessitatibus consequatur
+  eos odit, iste officiis praesentium temporibus minima ipsa quia, placeat iste iure modi.Accusamus ullam voluptate ad magni
+  eligendi facere cum non vel, in accusantium dolores culpa labore error molestias suscipit sit qui reprehenderit? Maxime
+  hic optio dicta iste error veniam perferendis, maxime harum architecto corporis explicabo, deleniti necessitatibus odit
+  voluptatibus, nam voluptates voluptatum placeat ea fuga mollitia iste veritatis, praesentium laboriosam vel at minima? Quaerat
+  saepe ullam voluptatem illum, numquam hic nemo rem amet dolorem natus culpa voluptatibus voluptatem consectetur laborum,
+  aut vero nemo, cumque atque illum eligendi exercitationem, saepe odio omnis consequatur iste est consequuntur blanditiis
+  cumque fugiat placeat. Magni eaque dicta pariatur natus commodi saepe consequuntur ex, officiis exercitationem esse obcaecati
+  eos ipsum excepturi voluptate laudantium, culpa officia sapiente expedita assumenda vel necessitatibus incidunt et perspiciatis
+  quo natus, est perferendis eveniet autem veritatis rem corrupti eum.Animi fugit deleniti, quibusdam autem sint quia aliquid
+  nihil architecto vitae, dicta eum enim impedit ratione dignissimos totam beatae aperiam voluptatum quod sed, inventore voluptatem
+  rem modi eum itaque consectetur tempora dicta et similique. Quae quod libero voluptate, voluptates facere temporibus corporis
+  ullam, eos quasi quia qui necessitatibus dolorem commodi esse quaerat, vitae iusto eum facilis assumenda blanditiis libero
+  voluptatum esse consequatur velit?Facilis dicta optio magnam, nemo reprehenderit magnam dolor eius ea laudantium tempore
+  qui quo. Quisquam repudiandae tempora quibusdam dolor eius omnis eos, et quis labore alias nisi quibusdam tenetur fugit
+  voluptates magni quaerat consequuntur, error aliquid nihil nostrum nam ullam omnis quia iure dolorum officia praesentium?
+  Rerum sint ab praesentium mollitia totam labore id, similique nemo in? Itaque reprehenderit corrupti placeat repellat sit,
+  aperiam quibusdam reiciendis quam, enim cum ducimus nostrum architecto vero eveniet nam, natus reprehenderit neque, minima
+  labore quia?
 
   '
-: EN: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor
-    incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-    exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute
-    irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-    pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
-    deserunt mollit anim id est laborum.Voluptate asperiores velit suscipit quia voluptatibus
-    tenetur at necessitatibus, quaerat veniam nostrum fuga ipsum laborum illum nobis?
-    Voluptates similique ex voluptas odit officiis expedita qui culpa, molestiae rem
-    ullam nesciunt eaque? Adipisci modi laboriosam et, voluptatem similique nisi nostrum
-    explicabo suscipit corrupti corporis omnis quis totam saepe, ut vel magni recusandae
-    necessitatibus consequatur eos odit, iste officiis praesentium temporibus minima
-    ipsa quia, placeat iste iure modi.Accusamus ullam voluptate ad magni eligendi
-    facere cum non vel, in accusantium dolores culpa labore error molestias suscipit
-    sit qui reprehenderit? Maxime hic optio dicta iste error veniam perferendis, maxime
-    harum architecto corporis explicabo, deleniti necessitatibus odit voluptatibus,
-    nam voluptates voluptatum placeat ea fuga mollitia iste veritatis, praesentium
-    laboriosam vel at minima? Quaerat saepe ullam voluptatem illum, numquam hic nemo
-    rem amet dolorem natus culpa voluptatibus voluptatem consectetur laborum, aut
-    vero nemo, cumque atque illum eligendi exercitationem, saepe odio omnis consequatur
-    iste est consequuntur blanditiis cumque fugiat placeat. Magni eaque dicta pariatur
-    natus commodi saepe consequuntur ex, officiis exercitationem esse obcaecati eos
-    ipsum excepturi voluptate laudantium, culpa officia sapiente expedita assumenda
-    vel necessitatibus incidunt et perspiciatis quo natus, est perferendis eveniet
-    autem veritatis rem corrupti eum.Animi fugit deleniti, quibusdam autem sint quia
-    aliquid nihil architecto vitae, dicta eum enim impedit ratione dignissimos totam
-    beatae aperiam voluptatum quod sed, inventore voluptatem rem modi eum itaque consectetur
-    tempora dicta et similique. Quae quod libero voluptate, voluptates facere temporibus
-    corporis ullam, eos quasi quia qui necessitatibus dolorem commodi esse quaerat,
-    vitae iusto eum facilis assumenda blanditiis libero voluptatum esse consequatur
-    velit?Facilis dicta optio magnam, nemo reprehenderit magnam dolor eius ea laudantium
-    tempore qui quo. Quisquam repudiandae tempora quibusdam dolor eius omnis eos,
-    et quis labore alias nisi quibusdam tenetur fugit voluptates magni quaerat consequuntur,
-    error aliquid nihil nostrum nam ullam omnis quia iure dolorum officia praesentium?
-    Rerum sint ab praesentium mollitia totam labore id, similique nemo in? Itaque
-    reprehenderit corrupti placeat repellat sit, aperiam quibusdam reiciendis quam,
-    enim cum ducimus nostrum architecto vero eveniet nam, natus reprehenderit neque,
-    minima labore quia?
+: EN: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+    aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis
+    aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
+    cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Voluptate asperiores velit suscipit
+    quia voluptatibus tenetur at necessitatibus, quaerat veniam nostrum fuga ipsum laborum illum nobis? Voluptates similique
+    ex voluptas odit officiis expedita qui culpa, molestiae rem ullam nesciunt eaque? Adipisci modi laboriosam et, voluptatem
+    similique nisi nostrum explicabo suscipit corrupti corporis omnis quis totam saepe, ut vel magni recusandae necessitatibus
+    consequatur eos odit, iste officiis praesentium temporibus minima ipsa quia, placeat iste iure modi.Accusamus ullam voluptate
+    ad magni eligendi facere cum non vel, in accusantium dolores culpa labore error molestias suscipit sit qui reprehenderit?
+    Maxime hic optio dicta iste error veniam perferendis, maxime harum architecto corporis explicabo, deleniti necessitatibus
+    odit voluptatibus, nam voluptates voluptatum placeat ea fuga mollitia iste veritatis, praesentium laboriosam vel at minima?
+    Quaerat saepe ullam voluptatem illum, numquam hic nemo rem amet dolorem natus culpa voluptatibus voluptatem consectetur
+    laborum, aut vero nemo, cumque atque illum eligendi exercitationem, saepe odio omnis consequatur iste est consequuntur
+    blanditiis cumque fugiat placeat. Magni eaque dicta pariatur natus commodi saepe consequuntur ex, officiis exercitationem
+    esse obcaecati eos ipsum excepturi voluptate laudantium, culpa officia sapiente expedita assumenda vel necessitatibus
+    incidunt et perspiciatis quo natus, est perferendis eveniet autem veritatis rem corrupti eum.Animi fugit deleniti, quibusdam
+    autem sint quia aliquid nihil architecto vitae, dicta eum enim impedit ratione dignissimos totam beatae aperiam voluptatum
+    quod sed, inventore voluptatem rem modi eum itaque consectetur tempora dicta et similique. Quae quod libero voluptate,
+    voluptates facere temporibus corporis ullam, eos quasi quia qui necessitatibus dolorem commodi esse quaerat, vitae iusto
+    eum facilis assumenda blanditiis libero voluptatum esse consequatur velit?Facilis dicta optio magnam, nemo reprehenderit
+    magnam dolor eius ea laudantium tempore qui quo. Quisquam repudiandae tempora quibusdam dolor eius omnis eos, et quis
+    labore alias nisi quibusdam tenetur fugit voluptates magni quaerat consequuntur, error aliquid nihil nostrum nam ullam
+    omnis quia iure dolorum officia praesentium? Rerum sint ab praesentium mollitia totam labore id, similique nemo in? Itaque
+    reprehenderit corrupti placeat repellat sit, aperiam quibusdam reiciendis quam, enim cum ducimus nostrum architecto vero
+    eveniet nam, natus reprehenderit neque, minima labore quia?
 
     '
-  PT: ''
-NO, I DO NOT CONSENT AND CANNOT USE THIS SERVICE.:
-  EN: NO, I DO NOT CONSENT AND CANNOT USE THIS SERVICE.
-  PT: ''
+  PT: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+    aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis
+    aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
+    cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Voluptate asperiores velit suscipit
+    quia voluptatibus tenetur at necessitatibus, quaerat veniam nostrum fuga ipsum laborum illum nobis? Voluptates similique
+    ex voluptas odit officiis expedita qui culpa, molestiae rem ullam nesciunt eaque? Adipisci modi laboriosam et, voluptatem
+    similique nisi nostrum explicabo suscipit corrupti corporis omnis quis totam saepe, ut vel magni recusandae necessitatibus
+    consequatur eos odit, iste officiis praesentium temporibus minima ipsa quia, placeat iste iure modi.Accusamus ullam voluptate
+    ad magni eligendi facere cum non vel, in accusantium dolores culpa labore error molestias suscipit sit qui reprehenderit?
+    Maxime hic optio dicta iste error veniam perferendis, maxime harum architecto corporis explicabo, deleniti necessitatibus
+    odit voluptatibus, nam voluptates voluptatum placeat ea fuga mollitia iste veritatis, praesentium laboriosam vel at minima?
+    Quaerat saepe ullam voluptatem illum, numquam hic nemo rem amet dolorem natus culpa voluptatibus voluptatem consectetur
+    laborum, aut vero nemo, cumque atque illum eligendi exercitationem, saepe odio omnis consequatur iste est consequuntur
+    blanditiis cumque fugiat placeat. Magni eaque dicta pariatur natus commodi saepe consequuntur ex, officiis exercitationem
+    esse obcaecati eos ipsum excepturi voluptate laudantium, culpa officia sapiente expedita assumenda vel necessitatibus
+    incidunt et perspiciatis quo natus, est perferendis eveniet autem veritatis rem corrupti eum.Animi fugit deleniti, quibusdam
+    autem sint quia aliquid nihil architecto vitae, dicta eum enim impedit ratione dignissimos totam beatae aperiam voluptatum
+    quod sed, inventore voluptatem rem modi eum itaque consectetur tempora dicta et similique. Quae quod libero voluptate,
+    voluptates facere temporibus corporis ullam, eos quasi quia qui necessitatibus dolorem commodi esse quaerat, vitae iusto
+    eum facilis assumenda blanditiis libero voluptatum esse consequatur velit?Facilis dicta optio magnam, nemo reprehenderit
+    magnam dolor eius ea laudantium tempore qui quo. Quisquam repudiandae tempora quibusdam dolor eius omnis eos, et quis
+    labore alias nisi quibusdam tenetur fugit voluptates magni quaerat consequuntur, error aliquid nihil nostrum nam ullam
+    omnis quia iure dolorum officia praesentium? Rerum sint ab praesentium mollitia totam labore id, similique nemo in? Itaque
+    reprehenderit corrupti placeat repellat sit, aperiam quibusdam reiciendis quam, enim cum ducimus nostrum architecto vero
+    eveniet nam, natus reprehenderit neque, minima labore quia?
+
+    '
+I do not accept and cannot use this service:
+  EN: I do not accept and cannot use this service
+  PT: Não aceito e não posso utilizar este serviço
 Need help? Open the:
   EN: Need help? Open the
-  PT: ''
+  PT: Precisa de ajuda? Abra as
 'Need help? Open the ':
   EN: 'Need help? Open the '
-  PT: ''
+  PT: 'Precisa de ajuda? Abra as '
 No, Cancel the session:
-  EN: No, Cancel the session
-  PT: ''
-Please disconnect the car and only reconnect it once instructed by the charger.:
-  EN: Please disconnect the car and only reconnect it once instructed by the charger.
-  PT: ''
+  EN: No, cancel the session
+  PT: Não, cancelar a sessão
+Please unplug the vehicle and only plug it in again when instructed by the charger:
+  EN: Please unplug the vehicle and only plug it in again when instructed by the charger.
+  PT: Desligue o veículo do carregador e volte a ligá-lo apenas quando indicado pelo carregador.
 Please wait:
   EN: Please wait
-  PT: ''
-Plug in the car to start the session:
-  EN: Plug in the car to start the session
-  PT: ''
-Plug the vehicle in only after login:
-  EN: Plug the vehicle in only after login
-  PT: ''
-Plug the vehicle in only after starting the session:
-  EN: Plug the vehicle in only after starting the session
-  PT: ''
+  PT: Aguarde, por favor
+Plug in the vehicle to start the charging session:
+  EN: Plug in the vehicle to start the charging session
+  PT: Ligue o veículo ao carregador para iniciar a sessão de carregamento
+Do not plug in yet. First validate your booking:
+  EN: Do not plug in yet. First validate your booking.
+  PT: Ainda não ligue o veículo ao carregador. Primeiro, valide a sua reserva.
 Portughese:
-  EN: Portughese
-  PT: ''
+  EN: Portuguese
+  PT: Português
 SESSION STARTED:
   EN: SESSION STARTED
-  PT: ''
-SMART CHARGING...:
-  EN: SMART CHARGING...
-  PT: ''
+  PT: SESSÃO INICIADA
+Smart session in progress:
+  EN: Smart session in progress
+  PT: Sessão inteligente em curso
 'Session duration: ':
   EN: 'Session duration: '
-  PT: ''
+  PT: 'Duração da sessão: '
 Session summary:
   EN: Session summary
-  PT: ''
-THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS...:
-  EN: THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS...
-  PT: ''
-TOUCH THE SCREEN TO log-in:
-  EN: TOUCH THE SCREEN TO log-in
-  PT: ''
+  PT: Resumo da sessão
+Your booking number has been validated. You will now see your booking details.:
+  EN: Your booking number has been validated. You will now see your booking details.
+  PT: O número da sua reserva foi validado. De seguida, serão apresentados os detalhes da reserva.
+Touch the screen to validate your booking:
+  EN: Touch the screen to validate your booking
+  PT: Toque no ecrã para validar a sua reserva
 Thanks:
   EN: Thanks
-  PT: ''
+  PT: Obrigado
 This may be caused by a weak cellular signal or scheduled maintenance. We are sorry for the inconvenience:
-  EN: This may be caused by a weak cellular signal or scheduled maintenance. We are
-    sorry for the inconvenience
-  PT: ''
+  EN: This may be caused by a weak cellular signal or scheduled maintenance. We are sorry for the inconvenience
+  PT: Esta situação poderá dever-se a um sinal de rede móvel fraco ou a uma manutenção programada. Lamentamos o incómodo causado
 This resource is busy.:
   EN: This resource is busy.
-  PT: ''
+  PT: Este recurso está ocupado.
 This window will automatically close in [60]s...:
   EN: This window will automatically close in [60]s...
-  PT: ''
+  PT: Esta janela será encerrada automaticamente dentro de [60] s...
 'Time of connection: ':
   EN: 'Time of connection: '
-  PT: ''
+  PT: 'Hora de conexão: '
 'Time of disconnection: ':
   EN: 'Time of disconnection: '
-  PT: ''
+  PT: 'Hora de desconexão: '
+We are having connection issues:
+  EN: We are having connection issues
+  PT: Estamos com problemas de ligação
 Unregistered device:
   EN: Unregistered device
-  PT: ''
+  PT: Dispositivo não registado
 We are having [connection] issues:
   EN: We are having [connection] issues
-  PT: ''
+  PT: Estamos com problemas de [conexão]
 Welcome:
   EN: Welcome
-  PT: ''
+  PT: Bem-vindo
 Welcome to the Drive2X Project demo:
   EN: Welcome to the Drive2X Project demo
-  PT: "Bem-vindo \xE0 demonstra\xE7\xE3o do Projeto Drive2X"
-YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA:
-  EN: YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA
-  PT: ''
+  PT: Bem-vindo à demonstração do Projeto Drive2X
+I have read and accept the Terms and Conditions and Privacy Policy:
+  EN: I have read and accept the Terms and Conditions and Privacy Policy
+  PT: Li e aceito os Termos e Condições e a Política de Privacidade
 You are in the queue to access the resource.:
   EN: You are in the queue to access the resource.
-  PT: ''
+  PT: Encontra-se na fila de espera para aceder ao recurso.
 'You can follow the live charging session here:':
   EN: 'You can follow the live charging session here:'
-  PT: ''
+  PT: 'Pode acompanhar a sessão de carregamento em tempo real aqui:'
 You can now leave the car, this screen will automatically close in [30]s...:
   EN: You can now leave the car, this screen will automatically close in [30]s...
-  PT: ''
+  PT: Pode agora deixar o veículo. Este ecrã será encerrado automaticamente dentro de [30] s...
 You have connected your EV too early.:
   EN: You have connected your EV too early.
-  PT: ''
+  PT: Conectou o seu veículo elétrico ao carregador demasiado cedo.
 Your place in the queue is:
   EN: Your place in the queue is
-  PT: ''
+  PT: A sua posição na fila de espera é
 ana - 12345678:
   EN: ana - 12345678
-  PT: ''
+  PT: ana - 12345678
 ana - xxxxxxxx:
   EN: ana - xxxxxxxx
-  PT: ''
+  PT: ana - xxxxxxxx
 is not active on device:
   EN: is not active on device
-  PT: ''
+  PT: não está ativo no dispositivo
 is not active. Please try later.:
   EN: is not active. Please try later.
-  PT: ''
+  PT: Não está ativo. Por favor, tente novamente mais tarde.
 until 22 Dec 2025 - 20:00:
   EN: until 22 Dec 2025 - 20:00
-  PT: ''
+  PT: até 22 dez. 2025 - 20:00
 yes, confirm the session:
   EN: yes, confirm the session
-  PT: ''
-? "\Luntil 22 Dec 2025 - 20:00"
-: EN: "\Luntil 22 Dec 2025 - 20:00"
-  PT: ''
+  PT: Sim, confirmar a sessão
+? '   until 22 Dec 2025 - 20:00'
+: EN: '     until 22 Dec 2025 - 20:00'
+  PT: '     até 22 dez. 2025 - 20:00'
