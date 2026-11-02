@@ -74,11 +74,11 @@ BOOKING DETAILS:
   EN: BOOKING DETAILS
   PT: DETALHES DA RESERVA
 Energy charged to the vehicle:
-  EN: Energy charged to the vehicle:
-  PT: Energia carregada no veículo:
-  Energy supplied by the vehicle:
-  EN: Energy supplied by the vehicle:
-  PT: Energia fornecida pelo veículo:
+  EN: Energy charged to the vehicle
+  PT: Energia carregada no veículo
+Energy supplied by the vehicle:
+  EN: Energy supplied by the vehicle
+  PT: Energia fornecida pelo veículo
 By using this charger you have contributed to make the smart grid smarter:
   EN: By using this charger, you have helped make the electricity grid smarter
   PT: Ao utilizar este carregador, ajudou a tornar a rede elétrica mais inteligente
@@ -113,8 +113,8 @@ FAQs:
   EN: 'For further assistance call: (+XXX) XX-XXX-XXXX'
   PT: 'Para assistência adicional, contacte: (+XXX) XX-XXX-XXXX'
 Energy supplied by the grid:
-  EN: Energy supplied by the grid:
-  PT: Energia fornecida pela rede:
+  EN: Energy supplied by the grid
+  PT: Energia fornecida pela rede
 Terms and Conditions for participating in the DriVe2X pilot:
   EN: Terms and Conditions for participating in the DriVe2X pilot.
   PT: Termos e Condições de participação no piloto DriVe2X.
@@ -155,8 +155,9 @@ Enter your parking booking number to start the charging session:
   EN: Enter your parking booking number to start the charging session
   PT: Introduza o número da sua reserva de estacionamento para iniciar a sessão de carregamento
 Live session power:
-  EN: Live session power:
-  PT: Potência instantânea da sessão:
+  EN: Live session power
+  PT: Potência instantânea da sessão
+Live session power - alt:
   PT: 'Potência de carregamento em tempo real:'
 Validate booking:
   EN: Validate booking
