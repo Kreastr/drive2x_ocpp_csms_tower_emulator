@@ -247,6 +247,7 @@ class FigmaRenderer():
             for candidate in [".svg", ".png"]:
                 if Path("static/images/"+current_node.name+candidate).exists():
                     current_element = ui.image("static/images/"+current_node.name+candidate)
+                    current_element.props("fit=contain")
                     break
         else:
             raise NotImplementedError(f"Missing handling for node type {current_node.type}")
