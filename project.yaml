@@ -5269,7 +5269,7 @@ children:
                 - id: VariableID:3:61
                   type: VARIABLE_ALIAS
               characterStyleOverrides: []
-              characters: Portughese
+              characters: Portuguese
               complexStrokeProperties:
                 strokeType: BASIC
               constraints:
