@@ -9,5 +9,5 @@ COPY . /app
 
 WORKDIR /app
 
-CMD python ocpp_server.py
+CMD python ocpp_server.py --redis_db csms_redis
 
