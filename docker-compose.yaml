@@ -53,7 +53,7 @@ services:
         - 7500:7500
       restart: unless-stopped
       depends_on:
-        - redis
+        - csms_redis
         - ocpp
       networks:
         - ocpp_net
