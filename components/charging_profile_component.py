@@ -202,9 +202,11 @@ class ChargingProfileComponent:
         if abs(limit) < self.evse_hard_limits[evse_id].minimal_absolute:
             cycle_second = moment.second
             cycle_switch_off_time = abs(int(limit * 60 / self.evse_hard_limits[evse_id].minimal_absolute))
-            if cycle_switch_off_time < 15:
-                cycle_switch_off_time = 15
-            if cycle_second < cycle_switch_off_time:
+            if limit == 0.0:
+                limit = 0.0  
+            elif cycle_second < 15:
+                limit = sign(limit) * self.evse_hard_limits[evse_id].minimal_absolute
+            elif cycle_second < cycle_switch_off_time:
                 limit = sign(limit) * self.evse_hard_limits[evse_id].minimal_absolute
             else:
                 limit = 0.0
