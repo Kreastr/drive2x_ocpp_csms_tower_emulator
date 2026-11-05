@@ -67,6 +67,9 @@
 AVAILABLE:
   EN: AVAILABLE
   PT: DISPONÍVEL
+Are this information correct?:
+  EN: Is this information correct?
+  PT: Esta informação está correta?
 Is this information correct?:
   EN: Is this information correct?
   PT: Esta informação está correta?
@@ -151,8 +154,8 @@ If you want to Stop the session, click here:
 Inactive equipment:
   EN: Inactive equipment
   PT: Equipamento inativo
-Enter your parking booking number to start the charging session:
-  EN: Enter your parking booking number to start the charging session
+Introduce your parking booking number to initiate smart charging:
+  EN: Introduce your parking booking number to start the charging session
   PT: Introduza o número da sua reserva de estacionamento para iniciar a sessão de carregamento
 Live session power:
   EN: Live session power
@@ -248,12 +251,9 @@ Validate booking:
 I do not accept and cannot use this service:
   EN: I do not accept and cannot use this service
   PT: Não aceito e não posso utilizar este serviço
-Need help? Open the:
-  EN: Need help? Open the
-  PT: Precisa de ajuda? Abra as
-'Need help? Open the ':
-  EN: 'Need help? Open the '
-  PT: 'Precisa de ajuda? Abra as '
+'Need help? Open the':
+  EN: 'Need help? Open the'
+  PT: 'Precisa de ajuda? Abra as'
 No, Cancel the session:
   EN: No, cancel the session
   PT: Não, cancelar a sessão
@@ -263,8 +263,8 @@ Please unplug the vehicle and only plug it in again when instructed by the charg
 Please wait:
   EN: Please wait
   PT: Aguarde, por favor
-Plug in the vehicle to start the charging session:
-  EN: Plug in the vehicle to start the charging session
+Plug in the car to start the charging session:
+  EN: Plug in the car to start the charging session
   PT: Ligue o veículo ao carregador para iniciar a sessão de carregamento
 Do not plug in yet. First validate your booking:
   EN: Do not plug in yet. First validate your booking.
@@ -290,6 +290,9 @@ Your booking number has been validated. You will now see your booking details.:
 Touch the screen to validate your booking:
   EN: Touch the screen to validate your booking
   PT: Toque no ecrã para validar a sua reserva
+TOUCH THE SCREEN TO log-in:
+  EN: TOUCH THE SCREEN TO log-in
+  PT: Toque no ecrã ...
 Thanks:
   EN: Thanks
   PT: Obrigado

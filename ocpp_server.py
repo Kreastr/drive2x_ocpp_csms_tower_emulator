@@ -247,7 +247,8 @@ EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "1132523008": "porto_apt", # Lab
            "1132523024": "porto_apt", # Lab
            "1132523017": "icl_lab",
-           "1132523027": "lut_internal"
+           "1132523027": "lut_internal",
+           "HASS_": "dr_ocpp"
            }
 
 @app.post("/sca_data/setpoints")
@@ -485,7 +486,7 @@ STATE_SCREEN_MAP = {UIManagerFSMState.new_session: new_session_screen,
                     UIManagerFSMState.booking_pincorrect: porto_login_code_screen_correct,
                     UIManagerFSMState.booking_pinincorrect: porto_login_code_screen_incorrect,
                     UIManagerFSMState.booking_details : booking_details_screen,
-                    UIManagerFSMState.evseselect_page: lambda cp_id, *vargs: ui.navigate.to(f"/d2x_ui/{cp_id}"),
+                    UIManagerFSMState.evseselect_page: lambda cp_id, evse_id, fsm, cp, language: ui.navigate.to(f"/d2x_ui/{cp_id}/{language}"),
                     UIManagerFSMState.car_not_connected: car_not_connected_screen,
                     UIManagerFSMState.car_connected: car_connected_screen,
                     UIManagerFSMState.normal_session: normal_session_screen,

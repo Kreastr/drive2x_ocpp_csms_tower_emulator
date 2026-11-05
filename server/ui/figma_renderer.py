@@ -16,6 +16,8 @@ from .models.figma_document_model import FigmaNode, NodeType, Color, LayoutMode,
 logger = setup_logging(__name__)
 logger.setLevel(logging.WARNING)
 
+LANG_MAP = {"ENGLISH": "EN", "PORTUGUESE": "PT"}
+
 class FigmaRenderer():
     
     def __init__(self, project_file : Path = Path("project.yaml")):
@@ -412,6 +414,33 @@ class FigmaRenderer():
         footer.children[0].layoutMode = None
         footer.children[0].children[0].layoutMode = None
         footer.children[1].layoutMode = None
+
+        selector_blocks = self.find_all_starting_with(screen_data, "ACTION_CHILD_LANGUAGE")
+        logger.error(f"{selector_blocks=}")
+
+        if selector_blocks is not None:
+            logger.error(f"lang debug {selector_blocks=}")
+
+            for selector in selector_blocks:
+                nodes_per_language = {node.name.upper(): node for node in selector.children}
+                active_default = nodes_per_language["ENGLISH"]
+                inactive_template = [x[1] for x in nodes_per_language.items() if x[0] != "ENGLISH"][0]
+
+                active_weight = active_default.style.fontWeight
+                inactive_weight = inactive_template.style.fontWeight
+                active_fills = copy.deepcopy(active_default.fills)
+                inactive_fills = copy.deepcopy(inactive_template.fills)
+
+                for node_lang, node in nodes_per_language.items():
+                    langiage_ISO_code = LANG_MAP[node_lang]
+                    node_is_active = langiage_ISO_code == language
+                    node.style.fontWeight = (
+                        active_weight if node_is_active else inactive_weight
+                    )
+                    node.fills = copy.deepcopy(
+                        active_fills if node_is_active else inactive_fills
+                    )
+
         root = FigmaRenderer.render_node(screen_data, language)
         root.style("min-height: 1936px;"
                    "border: 3px solid;"
@@ -419,4 +448,32 @@ class FigmaRenderer():
                    "border-color: white;")
         if footer.ui_element is not None:
             footer.ui_element.style("position: fixed; left: 0; bottom: 0; width: 1080px; ")
+
+        selector_blocks = self.find_all_starting_with(screen_data, "ACTION_CHILD_LANGUAGE")
+        logger.error(f"{selector_blocks=}")
+        if selector_blocks is not None:
+            logger.error(f"lang debug {selector_blocks=}")
+
+            for selector in selector_blocks:
+
+                for node in selector.children:
+                    logger.error(f"lang debug {node=}")
+                    if node.ui_element is None:
+                        continue
+                    lang = LANG_MAP.get(node.name.upper(), "EN")
+                    logger.error(f"lang debug {lang=}")
+                    node.ui_element.on(
+                        "click",
+                        js_handler=f"""(e) => {{
+                                            e.stopPropagation();
+                                            const current_url = new URL(window.location.href);
+                                            const new_location = current_url.pathname.replace(/\\/([A-Z]+)$/, '/{lang}');
+                                            if (new_location !== current_url.pathname) {{
+                                                current_url.pathname = new_location;
+                                                window.location.assign(current_url.href);
+                                            }}
+                                        }}"""
+                    )
+                    node.ui_element.classes("cursor-hand")
+
         return root, screen_data

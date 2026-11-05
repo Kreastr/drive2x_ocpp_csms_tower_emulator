@@ -11,8 +11,8 @@ else:
 def localize(text, language):
     if text not in locale_database:
         locale_database[text] = dict(EN=text, PT="")
-        with open("translations.yaml", "w") as f:
-            f.write(yaml.dump(locale_database))
+        #with open("translations.yaml", "w") as f:
+        #    f.write(yaml.dump(locale_database))
     if len(locale_database[text][language]) > 0:
         return locale_database[text][language]
     return text
