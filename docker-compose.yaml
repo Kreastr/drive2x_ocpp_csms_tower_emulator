@@ -7,8 +7,6 @@ services:
       - REDIS_PORT=6379
     volumes:
       - /opt/d2x_mail_log:/data/input:ro
-    depends_on:
-      - redis
     networks:
       - ocpp_net
     logging:
