@@ -67,9 +67,11 @@ def _try_parse_date(text: str) -> datetime | None:
 
 def load_yaml_file(path: Path) -> tuple[str, BookingDetails] | None:
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-        order = str(raw["order_number"])
-        order = "0"*(8-len(order)) + order
+        raw = yaml.load(
+            path.read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader,
+        )
+        order = raw["order_number"].zfill(8)
         start = _try_parse_date(raw["start_date"])
         end   = _try_parse_date(raw["end_date"])
 
