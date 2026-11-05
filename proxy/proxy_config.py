@@ -30,6 +30,7 @@ class ProxyConfig(BaseModel):
     service_port : int = 160000
     service_host : str = "0.0.0.0"
     upstream_uri: str = "wss://drive2x.lut.fi/ocpp/"
+    forbid_idle : bool = False
     
 class ProxyConfigurator(Configurator[ProxyConfig]):
     pass

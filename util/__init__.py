@@ -273,6 +273,7 @@ def get_proxy_app_args():
     argparse.add_argument("--redis_port", type=int, help="Port of Redis used by converting proxy.", default=6379)
     argparse.add_argument("--redis_db", type=int, help="DB id of Redis used by converting proxy.", default=3)
     argparse.add_argument("--service", action='store_true', help="Proxy that runs as service will not self restart on reboot command.")
+    argparse.add_argument("--forbid_idle", action='store_true', help="If set prevents car from idling even if power setpoint set to 0.0 W. This helps some cars.")
     argparse.add_argument("--upstream_uri", type=str, help="OCPP URI which serves OCPP 2.0.1 CSMS.",
                           default="ws://127.0.0.1:9000")
     return argparse.parse_args()
