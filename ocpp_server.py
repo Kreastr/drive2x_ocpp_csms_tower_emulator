@@ -413,19 +413,20 @@ async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
 
     root, screen_data = figma_renderer.render_screen("standby_available", language)
 
-    state = {"status": "OFFLINE"}
+    state = {"status": localize("OFFLINE", language)}
 
     def refresh_status(cpid=cp_id):
-        state["status"] = "OFFLINE"
+        next_status = "OFFLINE"
         if cpid in charge_points:
             if charge_points[cpid].fsm.current_state in [ChargePointFSMState.booted]:
                 if 1 in charge_points[cpid].fsm.context.transaction_fsms:
                     tx_fsm = charge_points[cpid].fsm.context.transaction_fsms[1]
-                    state["status"] = tx_fsm.context.evse.connector_status
+                    next_status = tx_fsm.context.evse.connector_status
                 else:
-                    state["status"] = "NO EVSE"
+                    next_status = "NO EVSE"
             else:
-                state["status"] = "BOOTING"
+                next_status = "BOOTING"
+        state["status"] = localize(next_status, language)
 
     def gated_navigation(cpid=cp_id):
         if cpid in charge_points:

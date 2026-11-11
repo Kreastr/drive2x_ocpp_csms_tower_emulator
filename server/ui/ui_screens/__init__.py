@@ -45,7 +45,7 @@ else:
 
 from server.ocpp_server_handler import OCPPServerHandler
 from server.ui.ui_manager import UIManagerFSMType
-from uimanager_fsm_enums import UIManagerFSMEvent
+from uimanager_fsm_enums import UIManagerFSMEvent, UIManagerFSMState
 from util import async_l, if_valid, setup_logging
 from util.dispatch import dispatch
 from util.types import ChargePointId, EVSEId
@@ -54,6 +54,23 @@ from zoneinfo import ZoneInfo
 logger = setup_logging(__name__)
 logger.setLevel(logging.INFO)
 
+PIN_UPDATE_INITIAL_COUNTDOWN = 30
+
+def with_countdown_timer(fsm, state, screen_state):
+
+    async def on_countdown():
+        if fsm.current_state != screen_state or t.is_deleted:
+            t.cancel()
+            return
+
+        state.update({"countdown": state["countdown"] - 1})
+        if state["countdown"] < 0:
+            state["countdown"] = 0
+            t.cancel()
+            await fsm.handle(UIManagerFSMEvent.on_exit)
+
+    t = ui.timer(1, on_countdown, immediate=False)
+    return t
 
 def gdpraccepted_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     ui.label("Do you have a pre-booked session?")
@@ -76,6 +93,7 @@ def new_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMT
 
 async def add_to_code(state, new_value, callbacks=None):
     current = state["code"]
+    state.update({"countdown": PIN_UPDATE_INITIAL_COUNTDOWN})
     new_code_l = list(current)
     if int(new_value) < 0 or int(new_value) > 9:
         return
@@ -91,6 +109,7 @@ async def add_to_code(state, new_value, callbacks=None):
 
 async def delete_last_in_code(state):
     current = state["code"]
+    state.update({"countdown": PIN_UPDATE_INITIAL_COUNTDOWN})
     new_code_l = list(current)
     for i, x in list(enumerate(new_code_l))[::-1]:
         if x != "X":
@@ -229,7 +248,8 @@ def porto_login_code_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManage
     input_pad = figma_renderer.find_exactly_one(screen_data, "INPUT_KEYPAD")
     code_display_parent = figma_renderer.find_exactly_one(screen_data, "CHILD_INPUT_PARKING_CODE")
 
-    state = {"code": "XXXXXXXX"}
+    state = {"code": "XXXXXXXX", "countdown": PIN_UPDATE_INITIAL_COUNTDOWN}
+    with_countdown_timer(fsm, state, UIManagerFSMState.enter_booking_pin)
 
     if code_display_parent is not None:
         if code_display_parent.children:
@@ -241,6 +261,7 @@ def porto_login_code_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManage
         pad_element: ui.element = input_pad.ui_element
         pad_element.clear()
         with pad_element:
+            state.update({"countdown": PIN_UPDATE_INITIAL_COUNTDOWN})
             common_style = ("height: 140px; font-size: 72px; line-height: 85px; "
                             "color: black; background-color: #F2F2F2; "
                             "border: 5px solid #2FAC66;  display: flex; "
@@ -350,6 +371,9 @@ def session_confirmed_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManag
 
 def car_not_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("ready_mode_booked", language)
+
+    state = {"countdown": 180}
+    with_countdown_timer(fsm, state, UIManagerFSMState.car_not_connected)
     update_generic_fields(screen_data, state=dict())
 
 
@@ -375,15 +399,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
     evse = txfsm.context.evse
     state = {"countdown": 30}
 
-
-    async def on_countdown():
-        state.update({"countdown": state["countdown"] - 1})
-        if state["countdown"] < 1:
-            state["countdown"] = 1
-            await fsm.handle(UIManagerFSMEvent.on_exit)
-
-
-    ui.timer(1, on_countdown)
+    with_countdown_timer(fsm, state, UIManagerFSMState.normal_session)
 
     root, screen_data = figma_renderer.render_screen("charging_mode", language)
     update_generic_fields(screen_data, state=state)
@@ -412,65 +428,23 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
                                   backward= lambda x: f"{x:.1f} kW")
     timeout_notice = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_TIMEOUT_NOTICE")
     if timeout_notice is not None:
-        timeout_notice.bind_text_from(state, "countdown", backward=lambda x: f"You can now leave the car, this screen will automatically close in {x} second{'s' if x > 1 else ''}...")
-
+        timeout_notice.bind_text_from(state, "countdown",
+                                      backward=lambda x, l=language:
+                                        localize("You can now leave the car, this screen will automatically close in [30]s...", l).replace("[30]s", f"{x} "+localize(f"second{'s' if x > 1 else ''}", language)))
 
     return
-
-    with ui.column(align_items="center"):
-        with ui.card():
-            with ui.row(align_items="end"):
-                with ui.column(align_items="center"):
-                    ui.label("50%").classes('text-3xl').style("color: primary;").bind_text_from(evse,
-                                                                                                "last_report_soc_percent",
-                                                                                                backward=lambda
-                                                                                                    x: "" if x is None else f"{int(x)}%")
-                    ui.icon("electric_car", color='brand').classes('text-5xl')
-
-                with ui.column(align_items="center").classes("lm-3 rm-3"):
-                    ui.label("0 kW").classes('text-3xl').style("color: primary;").bind_text_from(evse,
-                                                                                                 "last_reported_power",
-                                                                                                 backward=lambda
-                                                                                                     x: "" if x is None else f"{int(x)} kW")
-                    ui.icon("keyboard_double_arrow_left", color='brand').classes('text-5xl').bind_visibility_from(evse,
-                                                                                                                  "last_reported_power",
-                                                                                                                  backward=lambda
-                                                                                                                      x: x > 0)
-                    ui.icon("pause", color='brand').classes('text-5xl').bind_visibility_from(evse,
-                                                                                             "last_reported_power",
-                                                                                             backward=lambda x: x == 0)
-                    ui.icon("keyboard_double_arrow_right", color='brand').classes('text-5xl').bind_visibility_from(evse,
-                                                                                                                   "last_reported_power",
-                                                                                                                   backward=lambda
-                                                                                                                       x: x < 0)
-
-                ui.icon("ev_station", color='brand').classes('text-5xl')
-
-        ui.label(
-            "Thank you. Charging/dischargning of your EV will now occur according to the command from the Smart Charging Algorithm.")
-        ui.label().bind_text_from(fsm.context, "session_pin", lambda x: f"Your session PIN is {x}")
-        ui.label(f"Please record your PIN and use it to unlock charging progress information.")
-        ui.button(f"Stop session early", on_click=dispatch(fsm, UIManagerFSMEvent.on_early_stop))
-
-
 
 def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("final_thanks", language)
     state = {"countdown": 60}
+    with_countdown_timer(fsm, state, UIManagerFSMState.session_end_summary)
     update_generic_fields(screen_data, state=state)
-
-    async def on_countdown():
-        state.update({"countdown": state["countdown"] - 1})
-        if state["countdown"] < 1:
-            state["countdown"] = 1
-            await fsm.handle(UIManagerFSMEvent.on_exit)
-
-
-    ui.timer(1, on_countdown)
 
     timeout_notice = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_TIMEOUT_NOTICE")
     if timeout_notice is not None:
-        timeout_notice.bind_text_from(state, "countdown", backward=lambda x: f"This window will automatically close in {x} second{'s' if x > 1 else ''}...")
+        timeout_notice.bind_text_from(state, "countdown",
+                                      backward=lambda x, l=language: (localize("This window will automatically close in [60]s...", l)
+                                                                        .replace("[60]s",f"{x} "+localize(f"second{'s' if x > 1 else ''}", language))))
 
 def car_connected_too_soon_error_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     error_screen(localize("ERROR", language),

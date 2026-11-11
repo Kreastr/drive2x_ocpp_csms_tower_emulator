@@ -67,6 +67,30 @@
 AVAILABLE:
   EN: AVAILABLE
   PT: DISPONÍVEL
+OFFLINE:
+  EN: OFFLINE
+  PT: SEM LIGAÇÃO
+BOOTING:
+  EN: BOOTING
+  PT: A INICIAR
+NO EVSE:
+  EN: NO EVSE
+  PT: SEM EVSE
+Available:
+  EN: Available
+  PT: Disponível
+Occupied:
+  EN: Occupied
+  PT: Ocupado
+Reserved:
+  EN: Reserved
+  PT: Reservado
+Unavailable:
+  EN: Unavailable
+  PT: Indisponível
+Faulted:
+  EN: Faulted
+  PT: Com avaria
 Are this information correct?:
   EN: Is this information correct?
   PT: Esta informação está correta?
@@ -115,6 +139,9 @@ FAQs:
 'For further assistance call: (+XXX) XX-XXX-XXXX':
   EN: 'For further assistance call: (+XXX) XX-XXX-XXXX'
   PT: 'Para assistência adicional, contacte: (+XXX) XX-XXX-XXXX'
+'For further assistance call:':
+  EN: 'For further assistance call:'
+  PT: 'Para assistência adicional, contacte:'
 Energy supplied by the grid:
   EN: Energy supplied by the grid
   PT: Energia fornecida pela rede
@@ -221,7 +248,7 @@ Validate booking:
     eveniet nam, natus reprehenderit neque, minima labore quia?
 
     '
-  PT: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+  PT: '<PT> Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna
     aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis
     aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
     cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Voluptate asperiores velit suscipit
@@ -248,9 +275,12 @@ Validate booking:
     eveniet nam, natus reprehenderit neque, minima labore quia?
 
     '
-I do not accept and cannot use this service:
+'NO, I DO NOT CONSENT AND CANNOT USE THIS SERVICE':
   EN: I do not accept and cannot use this service
   PT: Não aceito e não posso utilizar este serviço
+'YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA':
+  EN: YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA
+  PT: '<PT> YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA'
 'Need help? Open the':
   EN: 'Need help? Open the'
   PT: 'Precisa de ajuda? Abra as'
@@ -269,6 +299,9 @@ Plug in the car to start the charging session:
 Do not plug in yet. First validate your booking:
   EN: Do not plug in yet. First validate your booking.
   PT: Ainda não ligue o veículo ao carregador. Primeiro, valide a sua reserva.
+Portuguese:
+  EN: Portuguese
+  PT: Português
 Portughese:
   EN: Portuguese
   PT: Português
@@ -304,7 +337,7 @@ This resource is busy.:
   PT: Este recurso está ocupado.
 This window will automatically close in [60]s...:
   EN: This window will automatically close in [60]s...
-  PT: Esta janela será encerrada automaticamente dentro de [60] s...
+  PT: Esta janela será encerrada automaticamente dentro de [60]s...
 'Time of connection: ':
   EN: 'Time of connection: '
   PT: 'Hora de conexão: '
@@ -337,10 +370,13 @@ You are in the queue to access the resource.:
   PT: 'Pode acompanhar a sessão de carregamento em tempo real aqui:'
 You can now leave the car, this screen will automatically close in [30]s...:
   EN: You can now leave the car, this screen will automatically close in [30]s...
-  PT: Pode agora deixar o veículo. Este ecrã será encerrado automaticamente dentro de [30] s...
+  PT: Pode agora deixar o veículo. Este ecrã será encerrado automaticamente dentro de [30]s...
 You have connected your EV too early.:
   EN: You have connected your EV too early.
   PT: Conectou o seu veículo elétrico ao carregador demasiado cedo.
+Please disconnect the car and only reconnect it once instructed by the charger.:
+  EN: Please disconnect the car and only reconnect it once instructed by the charger.
+  PT: '<PT>Please disconnect the car and only reconnect it once instructed by the charger.'
 Your place in the queue is:
   EN: Your place in the queue is
   PT: A sua posição na fila de espera é
@@ -365,3 +401,48 @@ yes, confirm the session:
 ? '   until 22 Dec 2025 - 20:00'
 : EN: '     until 22 Dec 2025 - 20:00'
   PT: '     até 22 dez. 2025 - 20:00'
+'Here is how we process your data.':
+  EN: 'Here is how we process your data.'
+  PT: '<PT> Here is how we process your data.'
+'Plug the vehicle in only after login':
+  EN: 'Plug the vehicle in only after login'
+  PT: '<PT> Plug the vehicle in only after login'
+'Introduce parking booking number to initiate smart charging':
+  EN: 'Introduce parking booking number to initiate smart charging'
+  PT: '<PT> Introduce parking booking number to initiate smart charging'
+LOGIN:
+  EN: LOGIN
+  PT: '<PT> LOGIN'
+Wrong code:
+  EN: 'Wrong code'
+  PT: '<PT> Wrong code'
+"Wrong code\LCheck the booking code and try again. If the problem persist, contact assistance at:":
+  EN: 'Wrong code\LCheck the booking code and try again. If the problem persist, contact assistance at:'
+  PT: '<PT> Wrong code\LCheck the booking code and try again. If the problem persist, contact assistance at:'
+"Try again":
+  EN: "Try again"
+  PT: "<PT> Try again"
+"THE CODE IS CORRECT...":
+  EN: "THE CODE IS CORRECT..."
+  PT: "<PT> THE CODE IS CORRECT..."
+"THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS...":
+  EN: "THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS..."
+  PT: "<PT> THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS..."
+"Plug the vehicle in only after starting the session":
+  EN: "Plug the vehicle in only after starting the session"
+  PT: "<PT> Plug the vehicle in only after starting the session"
+"Plug in the car to start the session":
+  EN: "Plug in the car to start the session"
+  PT: "<PT> Plug in the car to start the session"
+"SMART CHARGING...\Luntil 27 Nov 2025 - 20:00":
+  EN: "SMART CHARGING...\Luntil 27 Nov 2025 - 20:00"
+  PT: "<PT> SMART CHARGING...\Luntil 27 Nov 2025 - 20:00"
+'Live charging Power:':
+  EN: 'Live charging Power:'
+  PT: '<PT> Live charging Power:'
+second:
+  EN: second
+  PT: segundo
+seconds:
+  EN: seconds
+  PT: segundos
