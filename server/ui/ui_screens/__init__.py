@@ -414,7 +414,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
         logger.debug(f"Normal session {txfsm=} {txfsm.context=} {txfsm.context.session_info=}")
         logger.debug(f"{session_end_time=}")
         assert txfsm.context.session_info is not None
-        session_end_time.content = f"<br>until {format_datetime(txfsm.context.session_info.departure_time)}"
+        session_end_time.content = f"<br/>{localize('until', language)} {format_datetime(txfsm.context.session_info.departure_time)}"
         #session_end_time.bind_content_from(txfsm.context.session_info, "departure_time",
         #                                   backward=lambda x: f"<br>until {format_datetime(x)}")
     else:
@@ -451,7 +451,8 @@ def car_connected_too_soon_error_screen(cp_id: ChargePointId, evse_id: EVSEId, f
                  localize("You have connected your EV too early.", language),
                  localize("Please disconnect the car and only reconnect it once instructed by the charger.", language),
                  cp_id,
-                 hide_button=True)
+                 hide_button=True,
+                 language=language)
 
 
 

@@ -151,7 +151,7 @@ Terms and Conditions for participating in the DriVe2X pilot:
 Please review the conditions for participating in the DriVe2X pilot.:
   EN: Please review the conditions for participating in the DriVe2X pilot.
   PT: Consulte as condições de participação no piloto DriVe2X.
-If your booking details are incorrect, please cancel the session and update your parking reservation online:
+IF YOR BOOKING DETAILS ARE INCORRECT, PLEASE CANCEL THE SESSION AND MAKE A NEW ONE FROM THE APP:
   EN: If your booking details are incorrect, please cancel the session and update your parking reservation online.
   PT: Se os dados da sua reserva estiverem incorretos, cancele a sessão e atualize a sua reserva de estacionamento online.
 IMPORTANT:
@@ -275,7 +275,7 @@ Validate booking:
     eveniet nam, natus reprehenderit neque, minima labore quia?
 
     '
-'NO, I DO NOT CONSENT AND CANNOT USE THIS SERVICE':
+'NO, I DO NOT CONSENT AND CANNOT USE THIS SERVICE.':
   EN: I do not accept and cannot use this service
   PT: Não aceito e não posso utilizar este serviço
 'YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA':
@@ -433,10 +433,7 @@ Wrong code:
   PT: "<PT> Plug the vehicle in only after starting the session"
 "Plug in the car to start the session":
   EN: "Plug in the car to start the session"
-  PT: "<PT> Plug in the car to start the session"
-"SMART CHARGING...\Luntil 27 Nov 2025 - 20:00":
-  EN: "SMART CHARGING...\Luntil 27 Nov 2025 - 20:00"
-  PT: "<PT> SMART CHARGING...\Luntil 27 Nov 2025 - 20:00"
+  PT: "[PT] Plug in the car to start the session"
 'Live charging Power:':
   EN: 'Live charging Power:'
   PT: '<PT> Live charging Power:'
@@ -446,3 +443,15 @@ second:
 seconds:
   EN: seconds
   PT: segundos
+Battery charged:
+  EN: 'Battery charged'
+  PT: '<PT> Battery charged'
+Grid charged:
+  EN: 'Grid charged'
+  PT: '<PT> Grid charged'
+'SMART CHARGING...':
+  EN: 'SMART CHARGING...'
+  PT: '[PT] SMART CHARGING...'
+until:
+  EN: until
+  PT: até
