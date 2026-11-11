@@ -125,11 +125,11 @@ def format_datetime(x : datetime.datetime, lang: str = "EN"):
 
     return dt.strftime("%d %b %Y - %H:%M")
 
-def format_session_duration(td: timedelta) -> str:
+def format_session_duration(td: timedelta, language: str = "EN") -> str:
     total_hours = int(td.total_seconds() / 3600 + 0.5)
 
     days, hours = divmod(total_hours, 24)
-    return f"{days}d" if days > 0 else "" + f"{hours}h"
+    return f"{days} "+ localize("day" if days == 1 else "days", language=language) if days > 0 else "" + f"{hours} h"
 
 def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("session_details", language)
@@ -165,7 +165,7 @@ def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManager
         session_duration.content = ""
         session_duration.bind_content_from(fsm.context.session_info,
                                            "session_duration",
-                                            backward=format_session_duration)
+                                            backward=lambda x: format_session_duration(x, language=language))
 
 
 def update_generic_fields(screen_data, state, language: str = "EN"):

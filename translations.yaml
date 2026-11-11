@@ -455,3 +455,9 @@ seconds:
 until:
   EN: until
   PT: até
+day:
+  EN: day
+  PT: dia
+days:
+  EN: days
+  PT: dias
