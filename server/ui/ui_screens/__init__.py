@@ -117,8 +117,13 @@ async def delete_last_in_code(state):
             break
     state["code"] = "".join(new_code_l)
 
-def format_datetime(x : datetime.datetime):
-    return x.astimezone(ZoneInfo("Europe/Lisbon")).strftime("%d %b %Y - %H:%M")
+def format_datetime(x : datetime.datetime, lang: str = "EN"):
+    dt = x.astimezone(ZoneInfo("Europe/Lisbon"))
+
+    if lang == "PT":
+        return x.strftime("%d/%m/%Y - %H:%M")
+
+    return dt.strftime("%d %b %Y - %H:%M")
 
 def format_session_duration(td: timedelta) -> str:
     total_hours = int(td.total_seconds() / 3600 + 0.5)
@@ -128,10 +133,18 @@ def format_session_duration(td: timedelta) -> str:
 
 def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("session_details", language)
+
+    if language == "PT":
+        for lookup in ("ACTION_CHILD_CANCEL", "ACTION_CHILD_CONFIRM"):
+            for button in figma_renderer.find_all_starting_with(screen_data, lookup):
+                for child in button.children:
+                    if child.ui_element is not None:
+                        child.ui_element.style("transform: translateY(-16px);")
+
     map_click_action("ACTION_SELF_CONFIRM", UIManagerFSMEvent.on_confirm_session, fsm, screen_data)
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_exit, fsm, screen_data)
 
-    update_generic_fields(screen_data, state=dict())
+    update_generic_fields(screen_data, state=dict(), language=language)
 
     anchor = "TIME SET"
     time_of_connection = _lookup_span_in_child_of_anchor(anchor, child_index=0, span_index=1, screen_data=screen_data)
@@ -142,12 +155,12 @@ def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManager
         time_of_connection.content = ""
         time_of_connection.bind_content_from(fsm.context.session_info,
                                           "arrival_time",
-                                          backward=format_datetime)
+                                          backward=lambda x: format_datetime(x, language))
     if time_of_disconnection is not None:
         time_of_disconnection.content = ""
         time_of_disconnection.bind_content_from(fsm.context.session_info,
                                               "departure_time",
-                                              backward=format_datetime)
+                                              backward=lambda x: format_datetime(x, language))
     if session_duration is not None:
         session_duration.content = ""
         session_duration.bind_content_from(fsm.context.session_info,
@@ -155,7 +168,7 @@ def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManager
                                             backward=format_session_duration)
 
 
-def update_generic_fields(screen_data, state):
+def update_generic_fields(screen_data, state, language: str = "EN"):
     try:
         date_time_now_element = figma_renderer.maybe_find_one_label_child_of(screen_data, "BOOKING_DATE_TIME")
         if date_time_now_element is None:
@@ -167,7 +180,7 @@ def update_generic_fields(screen_data, state):
     
         if date_time_now_element is not None:
             assert type(date_time_now_element) is ui.label
-            date_time_now_element.bind_text_from(state, "current_time", backward=format_datetime)
+            date_time_now_element.bind_text_from(state, "current_time", backward=lambda x: format_datetime(x, language))
             ui.timer(5, lambda: state.update(dict(current_time=dt.now(tz=datetime.UTC))))
     except:
         logger.warning(f"update_generic_fields exception {traceback.format_exc()}")
@@ -414,7 +427,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
         logger.debug(f"Normal session {txfsm=} {txfsm.context=} {txfsm.context.session_info=}")
         logger.debug(f"{session_end_time=}")
         assert txfsm.context.session_info is not None
-        session_end_time.content = f"<br/>{localize('until', language)} {format_datetime(txfsm.context.session_info.departure_time)}"
+        session_end_time.content = f"<br/>{localize('until', language)} {format_datetime(txfsm.context.session_info.departure_time, language)}"
         #session_end_time.bind_content_from(txfsm.context.session_info, "departure_time",
         #                                   backward=lambda x: f"<br>until {format_datetime(x)}")
     else:

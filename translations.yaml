@@ -114,7 +114,7 @@ Charge Point with ID:
   PT: Ponto de carregamento com ID
 Charger:
   EN: Charger
-  PT: Carregador
+  PT: 'Carregador:'
 Charging confIrmed:
   EN: Charging confirmed
   PT: Carregamento confirmado
@@ -443,12 +443,12 @@ second:
 seconds:
   EN: seconds
   PT: segundos
-Battery charged:
-  EN: 'Battery charged'
-  PT: '<PT> Battery charged'
-Grid charged:
-  EN: 'Grid charged'
-  PT: '<PT> Grid charged'
+'Battery charged:':
+  EN: 'Battery charged:'
+  PT: '<PT> Battery charged:'
+'Grid charged:':
+  EN: 'Grid charged:'
+  PT: '<PT> Grid charged:'
 'SMART CHARGING...':
   EN: 'SMART CHARGING...'
   PT: '[PT] SMART CHARGING...'

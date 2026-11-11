@@ -413,6 +413,14 @@ async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
 
     root, screen_data = figma_renderer.render_screen("standby_available", language)
 
+    if language in ("PT", ):
+        status_indicator_row = FigmaRenderer.find_exactly_one(screen_data, "STATUS")
+        if status_indicator_row is not None:
+            label, colon, status = status_indicator_row.children[0:3]
+            label.ui_element.style("transform: translate(-50px, -20px)")
+            colon.ui_element.style("visibility: hidden")
+            status.ui_element.style("transform: translate(30px, -20px)")
+
     state = {"status": localize("OFFLINE", language)}
 
     def refresh_status(cpid=cp_id):
