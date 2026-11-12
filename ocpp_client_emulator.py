@@ -149,6 +149,8 @@ class TxFSM(TxFSMType):
                                               transaction_info=TransactionType(transaction_id=self.tx_id.value,),
                                               evse=EVSEType(id=self.context.evse.id, connector_id=1)
                                               ))
+        self.context.cp_interface.cpc.on_tx_end(self.tx_id.value)
+        self.context.evse.tx_id = None
 
     async def inform_on_remote_start(self, *vargs):
         self.context.cp_interface.cpc.on_tx_start(evse_id=self.context.evse.id,

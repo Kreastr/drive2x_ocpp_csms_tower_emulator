@@ -112,6 +112,8 @@ from util.db import get_default_redis
 from util import get_proxy_app_args
 from redis_dict import RedisDict
 
+from proxy.proxy_config import ProxyConfigurator
+
 class OCPPServerV16Interface(ABC):
 
     @abstractmethod
@@ -220,7 +222,8 @@ class OCPPClientV201(ChargePoint):
         self.cpc  = ChargingProfileComponent(evse_ids=[1],
                                    evse_hard_limits=limit_descriptor, 
                                              profile_table=RedisDict(f"{serial_number}:profile:", redis=get_default_redis(arg_provider=get_proxy_app_args)),
-                                   active_transaction_table=RedisDict(f"{serial_number}:active_transaction:", redis=get_default_redis(arg_provider=get_proxy_app_args)))
+                                   active_transaction_table=RedisDict(f"{serial_number}:active_transaction:", redis=get_default_redis(arg_provider=get_proxy_app_args)),
+                                             forbid_idle=ProxyConfigurator.get_global_config().forbid_idle)
         self.cpc.restore_from_database()
     
     async def meter_values_request(self, rq: MeterValuesRequest, tx_id : str | None):

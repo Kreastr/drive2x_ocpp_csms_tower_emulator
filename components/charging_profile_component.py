@@ -30,7 +30,6 @@ import sys
 
 from redis_dict import RedisDict
 
-from proxy.proxy_config import ProxyConfigurator
 
 if "--trace" in sys.argv:
     from snoop import snoop
@@ -72,10 +71,12 @@ class ChargingProfileComponent:
     def __init__(self, evse_ids : list[int],
                        evse_hard_limits : dict[int, LimitDescriptor],
                        profile_table : Optional[dict[str, Any] | RedisDict ] = None,
-                       active_transaction_table : Optional[dict[str, Any] | RedisDict ] = None):
+                       active_transaction_table : Optional[dict[str, Any] | RedisDict ] = None,
+                       forbid_idle : bool = False):
         self.evse_ids = evse_ids
         self.evse_hard_limits : dict[int, LimitDescriptor] = evse_hard_limits
         self.installed_profiles : defaultdict[int, list[ChargingProfileType]] = defaultdict(list)
+        self.forbid_idle = forbid_idle
         if profile_table is None:
             self.profile_table = dict()
         else:
@@ -204,7 +205,7 @@ class ChargingProfileComponent:
         if abs(limit) < self.evse_hard_limits[evse_id].minimal_absolute:
             cycle_second = moment.second
             cycle_switch_off_time = abs(int(limit * 60 / self.evse_hard_limits[evse_id].minimal_absolute))
-            if not ProxyConfigurator.get_global_config().forbid_idle and limit == 0.0:
+            if self.forbid_idle and limit == 0.0:
                 pass
             elif cycle_second < 15:
                 limit = sign(limit) * self.evse_hard_limits[evse_id].minimal_absolute

@@ -30,7 +30,7 @@ transaction_uml = """@startuml
 [*] -> Idle
 Idle --> Authorized : on authorized
 Idle --> CableConnected : if cable connected
-CableConnected --> Idle : if cable disconnected
+CableConnected --> StopTransactionDisconnected : if cable disconnected
 Authorized --> TransactionAuthFirst : if cable connected
 CableConnected --> TransactionCableFirst : on authorized
 TransactionCableFirst --> Transaction
