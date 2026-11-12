@@ -269,6 +269,9 @@ def porto_login_code_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManage
             code_text: ui.label = code_display_parent.children[0].ui_element
             code_text.text = f"ANA - {state['code']}"
             code_text.bind_text_from(state, "code", backward=lambda x: f"ANA - {x}")
+            # Hotfix code field offset
+            if language == "PT":
+                code_text.style("transform: translateY(-12px);")
 
     if input_pad is not None:
         pad_element: ui.element = input_pad.ui_element
