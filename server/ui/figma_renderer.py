@@ -446,6 +446,21 @@ class FigmaRenderer():
                    "border: 3px solid;"
                    "overflow: hidden; "
                    "border-color: white;")
+
+        if language == "PT":
+            for node in self.find_element(
+                    screen_data,
+                    lambda n: n.name == "Charger" and n.characters == "Login"
+            ):
+                node.parent.ui_element.style("width: 518px;")
+                node.ui_element.style(
+                    "width: 518px; "
+                    "max-width: none; "
+                    "flex-shrink: 0; "
+                    "white-space: nowrap; "
+                    "text-align: center;"
+                )
+        
         if footer.ui_element is not None:
             footer.ui_element.style("position: fixed; left: 0; bottom: 0; width: 1080px; ")
 
@@ -475,5 +490,11 @@ class FigmaRenderer():
                                         }}"""
                     )
                     node.ui_element.classes("cursor-hand")
-
+        
+        # Hotfix button layout.
+        if language == "PT":
+            for node in self.find_all_starting_with(screen_data, "Try again"):
+                if node.ui_element is not None:
+                    node.ui_element.style("height: auto;")
+                    
         return root, screen_data

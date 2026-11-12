@@ -183,7 +183,7 @@ Inactive equipment:
   PT: Equipamento inativo
 Introduce your parking booking number to initiate smart charging:
   EN: Introduce your parking booking number to start the charging session.
-  PT: Introduza o número da sua reserva para iniciar a sessão de carregamento.
+  PT: Introduza o número da sua reserva para iniciar a sessão de carregamento inteligente.
 Live session power:
   EN: Live session power
   PT: Potência instantânea da sessão
@@ -411,7 +411,7 @@ LOGIN:
   PT: 'INÍCIO DE SESSÃO'
 Login:
   EN: LOGIN
-  PT: 'INÍCIO DE SESSÃO'
+  PT: 'INICIE SESSÃO'
 Wrong code:
   EN: 'Wrong code'
   PT: 'Código inválido'
@@ -420,7 +420,7 @@ Wrong code:
   PT: 'Código inválido\LVerifique o código da reserva e tente novamente. Se o problema persistir, contacte a assistência através do:'
 "Try again":
   EN: "Try again"
-  PT: "Tente novamente"
+  PT: "Tente de novo"
 "THE CODE IS CORRECT...":
   EN: "THE CODE IS CORRECT..."
   PT: "CÓDIGO VÁLIDO..."
@@ -462,4 +462,4 @@ days:
   PT: dias
 CAUTION:
   EN: CAUTION
-  PT: "[PT] CAUTION"
+  PT: "ATENÇÃO"
