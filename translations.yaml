@@ -38,8 +38,8 @@
   EN: '5'
   PT: '5'
 5.3kW:
-  EN: '--- kW'
-  PT: '--- kW'
+  EN: '--- kWh'
+  PT: '--- kWh'
 '6':
   EN: '6'
   PT: '6'
@@ -441,7 +441,7 @@ seconds:
   PT: segundos
 'Battery charged:':
   EN: 'Battery charged:'
-  PT: 'Bateria carregada:'
+  PT: 'Carregamento:'
 'Grid charged:':
   EN: ' '
   PT: ' '
