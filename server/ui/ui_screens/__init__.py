@@ -134,7 +134,7 @@ def format_session_duration(td: timedelta, language: str = "EN") -> str:
 def booking_details_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("session_details", language)
 
-    if language == "PT":
+    if False : # language == "PT":
         for lookup in ("ACTION_CHILD_CANCEL", "ACTION_CHILD_CONFIRM"):
             for button in figma_renderer.find_all_starting_with(screen_data, lookup):
                 for child in button.children:

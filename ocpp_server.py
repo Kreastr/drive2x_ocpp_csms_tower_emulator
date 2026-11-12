@@ -391,7 +391,7 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
 
 @ui.page("/")
 async def index():
-    ui.page_title(f'Drive2X OCPP Server Control Panel')
+    ui.page_title(f'DriVe2x OCPP Server Control Panel')
     background_tasks.create_lazy(main(),name="main")
     ui.label(text="Charge Point status")
     with ui.row().mark("cp_card_container"):
@@ -409,7 +409,7 @@ async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
     #    cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
-    ui.page_title(f'Drive2X UI - {cp_id}')
+    ui.page_title(f'DriVe2x UI - {cp_id}')
 
     root, screen_data = figma_renderer.render_screen("standby_available", language)
 
@@ -417,9 +417,9 @@ async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
         status_indicator_row = FigmaRenderer.find_exactly_one(screen_data, "STATUS")
         if status_indicator_row is not None:
             label, colon, status = status_indicator_row.children[0:3]
-            label.ui_element.style("transform: translate(-50px, -20px)")
+            label.ui_element.style("transform: translate(-50px, 0px)")
             colon.ui_element.style("visibility: hidden")
-            status.ui_element.style("transform: translate(30px, -20px)")
+            status.ui_element.style("transform: translate(30px, 0px)")
 
     state = {"status": localize("OFFLINE", language)}
 
@@ -480,7 +480,7 @@ async def standard_header_footer(cp_id):
         ui.timer(1, timenow.refresh)
     with (ui.footer(elevated=True).style('background-color: brand').classes('items-center justify-between text-body2')):
         ui.label(f"Charging station serial number: {cp_id}.")
-        ui.label("Operator: Drive2X.")
+        ui.label("Operator: DriVe2x.")
         ui.label("Contact details: DriVe2X@lut.fi +358 XXX YYY ZZZ")
 
 
@@ -535,7 +535,7 @@ async def d2x_ui_evse(language: Literal["EN", "PT"], cp_id : ChargePointId, evse
     #    cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
-    ui.page_title(f'Drive2X UI - {cp_id}/{evse_id}')
+    ui.page_title(f'DriVe2x UI - {cp_id}/{evse_id}')
     semaphore = FairSemaphoreRedis(name="page-access-" + cp_id + "-" + str(evse_id), n_users=1, redis=get_default_redis(), session_timeout=5)
     semaphore.acquire()
     await screen_size_refreshable_block(cp_id, evse_id, semaphore, language)
