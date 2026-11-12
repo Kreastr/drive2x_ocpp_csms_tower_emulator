@@ -475,7 +475,8 @@ def car_connected_too_soon_error_screen(cp_id: ChargePointId, evse_id: EVSEId, f
 def error_screen(heading, title, text, cp_id : ChargePointId, hide_button=False, language="EN"):
     root, screen_data = figma_renderer.render_screen("error_page", language)
 
-    error_heading = figma_renderer.maybe_find_one_label_child_of(screen_data, "ERROR")
+    error_heading_node = figma_renderer.find_exactly_one(screen_data, "ERROR")
+    error_heading = error_heading_node.ui_element if error_heading_node else None
     if error_heading is not None:
         error_heading.text = heading
 

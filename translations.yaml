@@ -285,7 +285,7 @@ No, Cancel the session:
   PT: Não, cancelar
 Please unplug the vehicle and only plug it in again when instructed by the charger:
   EN: Please unplug the vehicle and only plug it in again when instructed by the charger.
-  PT: Por favor, desligue o cabo do veículo e volte a ligá-lo apenas quando indicado pelo carregador.
+  PT: Por favor, desligue o cabo do veículo e volte a ligá-lo apenas quando o carregador o indicar.
 Please wait:
   EN: Please wait
   PT: Aguarde, por favor
@@ -372,7 +372,7 @@ You have connected your EV too early.:
   PT: Ligou o cabo ao seu veículo demasiado cedo.
 Please disconnect the car and only reconnect it once instructed by the charger.:
   EN: Please disconnect the car and only reconnect it once instructed by the charger.
-  PT: '<PT>Please disconnect the car and only reconnect it once instructed by the charger.'
+  PT: 'Por favor, desligue o cabo do veículo e volte a ligá-lo apenas quando o carregador o indicar.'
 Your place in the queue is:
   EN: Your place in the queue is
   PT: A sua posição na fila de espera é
@@ -407,6 +407,9 @@ yes, confirm the session:
   EN: 'Introduce parking booking number to initiate smart charging'
   PT: 'Introduza o número da sua reserva para iniciar o carregamento inteligente.'
 LOGIN:
+  EN: LOGIN
+  PT: 'INÍCIO DE SESSÃO'
+Login:
   EN: LOGIN
   PT: 'INÍCIO DE SESSÃO'
 Wrong code:
