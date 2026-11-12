@@ -390,13 +390,13 @@ def car_not_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManag
 
     state = {"countdown": 180}
     with_countdown_timer(fsm, state, UIManagerFSMState.car_not_connected)
-    update_generic_fields(screen_data, state=dict())
+    update_generic_fields(screen_data, state=state, language=language)
 
 
 
 def car_connected_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
     root, screen_data = figma_renderer.render_screen("ready_mode_booked", language)
-    update_generic_fields(screen_data, state=dict())
+    update_generic_fields(screen_data, state=dict(), language=language)
 
     input_pad = figma_renderer.find_exactly_one(screen_data, "INFO_CHARGING_STATUS")
     if input_pad is not None:
@@ -418,7 +418,7 @@ def normal_session_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerF
     with_countdown_timer(fsm, state, UIManagerFSMState.normal_session)
 
     root, screen_data = figma_renderer.render_screen("charging_mode", language)
-    update_generic_fields(screen_data, state=state)
+    update_generic_fields(screen_data, state=state, language=language)
 
     map_click_action("ACTION_SELF_CANCEL", UIManagerFSMEvent.on_early_stop, fsm, screen_data)
 
@@ -454,7 +454,7 @@ def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIMan
     root, screen_data = figma_renderer.render_screen("final_thanks", language)
     state = {"countdown": 60}
     with_countdown_timer(fsm, state, UIManagerFSMState.session_end_summary)
-    update_generic_fields(screen_data, state=state)
+    update_generic_fields(screen_data, state=state, language=language)
 
     timeout_notice = figma_renderer.maybe_find_one_label_child_of(screen_data, "INFO_TIMEOUT_NOTICE")
     if timeout_notice is not None:
@@ -463,7 +463,7 @@ def session_end_summary_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIMan
                                                                         .replace("[60]s",f"{x} "+localize(f"second{'s' if x > 1 else ''}", language))))
 
 def car_connected_too_soon_error_screen(cp_id: ChargePointId, evse_id: EVSEId, fsm: UIManagerFSMType, cp: OCPPServerHandler, language : Literal["EN", "PT"]):
-    error_screen(localize("ERROR", language),
+    error_screen(localize("CAUTION", language),
                  localize("You have connected your EV too early.", language),
                  localize("Please disconnect the car and only reconnect it once instructed by the charger.", language),
                  cp_id,
