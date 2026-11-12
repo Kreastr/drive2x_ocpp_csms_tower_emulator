@@ -9,7 +9,7 @@
   PT: ' '
 . Please try later.:
   EN: . Please try later.
-  PT: . Por favor, tente novamente mais tarde.
+  PT: . Por favor, tente mais tarde.
 '0':
   EN: '0'
   PT: '0'
@@ -60,7 +60,7 @@
   PT: ':'
 <br/>If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX:
   EN: <br/>If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX
-  PT: <br/>Se nada acontecer, contacte a assistência através do número (+XXX) XX-XXX-XXXX
+  PT: <br/>Em caso de falha, contacte (+XXX) XX-XXX-XXXX
 <br/>If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.:
   EN: <br/>If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.
   PT: <br/>Se tiver um veículo Volkswagen e ainda não tiver ativado a bidirecionalidade, por favor, faça-o agora.
@@ -102,7 +102,7 @@ BOOKING DETAILS:
   PT: DETALHES DA RESERVA
 Energy charged to the vehicle:
   EN: Energy charged to the vehicle
-  PT: Energia carregada no veículo
+  PT: Energia fornecida ao veículo
 Energy supplied by the vehicle:
   EN: Energy supplied by the vehicle
   PT: Energia fornecida pelo veículo
@@ -129,7 +129,7 @@ ERROR:
   PT: ERRO
 EV charging equipment with ID:
   EN: EV charging equipment with ID
-  PT: Equipamento de carregamento de veículo elétrico com ID
+  PT: Carregador com ID
 EXIT:
   EN: EXIT
   PT: SAIR
@@ -138,10 +138,10 @@ FAQs:
   PT: Perguntas frequentes
 'For further assistance call: (+XXX) XX-XXX-XXXX':
   EN: 'For further assistance call: (+XXX) XX-XXX-XXXX'
-  PT: 'Para assistência adicional, contacte: (+XXX) XX-XXX-XXXX'
+  PT: 'Para obter assistência, contacte: (+XXX) XX-XXX-XXXX'
 'For further assistance call:':
   EN: 'For further assistance call:'
-  PT: 'Para assistência adicional, contacte:'
+  PT: 'Para obter assistência, contacte:'
 Energy supplied by the grid:
   EN: Energy supplied by the grid
   PT: Energia fornecida pela rede
@@ -168,7 +168,7 @@ IMPORTANT<br/>:
   PT: IMPORTANTE<br/>
 If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX:
   EN: If nothing happens, contact assistance at (+XXX) XX-XXX-XXXX
-  PT: Se nada acontecer, contacte a assistência através do número (+XXX) XX-XXX-XXXX
+  PT: Em caso de falha, contacte (+XXX) XX-XXX-XXXX
 If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.:
   EN: If you have a Volkswagen vehicle and have not yet enabled bidirectionality, please do so now.
   PT: Se tiver um veículo Volkswagen e ainda não tiver ativado a bidirecionalidade, por favor, faça-o agora.
@@ -182,18 +182,14 @@ Inactive equipment:
   EN: Inactive equipment
   PT: Equipamento inativo
 Introduce your parking booking number to initiate smart charging:
-  EN: Introduce your parking booking number to start the charging session
-  PT: Introduza o número da sua reserva de estacionamento para iniciar a sessão de carregamento
+  EN: Introduce your parking booking number to start the charging session.
+  PT: Introduza o número da sua reserva para iniciar a sessão de carregamento.
 Live session power:
   EN: Live session power
   PT: Potência instantânea da sessão
-Live session power - alt:
-  PT: 'Potência de carregamento em tempo real:'
 Validate booking:
   EN: Validate booking
   PT: Validar reserva
-
-
 ? 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
   Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure
   dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat
@@ -277,10 +273,10 @@ Validate booking:
     '
 'NO, I DO NOT CONSENT AND CANNOT USE THIS SERVICE.':
   EN: I do not accept and cannot use this service
-  PT: Não aceito e não posso utilizar este serviço
+  PT: Não aceito e não pretendo utilizar este serviço
 'YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA':
   EN: YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA
-  PT: '<PT> YES, I HAVE READ THE POLICIES AND CONSENT TO HANDLING OF MY DATA'
+  PT: 'Sim, li os termos e aceito o tratamento dos meus dados'
 'Need help? Open the':
   EN: 'Need help? Open the'
   PT: 'Precisa de ajuda? Abra as'
@@ -289,16 +285,16 @@ No, Cancel the session:
   PT: Não, cancelar
 Please unplug the vehicle and only plug it in again when instructed by the charger:
   EN: Please unplug the vehicle and only plug it in again when instructed by the charger.
-  PT: Desligue o veículo do carregador e volte a ligá-lo apenas quando indicado pelo carregador.
+  PT: Por favor, desligue o cabo do veículo e volte a ligá-lo apenas quando indicado pelo carregador.
 Please wait:
   EN: Please wait
   PT: Aguarde, por favor
 Plug in the car to start the charging session:
   EN: Plug in the car to start the charging session
-  PT: Ligue o veículo ao carregador para iniciar a sessão de carregamento
+  PT: Ligue o cabo ao veículo para iniciar o carregamento
 Do not plug in yet. First validate your booking:
   EN: Do not plug in yet. First validate your booking.
-  PT: Ainda não ligue o veículo ao carregador. Primeiro, valide a sua reserva.
+  PT: Ainda não ligue o cabo ao veículo. Primeiro, valide a sua reserva.
 Portuguese:
   EN: Portuguese
   PT: Português
@@ -319,7 +315,7 @@ Session summary:
   PT: Resumo da sessão
 Your booking number has been validated. You will now see your booking details.:
   EN: Your booking number has been validated. You will now see your booking details.
-  PT: O número da sua reserva foi validado. De seguida, serão apresentados os detalhes da reserva.
+  PT: O número da sua reserva foi validado. Veja, de seguida, os detalhes da reserva.
 Touch the screen to validate your booking:
   EN: Touch the screen to validate your booking
   PT: Toque no ecrã para validar a sua reserva
@@ -340,10 +336,10 @@ This window will automatically close in [60]s...:
   PT: Esta janela será encerrada automaticamente dentro de [60]s...
 'Time of connection: ':
   EN: 'Time of connection: '
-  PT: 'Hora de conexão: '
+  PT: 'Hora de início: '
 'Time of disconnection: ':
   EN: 'Time of disconnection: '
-  PT: 'Hora de desconexão: '
+  PT: 'Hora de fim: '
 We are having connection issues:
   EN: We are having connection issues
   PT: Estamos com problemas de ligação
@@ -370,10 +366,10 @@ You are in the queue to access the resource.:
   PT: 'Pode acompanhar a sessão de carregamento em tempo real aqui:'
 You can now leave the car, this screen will automatically close in [30]s...:
   EN: You can now leave the car, this screen will automatically close in [30]s...
-  PT: Pode agora deixar o veículo. Este ecrã será encerrado automaticamente dentro de [30]s...
+  PT: Já pode deixar o veículo. Este ecrã irá fechar-se automaticamente dentro de [30]s...
 You have connected your EV too early.:
   EN: You have connected your EV too early.
-  PT: Conectou o seu veículo elétrico ao carregador demasiado cedo.
+  PT: Ligou o cabo ao seu veículo demasiado cedo.
 Please disconnect the car and only reconnect it once instructed by the charger.:
   EN: Please disconnect the car and only reconnect it once instructed by the charger.
   PT: '<PT>Please disconnect the car and only reconnect it once instructed by the charger.'
@@ -403,40 +399,40 @@ yes, confirm the session:
   PT: '     até 22 dez. 2025 - 20:00'
 'Here is how we process your data.':
   EN: 'Here is how we process your data.'
-  PT: '<PT> Here is how we process your data.'
+  PT: 'Saiba como tratamos os seus dados.'
 'Plug the vehicle in only after login':
   EN: 'Plug the vehicle in only after login'
-  PT: '<PT> Plug the vehicle in only after login'
+  PT: 'Ligue o cabo ao veículo apenas após iniciar sessão'
 'Introduce parking booking number to initiate smart charging':
   EN: 'Introduce parking booking number to initiate smart charging'
-  PT: '<PT> Introduce parking booking number to initiate smart charging'
+  PT: 'Introduza o número da sua reserva para iniciar o carregamento inteligente.'
 LOGIN:
   EN: LOGIN
-  PT: '<PT> LOGIN'
+  PT: 'INÍCIO DE SESSÃO'
 Wrong code:
   EN: 'Wrong code'
-  PT: '<PT> Wrong code'
+  PT: 'Código inválido'
 "Wrong code\LCheck the booking code and try again. If the problem persist, contact assistance at:":
-  EN: 'Wrong code\LCheck the booking code and try again. If the problem persist, contact assistance at:'
-  PT: '<PT> Wrong code\LCheck the booking code and try again. If the problem persist, contact assistance at:'
+  EN: 'Wrong code\LCheck the booking code and try again. If the problem persists, contact assistance at:'
+  PT: 'Código inválido\LVerifique o código da reserva e tente novamente. Se o problema persistir, contacte a assistência através do:'
 "Try again":
   EN: "Try again"
-  PT: "<PT> Try again"
+  PT: "Tente novamente"
 "THE CODE IS CORRECT...":
   EN: "THE CODE IS CORRECT..."
-  PT: "<PT> THE CODE IS CORRECT..."
+  PT: "CÓDIGO VÁLIDO..."
 "THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS...":
   EN: "THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS..."
-  PT: "<PT> THE CODE IS CORRECT, YOU WILL NOW SEE YOU BOOKING DETAILS..."
+  PT: "CÓDIGO VÁLIDO. CONSULTE, DE SEGUIDA, OS DETALHES DA SUA RESERVA..."
 "Plug the vehicle in only after starting the session":
   EN: "Plug the vehicle in only after starting the session"
-  PT: "<PT> Plug the vehicle in only after starting the session"
+  PT: "Ligue o cabo ao veículo apenas após iniciar a sessão"
 "Plug in the car to start the session":
-  EN: "Plug in the car to start the session"
-  PT: "[PT] Plug in the car to start the session"
+  EN: "Plug in the car to start the session."
+  PT: "Ligue o cabo ao veículo para iniciar a sessão."
 'Live charging Power:':
   EN: 'Live charging Power:'
-  PT: '<PT> Live charging Power:'
+  PT: 'Potência de carga:'
 second:
   EN: second
   PT: segundo
@@ -445,13 +441,13 @@ seconds:
   PT: segundos
 'Battery charged:':
   EN: 'Battery charged:'
-  PT: '<PT> Battery charged:'
+  PT: 'Bateria carregada:'
 'Grid charged:':
   EN: ' '
   PT: ' '
 'SMART CHARGING...':
   EN: 'SMART CHARGING...'
-  PT: '[PT] SMART CHARGING...'
+  PT: 'CARREGAMENTO INTELIGENTE ATIVO...'
 until:
   EN: until
   PT: até
