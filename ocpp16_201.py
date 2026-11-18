@@ -56,6 +56,7 @@ from websockets import Subprotocol, ConnectionClosedOK, ConnectionClosedError
 from client_v16 import OCPPClientV201, OCPPServerV16Interface
 from ocpp_models.v16.authorize import AuthorizeRequest
 from ocpp_models.v16.boot_notification import BootNotificationRequest
+from ocpp_models.v16.data_transfer import DataTransferRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest
 from ocpp_models.v16.security_event_notification import SecurityEventNotification
 from ocpp_models.v16.start_transaction import StartTransactionRequest
@@ -482,6 +483,18 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             await self.upstream_interface.meter_values_request(request, tx_id=txid)
         return call_result.MeterValues(
         )
+
+    @on(Action.data_transfer)
+    @log_req_response
+    @async_camelize_kwargs
+    @with_request_model(DataTransferRequest)
+    async def on_authorize(self, request: DataTransferRequest, **data):
+        if self.upstream_interface is not None:
+            result : call_result.DataTransfer = await self.upstream_interface.data_transfer_request(request)
+            if isinstance(result, call_result.DataTransfer):
+                if result.status == result.status.accepted:
+                    return call_result.DataTransfer(status=ocpp.v16.enums.DataTransferStatus.accepted)
+        return call_result.DataTransfer(status=ocpp.v16.enums.DataTransferStatus.rejected)
 
     @on(Action.authorize)
     @log_req_response

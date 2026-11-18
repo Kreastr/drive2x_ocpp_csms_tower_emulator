@@ -84,6 +84,7 @@ from components.charging_profile_component import LimitDescriptor, ChargingProfi
 
 from ocpp_models.v16.authorize import AuthorizeRequest
 from ocpp_models.v16.boot_notification import BootNotificationRequest
+from ocpp_models.v16.data_transfer import DataTransferRequest
 from ocpp_models.v16.meter_values import MeterValuesRequest, MeterValue, SampledValue
 from ocpp_models.v16.start_transaction import StartTransactionRequest
 from ocpp_models.v16.status_notification import StatusNotificationRequest
@@ -394,3 +395,8 @@ class OCPPClientV201(ChargePoint):
 
     async def on_authorize_request(self, request : AuthorizeRequest) -> call_result.Authorize:
         return await self.call_upstream_payload(call.Authorize(id_token=IdTokenType(id_token=request.idTag, type=IdTokenEnumType.iso14443)))
+
+    async def data_transfer_request(self, request : DataTransferRequest) -> call_result.DataTransfer:
+        return await self.call_upstream_payload(call.DataTransfer(vendor_id=request.vendorId,
+                                                                  message_id=request.messageId,
+                                                                  data=request.data))

@@ -242,13 +242,21 @@ async def setpoint(cp_id : ChargePointId, value : int):
 
 EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "D2X_DEMO_": "d2x_ga3_demo",
-           "PORTO_APT_": "porto_apt",
-           "LatinkiHQ": "d2x_ga3_demo",
+           "PORTO_APT_": "porto_apt",   
            "1132523008": "porto_apt", # Lab
            "1132523024": "porto_apt", # Lab
            "1132523017": "icl_lab",
            "1132523027": "lut_internal",
-           "HASS_": "dr_ocpp"
+           "HASS_": "dr_ocpp",
+            "1132523009": "UNK_62_12",
+            "1132523010": "UNK_62_12",
+            "1132523011": "UNK_62_12",
+            "1132523013": "UNK_62_12",
+            "1132523016": "UNK_62_12",
+            "1132523018": "UNK_62_12",
+            "1132523019": "UNK_62_12",
+            "1132523023": "UNK_62_12",
+            "1132523025": "UNK_62_12",
            }
 
 @app.post("/sca_data/setpoints")
@@ -321,9 +329,6 @@ def check_control(cp_id : ChargePointId, site_tag : str):
             if str(cp_id).startswith(prefix):
                 control_allowed = True
                 break
-    # If nothing else controls this charger than default to demo group.
-    if control_allowed == False and site_tag == "d2x_ga3_demo":
-        return True
     return control_allowed
 
 SITE_TIMEZONES = {"d2x_ga3_demo": timezone("Europe/Helsinki")}
@@ -405,8 +410,6 @@ async def d2x_ui_evse(cp_id : ChargePointId):
 
 @ui.page("/d2x_ui/{cp_id}/{language}")
 async def d2x_ui_landing(language : Literal["EN", "PT"], cp_id : ChargePointId):
-    #if str(cp_id) == "1132523027":
-    #    cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'DriVe2x UI - {cp_id}')
@@ -531,8 +534,6 @@ async def d2x_ui_evse(cp_id : ChargePointId, evse_id : EVSEId):
 
 @ui.page("/d2x_ui/{cp_id}/{evse_id}/{language}")
 async def d2x_ui_evse(language: Literal["EN", "PT"], cp_id : ChargePointId, evse_id : EVSEId):
-    #if str(cp_id) == "1132523027":
-    #    cp_id = ChargePointId("D2X_DEMO_92B995DE70A6AFD6")
     figma_renderer.render_header()
     background_tasks.create_lazy(main(),name="main")
     ui.page_title(f'DriVe2x UI - {cp_id}/{evse_id}')
