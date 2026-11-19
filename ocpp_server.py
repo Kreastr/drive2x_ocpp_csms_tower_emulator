@@ -30,6 +30,7 @@ import logging
 import traceback
 from typing import Optional, Literal
 
+import ocpp
 import pytz
 import websockets
 from ocpp.v201 import call
@@ -83,6 +84,7 @@ from server.ui.ui_manager import UIManagerFSMType, UIManagerContext, ui_manager_
 from server.callable_interface import CallableInterface
 
 from pytz import timezone
+from ocpp.exceptions import NotImplementedError as OCPPNotImplementedError
 
 configure_json_logging()
 
@@ -262,7 +264,7 @@ async def setpoint(cp_id : ChargePointId):
                 ),
                 suppress=False,
             )
-        except NotImplementedError:
+        except OCPPNotImplementedError:
             return {"status": "not implemented by CP"}
 
         if result.status != "Accepted":
