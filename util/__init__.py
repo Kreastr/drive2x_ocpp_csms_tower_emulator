@@ -306,10 +306,10 @@ def get_virtual_cp_args():
 
 @dataclasses.dataclass(frozen=True)
 class LogRecord:
-    type: Literal["in", "out"]
+    direction: Literal["in", "out"]
     data: str
     size: int
-    ts : int 
+    ts : int
     datetime : str
 
 OCPP_LOGS : deque[LogRecord] = deque()
