@@ -25,6 +25,7 @@ Union nor the granting authority can be held responsible for them.
 
 import asyncio
 import datetime
+import json
 import logging
 import traceback
 from typing import Optional, Literal
@@ -240,9 +241,46 @@ async def read_report(cp_id : ChargePointId):
 async def setpoint(cp_id : ChargePointId, value : int):
     return {"status": "retired"}
 
+@app.get("/cp/{cp_id}/proxy_logs")
+async def setpoint(cp_id : ChargePointId):
+    MAX_REQUESTS = 50
+
+    cp = charge_points.get(cp_id)
+    if cp is None:
+        return {"status": "not found"}
+
+    after = 1
+    logs = []
+
+    for i in range(MAX_REQUESTS):
+        try:
+            result = await cp.call_downstream_payload(
+                call.DataTransfer(
+                    vendor_id="LUT University",
+                    message_id="GetProxyLogs",
+                    data=str(after),
+                ),
+                suppress=False,
+            )
+        except NotImplementedError:
+            return {"status": "not implemented by CP"}
+
+        if result.status != "Accepted":
+            return {"status": "rejected by proxy"}
+
+        if isinstance(result.data, str):
+            new_data = json.loads(result.data)
+
+            if len(new_data.logs) == 0:
+                break
+            logs.extend(new_data.logs)
+            after = new_data.up_to + 1
+
+    return {"status": "ok", "logs": logs, "up_to": after - 1}
+
 EV_TAGS = {"IOW_LHH_": "iow_luccombe_hall_hotel",
            "D2X_DEMO_": "d2x_ga3_demo",
-           "PORTO_APT_": "porto_apt",   
+           "PORTO_APT_": "porto_apt",
            "1132523008": "porto_apt", # Lab
            "1132523024": "porto_apt", # Lab
            "1132523017": "icl_lab",
