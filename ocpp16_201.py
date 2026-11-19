@@ -39,7 +39,7 @@ from beartype import beartype
 from ocpp.exceptions import TypeConstraintViolationError, GenericError
 from ocpp.messages import CallError
 from ocpp.routing import on
-from ocpp.v16.datatypes import IdTagInfo
+from ocpp.v16.datatypes import IdTagInfo, ChargingProfile, ChargingSchedule, ChargingSchedulePeriod
 from ocpp.v16.enums import RegistrationStatus, Action, AuthorizationStatus, RemoteStartStopStatus, ResetType
 from ocpp.v16 import ChargePoint, call_result, call
 from ocpp.v16 import enums as v16enums
@@ -90,6 +90,8 @@ from typing import Any, Optional
 import websockets
 import traceback
 
+from ocpp.v16.enums import ChargingProfilePurposeType, ChargingProfileKindType, ChargingRateUnitType
+from datetime import datetime as dt, UTC
 configure_json_logging()
 
 logger = getLogger(__name__)
@@ -264,6 +266,17 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
             try:
                 result: call_result.ChangeConfiguration = await self.call_downstream_payload(
                     call.ChangeConfiguration(key="pBaseline", value=str(next_setpoint)))
+                if get_proxy_app_args().experimental_set_charging_profile_v16:
+                    await self.call_downstream_payload(call.SetChargingProfile(connector_id=1,
+                       cs_charging_profiles=ChargingProfile(charging_profile_id=2026,
+                                                            stack_level=0,
+                                                            charging_profile_purpose=ChargingProfilePurposeType.tx_default_profile,
+                                                            charging_profile_kind=ChargingProfileKindType.absolute,
+                                                            charging_schedule=ChargingSchedule(charging_rate_unit=ChargingRateUnitType.watts,
+                                                                                               charging_schedule_period=[ChargingSchedulePeriod(start_period=0,
+                                                                                                                                                limit=max(0, next_setpoint),
+                                                                                                                                                )],
+                                                                                               start_schedule=dt(2026,1,1, tzinfo=UTC).isoformat()))))
             except Exception:
                 self.logger.error("ToDo. Cleanup periodic_setpoint_update for dead connections")
                 pass
@@ -488,7 +501,7 @@ class OCPPServer16Proxy(ChargePoint, CPInterface, OCPPServerV16Interface):
     @log_req_response
     @async_camelize_kwargs
     @with_request_model(DataTransferRequest)
-    async def on_authorize(self, request: DataTransferRequest, **data):
+    async def on_data_transfer(self, request: DataTransferRequest, **data):
         if self.upstream_interface is not None:
             result : call_result.DataTransfer = await self.upstream_interface.data_transfer_request(request)
             if isinstance(result, call_result.DataTransfer):
