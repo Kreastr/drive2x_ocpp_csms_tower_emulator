@@ -36,12 +36,14 @@ from ocpp.v201 import ChargePoint, call_result, call
 from ocpp.v201.datatypes import GetVariableDataType, ComponentType, VariableType, GetVariableResultType, \
     IdTokenInfoType, ChargingProfileType
 from ocpp.v201.enums import GetVariableStatusEnumType, Action, RegistrationStatusEnumType, AuthorizationStatusEnumType, \
-    ReportBaseEnumType, ResetEnumType, ResetStatusEnumType, ChargingProfileStatusEnumType
+    ReportBaseEnumType, ResetEnumType, ResetStatusEnumType, ChargingProfileStatusEnumType, DataTransferStatusEnumType
+from pydantic import ValidationError
 from redis_dict import RedisDict
 from typing_extensions import deprecated
 from websockets import ConnectionClosedOK
 
 from charge_point_fsm_enums import ChargePointFSMState, ChargePointFSMEvent
+from ocpp_models.vendor.ambibox import NotifyEVChargingNeeds, ControlMode
 from server.transaction_manager.tx_fsm import TxFSMServer
 
 from util.db import get_default_redis
@@ -60,6 +62,8 @@ from typing import Any, Optional
 from server.callable_interface import CallableInterface
 
 import traceback
+
+from drive2x_sca_interfaces import AbsolutePowerRange
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -90,11 +94,12 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
+        self.ev_charging_needs : dict[int, NotifyEVChargingNeeds] = dict()
         self.events = []
         self.onl_task = asyncio.create_task(self.online_status_task())
         self.fsm = get_charge_point_fsm(ChargePointContext())
         self.fsm.fsm_name = f"CP <{self.id}>"
-        self.fsm.context : ChargePointContext
+        self.fsm.context : Optional[ChargePointContext] = None
 
         self.fw_version = "Unknown FW version"
 
@@ -470,6 +475,32 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         finally:   
             return call_result.NotifyReport()
 
+    @on(Action.data_transfer)
+    async def on_data_transfer(self, **request_data):
+        self.log_event(("on_data_transfer", request_data))
+        logger.warning(f"id={self.fsm.context.id} on_data_transfer {request_data=}")
+        if "vendor_id" not in request_data:
+            return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+        if "message_id" not in request_data:
+            return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+        if request_data["vendor_id"] != "Ambibox":
+            return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+        if request_data["message_id"] != "NotifyEVChargingNeeds":
+            return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+        if "data" not in request_data:
+            return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+        try:
+            request = NotifyEVChargingNeeds.model_validate(request_data["data"])
+        except ValidationError as err:
+            logger.error(f"id={self.fsm.context.id} on_data_transfer validation failed {err=}")
+            return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+        self.ev_charging_needs[request.evse_id] = request
+
+
+
+
+
+
     def log_event(self, event_data):
         self.events.append(event_data)
 
@@ -546,6 +577,26 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
 
     def get_charge_point_id(self) -> str:
         return self.id
+
+    def get_ev_charging_details(self, evse_id : EVSEId):
+        usable_capacity = 70
+        power_limit_charge : Optional[AbsolutePowerRange] = None
+        power_limit_discharge : Optional[AbsolutePowerRange] = None
+        if evse_id in self.ev_charging_needs:
+            data : NotifyEVChargingNeeds = self.ev_charging_needs[evse_id]
+            if data.control_mode == ControlMode.Scheduled:
+                power_limit_discharge = AbsolutePowerRange(minimal=0, maximal=0)
+            elif data.control_mode == ControlMode.Dynamic:
+                evparams = data.charging_needs.v2x_charging_parameters
+                power_limit_discharge = AbsolutePowerRange(minimal=abs(evparams.min_discharge_power or 0.0),
+                                                           maximal=abs(evparams.max_discharge_power or 0.0))
+                power_limit_charge = AbsolutePowerRange(minimal=abs(evparams.min_charge_power or 0.0),
+                                                        maximal=abs(evparams.max_charge_power or 0.0))
+                full_capacity = abs(evparams.ev_max_energy_request) + abs(evparams.ev_min_energy_request)
+                current_soc = (abs(evparams.ev_min_energy_request) * 100.0) / full_capacity
+                usable_capacity = abs(evparams.ev_max_v2x_energy_request) + abs(evparams.ev_min_v2x_energy_request)
+                v2x_soc = (abs(evparams.ev_min_v2x_energy_request) * 100.0) / usable_capacity
+        return usable_capacity, power_limit_charge, power_limit_discharge
 
 charge_points : dict[ChargePointId, OCPPServerHandler] = dict()
 ui_pages : dict[ChargePointId, UIManagerFSMType] = dict()

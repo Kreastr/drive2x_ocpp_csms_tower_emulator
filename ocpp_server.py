@@ -431,9 +431,12 @@ async def sca_data_evs(tag : str) -> SCADataEVs:
                     dept = sinfo.departure_time.astimezone(datetime.UTC)
                     #car : CarDetails = CAR_DB[sinfo.car_make][sinfo.car_model]
                     evid = ConnectedEVId.model_validate({"charge_point_id": cp_id, "evse_id": evse_id})
+                    usable_capacity, power_limit_charge, power_limit_discharge = cp.get_ev_charging_details(evse_id)
                     response.values[evid] = SCADatum.model_validate({"soc": pred_soc,
                                                                      "tdep": get_slot_start(dept),
-                                                                     "usable_battery_capacity_kwh": 70})
+                                                                     "usable_battery_capacity_kwh": usable_capacity,
+                                                                     "charge_power_w": power_limit_charge,
+                                                                     "discharge_power_w": power_limit_discharge})
     return response
 
 
