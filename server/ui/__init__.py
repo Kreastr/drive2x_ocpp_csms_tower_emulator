@@ -82,7 +82,7 @@ class CPCard(Element):
                 ui.label("Status")
                 ui.label().bind_text(self.fsm, "current_state")
 
-                ui.button("Read Proxy Logs", on_click=lambda: ui.navigate.to(f"/cp/{self.cp_context.id}/proxy_logs", new_tab=True))
+                ui.button("Read Proxy Logs", on_click=lambda: ui.navigate.to(f"/d2x_admin/cp/{self.cp_context.id}/proxy_logs", new_tab=True))
             ui.button("REBOOT", icon="refresh", on_click=cp.try_reboot_peer).classes("w-40")
             ui.separator()
             self.connector_container = ui.column()
