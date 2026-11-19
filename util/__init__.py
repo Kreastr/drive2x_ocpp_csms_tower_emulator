@@ -48,6 +48,7 @@ from nicegui import ElementFilter, ui
 import logging
 import sys
 import ecs_logging
+from datetime import datetime as dt, UTC
 
 
 from pydantic import BaseModel
@@ -309,9 +310,10 @@ class LogRecord:
     data: str
     size: int
     ts : int 
+    datetime : str
 
 OCPP_LOGS : deque[LogRecord] = deque()
-LOG_MAX_SIZE = 4096
+LOG_MAX_SIZE = 8*1024*1024
 LOG_MAX_SINGLE_SIZE = 256*1024
 log_size : int = 0
 LOG_OVH = 256
@@ -320,13 +322,13 @@ def log_req_response(f):
     _logger = getLogger("OCPP_PROTO")
     async def wrapped_call(self, *vargs, **kwargs):
         #logger.error(f"Called log_req_response on {f.__name__}")
-        logline = f"\n==> func={f.__name__} {vargs=} {kwargs=}"
+        logline = f"func={f.__name__} {vargs=} {kwargs=}"
         save_log("in", logline)
-        _logger.info(logline)
+        _logger.info("\n ==> "+logline)
         result = await f(self, *vargs, **kwargs)
-        logline = f"\n<== func={f.__name__} {result=}"
+        logline = f"func={f.__name__} {result=}"
         save_log("out", logline)
-        _logger.info(logline)
+        _logger.info("\n<== "+logline)
         return result
 
     def save_log(direction, logline):
@@ -339,7 +341,7 @@ def log_req_response(f):
             log_size -= removed.size
 
         log_size += new_size
-        OCPP_LOGS.append(LogRecord(direction, logline, new_size, time.monotonic_ns()))
+        OCPP_LOGS.append(LogRecord(direction, logline, new_size, time.monotonic_ns(), dt.now(tz=UTC).isoformat()))
 
     wrapped_call.__name__ = f.__name__
     wrapped_call.__doc__ = f.__doc__

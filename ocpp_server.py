@@ -273,10 +273,13 @@ async def setpoint(cp_id : ChargePointId):
         if isinstance(result.data, str):
             new_data = json.loads(result.data)
 
-            if len(new_data.logs) == 0:
-                break
-            logs.extend(new_data.logs)
-            after = new_data.up_to + 1
+        else:
+            new_data = result.data
+
+        if len(new_data["logs"]) == 0:
+            break
+        logs.extend(new_data["logs"])
+        after = int(new_data["up_to"]) + 1
 
     return {"status": "ok", "logs": logs, "up_to": after - 1}
 

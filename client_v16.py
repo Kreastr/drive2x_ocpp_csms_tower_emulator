@@ -381,10 +381,10 @@ class OCPPClientV201(ChargePoint):
                 last_added = logs_after - 1
                 for line in OCPP_LOGS:
                     if line.ts >= logs_after:
-                        rec_len = len(json.dumps(line.data).encode("utf-8")) + 2
+                        rec_len = len(json.dumps(line.data+line.datetime).encode("utf-8")) + 2
                         if rec_len + accumulated_size < LOG_MAX_SINGLE_SIZE:
                             accumulated_size += rec_len
-                            logs.append(line.data)
+                            logs.append((line.datetime, line.direction, line.data))
                             last_added = line.ts
                         else:
                             break
