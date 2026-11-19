@@ -3,7 +3,7 @@ services:
     image: ocpp:latest
     restart: unless-stopped
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=csms_redis
       - REDIS_PORT=6379
     volumes:
       - /opt/d2x_mail_log:/data/input:ro
@@ -37,7 +37,7 @@ services:
       restart: always
       command: redis-server --save 20 1 --loglevel warning
       volumes:
-        - redisdb:/data
+        - csms_redisdb:/data
       networks:
         - ocpp_net
       logging:
@@ -141,7 +141,7 @@ services:
 volumes:
   elasticsearch-data:
   elastic-agent-data:
-  redisdb:
+  csms_redisdb:
     driver: local
 networks:
   ocpp_net:
