@@ -29,5 +29,5 @@ from ocpp_models.v16.base_types import CiString50Type, CiString255Type
 
 class DataTransferRequest(BaseModel):
     vendorId : CiString255Type
-    messageId : Optional[CiString50Type]
-    data : Optional[str]
+    messageId : Optional[CiString50Type] = None
+    data : Optional[str] = None

@@ -66,6 +66,7 @@ Union nor the granting authority can be held responsible for them.
 
 """
 import datetime
+import json
 import logging
 from abc import ABC, abstractmethod
 from logging import getLogger
@@ -77,7 +78,7 @@ from ocpp.v16.enums import ChargePointStatus, Reason, Measurand, UnitOfMeasure
 from ocpp.v201.datatypes import ChargingStationType, EVSEType, TransactionType, MeterValueType, SampledValueType, \
     IdTokenType, UnitOfMeasureType
 from ocpp.v201.enums import BootReasonEnumType, ConnectorStatusEnumType, TransactionEventEnumType, \
-    TriggerReasonEnumType, IdTokenEnumType
+    TriggerReasonEnumType, IdTokenEnumType, DataTransferStatusEnumType
 from ocpp.v201.enums import Action
 
 from components.charging_profile_component import LimitDescriptor, ChargingProfileComponent
@@ -98,7 +99,7 @@ from ocpp_models.v201.reset import ResetRequest
 from ocpp_models.v201.set_charging_profile import SetChargingProfileRequest
 from ocpp_models.v201.set_variables import SetVariablesRequest
 from proxy.proxy_connection_fsm import ProxyConnectionFSM
-from util import log_req_response, with_request_model, async_camelize_kwargs
+from util import log_req_response, with_request_model, async_camelize_kwargs, OCPP_LOGS, LOG_MAX_SINGLE_SIZE
 
 logger = getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -363,6 +364,33 @@ class OCPPClientV201(ChargePoint):
     @with_request_model(SetVariablesRequest)
     async def on_set_variables(self, request : SetVariablesRequest, *vargs, **kwargs):
         return await self.client_interface.on_server_set_variables(request)
+
+    @on(Action.data_transfer)
+    @async_camelize_kwargs
+    @with_request_model(DataTransferRequest)
+    async def on_data_transfer(self, request : DataTransferRequest, *vargs, **kwargs):
+        if request.vendorId == "LUT University":
+            if request.messageId == "GetProxyLogs":
+                logs_after = 1
+                try:
+                    logs_after = int(request.data)
+                except (TypeError, ValueError):
+                    pass
+                logs = []
+                accumulated_size = 0
+                last_added = logs_after - 1
+                for line in OCPP_LOGS:
+                    if line.ts >= logs_after:
+                        rec_len = len(json.dumps(line.data).encode("utf-8")) + 2
+                        if rec_len + accumulated_size < LOG_MAX_SINGLE_SIZE:
+                            accumulated_size += rec_len
+                            logs.append(line.data)
+                            last_added = line.ts
+                        else:
+                            break
+                return call_result.DataTransfer(status=DataTransferStatusEnumType.accepted, data={"logs": logs, "up_to": last_added})
+        return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected, data="Unknown message")
+
 
     @log_req_response
     async def call_upstream_payload(

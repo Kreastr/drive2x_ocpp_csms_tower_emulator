@@ -24,12 +24,15 @@ Union nor the granting authority can be held responsible for them.
 
 
 import base64
+import dataclasses
 import inspect
 import io
+import time
+from collections import deque
 from datetime import timedelta
 from argparse import ArgumentParser
 import datetime
-from typing import TypeVar, Type
+from typing import TypeVar, Type, Literal
 
 from beartype.typing import Generic
 from functools import wraps
@@ -300,14 +303,43 @@ def get_virtual_cp_args():
 
     return argparse.parse_args()
 
+@dataclasses.dataclass(frozen=True)
+class LogRecord:
+    type: Literal["in", "out"]
+    data: str
+    size: int
+    ts : int 
+
+OCPP_LOGS : deque[LogRecord] = deque()
+LOG_MAX_SIZE = 4096
+LOG_MAX_SINGLE_SIZE = 256*1024
+log_size : int = 0
+LOG_OVH = 256
+
 def log_req_response(f):
     _logger = getLogger("OCPP_PROTO")
     async def wrapped_call(self, *vargs, **kwargs):
         #logger.error(f"Called log_req_response on {f.__name__}")
-        _logger.info(f"\n==> {vargs=} {kwargs=}")
+        logline = f"\n==> func={f.__name__} {vargs=} {kwargs=}"
+        save_log("in", logline)
+        _logger.info(logline)
         result = await f(self, *vargs, **kwargs)
-        _logger.info(f"\n<== {result=}")
+        logline = f"\n<== func={f.__name__} {result=}"
+        save_log("out", logline)
+        _logger.info(logline)
         return result
+
+    def save_log(direction, logline):
+        global log_size
+        new_size = sys.getsizeof(logline) + LOG_OVH
+        if new_size >= LOG_MAX_SIZE or new_size > LOG_MAX_SINGLE_SIZE:
+            return
+        while new_size + log_size > LOG_MAX_SIZE:
+            removed = OCPP_LOGS.popleft()
+            log_size -= removed.size
+
+        log_size += new_size
+        OCPP_LOGS.append(LogRecord(direction, logline, new_size, time.monotonic_ns()))
 
     wrapped_call.__name__ = f.__name__
     wrapped_call.__doc__ = f.__doc__
