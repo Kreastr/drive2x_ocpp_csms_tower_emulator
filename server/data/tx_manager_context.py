@@ -43,3 +43,4 @@ class TxManagerContext(BaseModel):
     tx_id : TransactionId | None = None
     cp_interface : CallableInterface | None = None
     session_info : BookingDetails | None = None
+    remote_ip : Any | None = None

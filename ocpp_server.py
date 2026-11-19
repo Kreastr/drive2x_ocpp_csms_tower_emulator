@@ -42,6 +42,7 @@ from nicegui import ui, app, background_tasks
 from ocpp.v201.enums import ChargingProfilePurposeEnumType, ChargingProfileKindEnumType, ChargingRateUnitEnumType
 
 from server.data import BookingDetails
+from server.data.tx_manager_context import TxManagerContext
 from server.transaction_manager.tx_manager_fsm_type import TxManagerFSMType
 from server.ui.figma_renderer import FigmaRenderer
 from server.ui.localization import localize
@@ -124,6 +125,8 @@ async def get_remote_ip(cp, websocket):
         real_ip = websocket.request.headers["X-Real-IP"]
     else:
         real_ip = websocket.remote_address[0]
+    if cp.fsm.context is None:
+        cp.fsm.context = TxManagerContext()
     cp.fsm.context.remote_ip = real_ip
 
 

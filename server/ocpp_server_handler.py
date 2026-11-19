@@ -99,7 +99,8 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.onl_task = asyncio.create_task(self.online_status_task())
         self.fsm = get_charge_point_fsm(ChargePointContext())
         self.fsm.fsm_name = f"CP <{self.id}>"
-        self.fsm.context : Optional[ChargePointContext] = None
+        # True by construction. Assigned in super
+        self.fsm.context : ChargePointContext
 
         self.fw_version = "Unknown FW version"
 
