@@ -506,6 +506,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
             logger.error(f"id={self.fsm.context.id} on_data_transfer validation failed {err=}")
             return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
         self.ev_charging_needs[request.evse_id] = request
+        return call_result.DataTransfer(status=DataTransferStatusEnumType.accepted)
 
 
 
@@ -607,7 +608,7 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                     full_capacity = abs(evparams.ev_max_energy_request) + abs(evparams.ev_min_energy_request)
                     current_soc = (abs(evparams.ev_min_energy_request) * 100.0) / full_capacity
                 if evparams.ev_min_v2x_energy_request is not None and evparams.ev_max_v2x_energy_request is not None:
-                        
+
                     usable_capacity = abs(evparams.ev_max_v2x_energy_request) + abs(evparams.ev_min_v2x_energy_request)
                     v2x_soc = (abs(evparams.ev_min_v2x_energy_request) * 100.0) / usable_capacity
         return usable_capacity, power_limit_charge, power_limit_discharge
