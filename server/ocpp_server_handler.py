@@ -595,9 +595,9 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         power_limit_discharge : Optional[AbsolutePowerRange] = None
         if evse_id in self.ev_charging_needs:
             data : NotifyEVChargingNeeds = self.ev_charging_needs[evse_id]
-            if data.control_mode == ControlMode.Scheduled:
+            if data.charging_needs.control_mode == ControlMode.Scheduled:
                 power_limit_discharge = AbsolutePowerRange(minimal=0, maximal=0)
-            elif data.control_mode == ControlMode.Dynamic:
+            elif data.charging_needs.control_mode == ControlMode.Dynamic:
                 evparams = data.charging_needs.v2x_charging_parameters
                 power_limit_discharge = AbsolutePowerRange(minimal=abs(evparams.min_discharge_power or 0.0),
                                                            maximal=abs(evparams.max_discharge_power or 0.0))
