@@ -508,11 +508,6 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         self.ev_charging_needs[request.evse_id] = request
         return call_result.DataTransfer(status=DataTransferStatusEnumType.accepted)
 
-
-
-
-
-
     def log_event(self, event_data):
         self.events.append(event_data)
 
@@ -607,10 +602,16 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                 if evparams.ev_min_energy_request is not None and evparams.ev_max_energy_request is not None:
                     full_capacity = abs(evparams.ev_max_energy_request) + abs(evparams.ev_min_energy_request)
                     current_soc = (abs(evparams.ev_min_energy_request) * 100.0) / full_capacity
+                else:
+                    # Forced bi-di mode detected. Car is not discharge compatible  
+                    power_limit_discharge = AbsolutePowerRange(minimal=0.0, maximal=0.0)
                 if evparams.ev_min_v2x_energy_request is not None and evparams.ev_max_v2x_energy_request is not None:
 
                     usable_capacity = abs(evparams.ev_max_v2x_energy_request) + abs(evparams.ev_min_v2x_energy_request)
                     v2x_soc = (abs(evparams.ev_min_v2x_energy_request) * 100.0) / usable_capacity
+                else:
+                    # Forced bi-di mode detected. Car is not discharge compatible  
+                    power_limit_discharge = AbsolutePowerRange(minimal=0.0, maximal=0.0)
         return usable_capacity, power_limit_charge, power_limit_discharge
 
 charge_points : dict[ChargePointId, OCPPServerHandler] = dict()
