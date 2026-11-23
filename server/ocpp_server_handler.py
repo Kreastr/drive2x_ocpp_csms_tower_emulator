@@ -491,7 +491,17 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
         if "data" not in request_data:
             return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
         try:
-            request = NotifyEVChargingNeeds.model_validate(request_data["data"])
+            data = request_data["data"]
+            if type(data) is str:
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError:
+                    logger.exception(f"id={self.fsm.context.id} on_data_transfer str->JSON coercion failed")
+                    return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+            if type(data) is not dict:
+                logger.error(f"id={self.fsm.context.id} on_data_transfer validation failed {type(data)=} after dict coercion")
+                return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
+            request = NotifyEVChargingNeeds.model_validate(data)
         except ValidationError as err:
             logger.error(f"id={self.fsm.context.id} on_data_transfer validation failed {err=}")
             return call_result.DataTransfer(status=DataTransferStatusEnumType.rejected)
