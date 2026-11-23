@@ -603,10 +603,13 @@ class OCPPServerHandler(CallableInterface, ChargePoint):
                                                            maximal=abs(evparams.max_discharge_power or 0.0))
                 power_limit_charge = AbsolutePowerRange(minimal=abs(evparams.min_charge_power or 0.0),
                                                         maximal=abs(evparams.max_charge_power or 0.0))
-                full_capacity = abs(evparams.ev_max_energy_request) + abs(evparams.ev_min_energy_request)
-                current_soc = (abs(evparams.ev_min_energy_request) * 100.0) / full_capacity
-                usable_capacity = abs(evparams.ev_max_v2x_energy_request) + abs(evparams.ev_min_v2x_energy_request)
-                v2x_soc = (abs(evparams.ev_min_v2x_energy_request) * 100.0) / usable_capacity
+                if evparams.ev_min_energy_request is not None and evparams.ev_max_energy_request is not None:
+                    full_capacity = abs(evparams.ev_max_energy_request) + abs(evparams.ev_min_energy_request)
+                    current_soc = (abs(evparams.ev_min_energy_request) * 100.0) / full_capacity
+                if evparams.ev_min_v2x_energy_request is not None and evparams.ev_max_v2x_energy_request is not None:
+                        
+                    usable_capacity = abs(evparams.ev_max_v2x_energy_request) + abs(evparams.ev_min_v2x_energy_request)
+                    v2x_soc = (abs(evparams.ev_min_v2x_energy_request) * 100.0) / usable_capacity
         return usable_capacity, power_limit_charge, power_limit_discharge
 
 charge_points : dict[ChargePointId, OCPPServerHandler] = dict()
