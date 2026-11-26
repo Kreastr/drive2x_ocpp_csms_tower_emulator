@@ -64,7 +64,10 @@ class LimitDescriptor:
     maximal_absolute : float
 
 def sign(x):
-    return x/abs(x)
+    if x != 0:
+        return x/abs(x)
+    else:
+        return 1
 
 class ChargingProfileComponent:
 
@@ -205,7 +208,7 @@ class ChargingProfileComponent:
         if abs(limit) < self.evse_hard_limits[evse_id].minimal_absolute:
             cycle_second = moment.second
             cycle_switch_off_time = abs(int(limit * 60 / self.evse_hard_limits[evse_id].minimal_absolute))
-            if self.forbid_idle and limit == 0.0:
+            if not self.forbid_idle and limit == 0.0:
                 pass
             elif cycle_second < 15:
                 limit = sign(limit) * self.evse_hard_limits[evse_id].minimal_absolute
